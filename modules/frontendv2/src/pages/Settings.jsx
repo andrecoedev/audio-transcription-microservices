@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings as SettingsIcon, Save, RefreshCw, Key, Eye, EyeOff } from 'lucide-react'
+import { Settings as SettingsIcon, Save, RefreshCw, Key, Eye, EyeOff, Cpu, Zap, AlertTriangle, CheckCircle, XCircle, Activity } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import Button from '../components/Button'
 import ApiKeyGuide from '../components/ApiKeyGuide'
@@ -26,6 +26,8 @@ export default function Settings() {
   })
   const [loading, setLoading] = useState(false)
   const [savingKeys, setSavingKeys] = useState(false)
+  const [gpuDiag, setGpuDiag] = useState(null)
+  const [loadingGpu, setLoadingGpu] = useState(false)
 
   useEffect(() => {
     checkSystemHealth()
@@ -48,6 +50,26 @@ export default function Settings() {
     } catch (error) {
       toast.error('Erro ao verificar saúde do sistema')
       console.error(error)
+    }
+  }
+
+  const checkGpuDiagnostics = async () => {
+    try {
+      setLoadingGpu(true)
+      const data = await audioService.getSystemGpu()
+      setGpuDiag(data)
+      if (data.gpu_being_used) {
+        toast.success('✅ GPU detectada e em uso!')
+      } else if (data.gpu?.cuda_available) {
+        toast('⚠️ GPU detectada mas não está sendo usada pelos engines.', { icon: '⚠️' })
+      } else {
+        toast.error('❌ GPU (CUDA) não disponível. Usando CPU.')
+      }
+    } catch (error) {
+      toast.error('Erro ao verificar GPU: ' + (error.message || 'backend indisponível'))
+      console.error(error)
+    } finally {
+      setLoadingGpu(false)
     }
   }
 
@@ -367,6 +389,179 @@ export default function Settings() {
           >
             {savingKeys ? 'Salvando e Recarregando...' : 'Salvar e Ativar Modelos'}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Diagnóstico de GPU e Hardware */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>🖥️ Diagnóstico de Hardware</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={checkGpuDiagnostics}
+              loading={loadingGpu}
+              icon={Cpu}
+            >
+              {loadingGpu ? 'Verificando...' : 'Verificar GPU'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!gpuDiag ? (
+            <div className="text-center py-8 text-gray-400">
+              <Cpu className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Clique em <strong>Verificar GPU</strong> para ver o diagnóstico de hardware</p>
+            </div>
+          ) : (
+            <>
+              {/* Status geral */}
+              <div className={`flex items-center gap-3 p-4 rounded-xl border-2 ${
+                gpuDiag.gpu_being_used
+                  ? 'bg-green-50 border-green-200'
+                  : gpuDiag.gpu?.cuda_available
+                  ? 'bg-yellow-50 border-yellow-200'
+                  : 'bg-red-50 border-red-200'
+              }`}>
+                {gpuDiag.gpu_being_used ? (
+                  <CheckCircle className="w-8 h-8 text-green-500 shrink-0" />
+                ) : gpuDiag.gpu?.cuda_available ? (
+                  <AlertTriangle className="w-8 h-8 text-yellow-500 shrink-0" />
+                ) : (
+                  <XCircle className="w-8 h-8 text-red-500 shrink-0" />
+                )}
+                <div>
+                  <p className="font-semibold text-gray-900">
+                    {gpuDiag.gpu_being_used
+                      ? '✅ GPU em uso — ótimo desempenho!'
+                      : gpuDiag.gpu?.cuda_available
+                      ? '⚠️ GPU detectada mas modelos estão em CPU'
+                      : '❌ GPU não disponível — usando CPU (lento + alto consumo de RAM)'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    PyTorch {gpuDiag.gpu?.pytorch_version}
+                    {gpuDiag.gpu?.cuda_version ? ` • CUDA ${gpuDiag.gpu.cuda_version}` : ''}
+                  </p>
+                </div>
+              </div>
+
+              {/* GPU(s) detectadas */}
+              {gpuDiag.gpu?.devices?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">🎮 GPU Detectada</h4>
+                  {gpuDiag.gpu.devices.map(dev => (
+                    <div key={dev.id} className="bg-gray-50 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-gray-900">{dev.name}</span>
+                        <span className="text-xs text-gray-500">Compute {dev.compute_capability}</span>
+                      </div>
+                      {/* Barra de VRAM */}
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-600 mb-1">
+                          <span>VRAM: {dev.allocated_vram_gb.toFixed(1)}GB em uso</span>
+                          <span>Total: {dev.total_vram_gb.toFixed(1)}GB</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              (dev.allocated_vram_gb / dev.total_vram_gb) > 0.85
+                                ? 'bg-red-500'
+                                : (dev.allocated_vram_gb / dev.total_vram_gb) > 0.6
+                                ? 'bg-yellow-500'
+                                : 'bg-green-500'
+                            }`}
+                            style={{ width: `${Math.min(100, (dev.allocated_vram_gb / dev.total_vram_gb) * 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Livre: {dev.free_vram_gb.toFixed(1)}GB • Reservado: {dev.reserved_vram_gb.toFixed(1)}GB
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* RAM do sistema */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">💾 RAM do Sistema</h4>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  <div className="flex justify-between text-xs text-gray-600 mb-1">
+                    <span>Em uso: {gpuDiag.ram?.used_gb?.toFixed(1)}GB</span>
+                    <span>Total: {gpuDiag.ram?.total_gb?.toFixed(1)}GB ({gpuDiag.ram?.percent}%)</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${
+                        gpuDiag.ram?.percent >= 90
+                          ? 'bg-red-500'
+                          : gpuDiag.ram?.percent >= 75
+                          ? 'bg-yellow-500'
+                          : 'bg-green-500'
+                      }`}
+                      style={{ width: `${gpuDiag.ram?.percent || 0}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Disponível: {gpuDiag.ram?.available_gb?.toFixed(1)}GB
+                    {gpuDiag.ram?.status === 'critical' && ' ⚠️ RAM crítica!'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Device de cada engine */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">⚡ Device dos Engines</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(gpuDiag.engines || {}).map(([name, device]) => {
+                    const isGpu = device.toLowerCase().includes('cuda')
+                    const isCloud = device === 'cloud'
+                    const isLoaded = device !== 'not loaded'
+                    return (
+                      <div key={name} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                        <span className="text-xs font-medium text-gray-700 capitalize">{name}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          isGpu ? 'bg-green-100 text-green-700'
+                          : isCloud ? 'bg-blue-100 text-blue-700'
+                          : isLoaded ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {isGpu ? '🎮 ' : isCloud ? '☁️ ' : isLoaded ? '💻 ' : ''}{device}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Problemas encontrados */}
+              {gpuDiag.issues?.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-red-700">🔴 Problemas Detectados</h4>
+                  {gpuDiag.issues.map((issue, i) => (
+                    <div key={i} className="flex gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-red-800">{issue}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Recomendações */}
+              {gpuDiag.recommendations?.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-blue-700">💡 Recomendações</h4>
+                  {gpuDiag.recommendations.map((rec, i) => (
+                    <div key={i} className="flex gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <Zap className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-blue-800">{rec}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 

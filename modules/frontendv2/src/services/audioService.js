@@ -126,4 +126,10 @@ export const audioService = {
     const { data } = await api.get('/meeting-minutes/status')
     return data
   },
+
+  // Diagnóstico completo de GPU e RAM
+  async getSystemGpu() {
+    const { data } = await api.get('/system/gpu')
+    return data
+  },
 }
