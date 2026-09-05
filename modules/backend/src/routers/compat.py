@@ -7,20 +7,33 @@ clientes legados.
 """
 
 import logging
-import os
+from pathlib import Path
 from typing import Optional
 
-import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from .. import engine_registry
 from ..config import settings
 from ..security import TokenData, require_scope_when
 from ..utils.audio import remove_temp_file_with_retry
+from ..utils.uploads import UploadValidationError, save_validated_upload
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+_TEMP_DIRECTORY = Path(__file__).resolve().parents[2] / "temp"
+
+
+async def _save_compat_upload(file: UploadFile):
+    try:
+        return await save_validated_upload(
+            file,
+            destination=_TEMP_DIRECTORY,
+            allowed_extensions=settings.allowed_extensions_list,
+            max_size_bytes=settings.max_upload_size_bytes,
+        )
+    except UploadValidationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post("/diarize")
@@ -53,13 +66,9 @@ async def diarize_endpoint(
     temp_wav_path: Optional[str] = None
 
     try:
-        temp_path = f"temp/diarize_{file.filename}"
-        async with aiofiles.open(temp_path, "wb") as f:
-            content = await file.read()
-            await f.write(content)
-
-        file_ext = file.filename.split(".")[-1].lower()
-        if file_ext != "wav":
+        saved_upload = await _save_compat_upload(file)
+        temp_path = str(saved_upload.path)
+        if saved_upload.extension != "wav":
             temp_wav_path = engine_registry.diarization_engine.convert_to_wav(temp_path)
         else:
             temp_wav_path = temp_path
@@ -70,6 +79,7 @@ async def diarize_endpoint(
         return result
 
     finally:
+        await file.close()
         await remove_temp_file_with_retry(temp_path)
         if temp_wav_path and temp_wav_path != temp_path:
             await remove_temp_file_with_retry(temp_wav_path)
@@ -104,15 +114,13 @@ async def whisper_transcribe_segment_endpoint(
     temp_path: Optional[str] = None
 
     try:
-        temp_path = f"temp/whisper_{start}_{end}_{file.filename}"
-        async with aiofiles.open(temp_path, "wb") as f:
-            content = await file.read()
-            await f.write(content)
-
+        saved_upload = await _save_compat_upload(file)
+        temp_path = str(saved_upload.path)
         text = engine_registry.whisper_engine.transcribe_segment(temp_path, start, end)
         return {"transcription": text}
 
     finally:
+        await file.close()
         await remove_temp_file_with_retry(temp_path)
 
 
@@ -145,13 +153,11 @@ async def assemblyai_transcribe_segment_endpoint(
     temp_path: Optional[str] = None
 
     try:
-        temp_path = f"temp/assemblyai_{start}_{end}_{file.filename}"
-        async with aiofiles.open(temp_path, "wb") as f:
-            content = await file.read()
-            await f.write(content)
-
+        saved_upload = await _save_compat_upload(file)
+        temp_path = str(saved_upload.path)
         text = engine_registry.assemblyai_engine.transcribe_segment(temp_path, start, end)
         return {"transcription": text}
 
     finally:
+        await file.close()
         await remove_temp_file_with_retry(temp_path)

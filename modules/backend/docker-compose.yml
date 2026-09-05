@@ -1,25 +1,43 @@
-version: '3.8'
-
 services:
   app:
     build:
-      context: ..
+      context: ../..
       dockerfile: modules/backend/Dockerfile
     container_name: transcription-app
     ports:
       - "2020:2020"
-      - "8000:8000"
-      - "8001:8001"
-      - "8002:8002"
     env_file:
       - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
     volumes:
-      - ./database:/app/database
-      - ../diarization_service:/app/diarization_service:ro
-      - ../transcription_service:/app/transcription_service:ro
-      - ../frontend:/app/frontend:ro
+      - ./database:/app/modules/backend/database
     depends_on:
       - db
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: modules/backend/Dockerfile
+    command: ["python", "run_worker.py"]
+    working_dir: /app/modules/backend
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./database:/app/modules/backend/database
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
 
   db:
@@ -37,3 +55,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

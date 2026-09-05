@@ -75,9 +75,6 @@ The project has been **fully restructured** for maximum simplicity and performan
 │   │   ├── 📁 services/
 │   │   │   ├── diarization_engine.py  # GPU-optimized Pyannote
 │   │   │   ├── transcription_engine.py # Whisper + AssemblyAI engines
-│   │   │   ├── diarization.py         # Legacy service
-│   │   │   ├── transcription.py       # Legacy service
-│   │   │   └── orchestrator.py        # Service orchestration
 │   │   └── 📁 utils/
 │   │       └── gpu_utils.py           # CUDA/cuDNN optimizations
 │   ├── requirements.txt               # Python dependencies

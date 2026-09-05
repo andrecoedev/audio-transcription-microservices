@@ -45,20 +45,6 @@ class Settings(BaseSettings):
         description="Access token expiration time"
     )
     
-    # Services URLs
-    DIARIZATION_SERVICE_URL: str = Field(
-        default="http://localhost:8001",
-        description="Diarization service URL"
-    )
-    WHISPER_SERVICE_URL: str = Field(
-        default="http://localhost:8000",
-        description="Whisper service URL"
-    )
-    ASSEMBLYAI_SERVICE_URL: str = Field(
-        default="http://localhost:8002",
-        description="AssemblyAI service URL"
-    )
-    
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = Field(
         default=5120,
@@ -135,6 +121,8 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
+        # Tolera chaves antigas em arquivos .env durante a migração P0.
+        extra = "ignore"
 
     @property
     def is_production(self) -> bool:

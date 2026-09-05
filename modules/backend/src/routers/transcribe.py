@@ -14,190 +14,26 @@ import logging
 import time
 import uuid
 from functools import partial
+from pathlib import Path
 from typing import Optional
 
-import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from .. import engine_registry
-from ..authorization import create_transcription_owner, enforce_transcription_access
+from ..authorization import create_transcription_owner
 from ..config import settings
-from ..database import SessionLocal, get_db
-from ..models import Transcription, TranscriptionJob
+from ..database import get_db
+from ..models import Transcription
 from ..security import TokenData, require_scope_when
 from ..utils.audio import convert_to_wav, remove_temp_file_with_retry
+from ..utils.uploads import UploadValidationError, save_validated_upload
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_job_queue: asyncio.Queue[Optional[int]] = asyncio.Queue()
-_worker_task: Optional[asyncio.Task] = None
-
-
-async def start_transcription_worker():
-    """Inicia worker local de processamento assíncrono, se ainda não estiver rodando."""
-    global _worker_task
-    if _worker_task and not _worker_task.done():
-        return
-    _worker_task = asyncio.create_task(_transcription_worker_loop())
-    logger.info("Transcription worker started")
-
-
-async def stop_transcription_worker():
-    """Encerra worker local de transcrição de forma graciosa."""
-    global _worker_task
-    if not _worker_task:
-        return
-
-    await _job_queue.put(None)
-    await _worker_task
-    _worker_task = None
-    logger.info("Transcription worker stopped")
-
-
-async def recover_pending_transcription_jobs():
-    """Reenfileira jobs pendentes (queued/processing) após restart do processo."""
-    db = SessionLocal()
-    try:
-        pending_jobs = (
-            db.query(TranscriptionJob)
-            .filter(TranscriptionJob.status.in_(["queued", "processing"]))
-            .all()
-        )
-
-        for job in pending_jobs:
-            job.status = "queued"
-            await _job_queue.put(job.transcription_id)
-
-        db.commit()
-        if pending_jobs:
-            logger.info(f"Recovered {len(pending_jobs)} pending transcription jobs")
-    finally:
-        db.close()
-
-
-async def get_transcription_job_queue_size() -> int:
-    return _job_queue.qsize()
-
-
-async def enqueue_transcription_job(transcription_id: int):
-    await _job_queue.put(transcription_id)
-
-
-async def _transcription_worker_loop():
-    """Loop do worker local: consome fila e processa jobs de transcrição."""
-    while True:
-        transcription_id = await _job_queue.get()
-        if transcription_id is None:
-            _job_queue.task_done()
-            break
-
-        try:
-            await _process_transcription_job(transcription_id)
-        except Exception as e:
-            logger.exception(f"Unhandled worker error for transcription {transcription_id}: {e}")
-        finally:
-            _job_queue.task_done()
-
-
-async def _process_transcription_job(transcription_id: int):
-    """Processa um job de transcrição pendente e persiste o resultado."""
-    db = SessionLocal()
-    temp_wav_path: Optional[str] = None
-    input_path: Optional[str] = None
-
-    try:
-        job = (
-            db.query(TranscriptionJob)
-            .filter(TranscriptionJob.transcription_id == transcription_id)
-            .first()
-        )
-        transcription = (
-            db.query(Transcription)
-            .filter(Transcription.id == transcription_id)
-            .first()
-        )
-
-        if not job or not transcription:
-            logger.warning(f"Job or transcription not found for id={transcription_id}")
-            return
-
-        if job.status == "done":
-            return
-
-        start_time = time.time()
-        loop = asyncio.get_running_loop()
-        input_path = job.input_path
-
-        job.status = "processing"
-        transcription.status = "processing"
-        db.commit()
-
-        wav_output_path = f"temp/wav_{uuid.uuid4()}.wav"
-        temp_wav_path, duration = await loop.run_in_executor(
-            None,
-            convert_to_wav,
-            input_path,
-            wav_output_path,
-        )
-
-        if job.use_diarization:
-            segments, num_speakers = await _process_with_diarization(
-                temp_wav_path,
-                job.transcription_model,
-                loop,
-            )
-        else:
-            segments, num_speakers = await _process_without_diarization(
-                temp_wav_path,
-                duration,
-                job.transcription_model,
-                loop,
-            )
-
-        word_count = sum(len(seg["text"].split()) for seg in segments)
-        processing_time = time.time() - start_time
-
-        transcription.duration_seconds = duration
-        transcription.transcription_model = job.transcription_model
-        transcription.use_diarization = job.use_diarization
-        transcription.segments = segments
-        transcription.num_speakers = num_speakers
-        transcription.word_count = word_count
-        transcription.processing_time_seconds = processing_time
-        transcription.status = "completed"
-        transcription.error_message = None
-
-        job.status = "done"
-        job.error_message = None
-        db.commit()
-
-    except Exception as e:
-        transcription = (
-            db.query(Transcription)
-            .filter(Transcription.id == transcription_id)
-            .first()
-        )
-        job = (
-            db.query(TranscriptionJob)
-            .filter(TranscriptionJob.transcription_id == transcription_id)
-            .first()
-        )
-        if transcription:
-            transcription.status = "failed"
-            transcription.error_message = str(e)
-        if job:
-            job.status = "failed"
-            job.error_message = str(e)
-        db.commit()
-        logger.error(f"Error processing async transcription job {transcription_id}: {e}")
-
-    finally:
-        await remove_temp_file_with_retry(input_path)
-        await remove_temp_file_with_retry(temp_wav_path)
-        db.close()
+_TEMP_DIRECTORY = Path(__file__).resolve().parents[2] / "temp"
 
 
 @router.post("/transcribe")
@@ -226,42 +62,27 @@ async def transcribe_audio(
     temp_wav_path: Optional[str] = None
 
     try:
-        # ---- Validar extensão ----
-        file_ext = file.filename.split(".")[-1].lower()
-        if file_ext not in settings.allowed_extensions_list:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"File extension '{file_ext}' not allowed. "
-                    f"Allowed: {settings.ALLOWED_EXTENSIONS}"
-                ),
-            )
-
-        # ---- Salvar upload com nome único ----
-        unique_name = f"upload_{uuid.uuid4()}.{file_ext}"
-        temp_input_path = f"temp/{unique_name}"
-        async with aiofiles.open(temp_input_path, "wb") as f:
-            content = await file.read()
-
-            if len(content) > settings.max_upload_size_bytes:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"File size exceeds maximum allowed ({settings.MAX_UPLOAD_SIZE_MB} MB)",
-                )
-
-            await f.write(content)
-
-        file_size_mb = len(content) / (1024 * 1024)
+        saved_upload = await save_validated_upload(
+            file,
+            destination=_TEMP_DIRECTORY,
+            allowed_extensions=settings.allowed_extensions_list,
+            max_size_bytes=settings.max_upload_size_bytes,
+        )
+        temp_input_path = str(saved_upload.path)
+        file_size_mb = saved_upload.size_bytes / (1024 * 1024)
 
         # ---- Converter para WAV (I/O-bound via pydub/ffmpeg, em executor) ----
-        wav_output_path = f"temp/wav_{uuid.uuid4()}.wav"
+        wav_output_path = str(_TEMP_DIRECTORY / f"wav_{uuid.uuid4()}.wav")
         loop = asyncio.get_event_loop()
         temp_wav_path, duration = await loop.run_in_executor(
             None, convert_to_wav, temp_input_path, wav_output_path
         )
 
         logger.info(
-            f"Processing file: {file.filename} ({file_size_mb:.2f} MB, {duration:.2f}s)"
+            "Processing validated upload %s (%.2f MB, %.2fs)",
+            saved_upload.original_filename,
+            file_size_mb,
+            duration,
         )
 
         # ---- Selecionar modelo ----
@@ -270,8 +91,8 @@ async def transcribe_audio(
 
         # ---- Criar registro inicial no banco ----
         transcription_record = Transcription(
-            filename=file.filename,
-            original_filename=file.filename,
+            filename=saved_upload.path.name,
+            original_filename=saved_upload.original_filename,
             file_size_mb=file_size_mb,
             duration_seconds=duration,
             transcription_model=transcription_model,
@@ -323,145 +144,28 @@ async def transcribe_audio(
                 "processing_time": processing_time,
             }
 
-        except HTTPException:
+        except Exception as exc:
+            transcription_record.status = "failed"
+            transcription_record.error_message = "Transcription processing failed"
+            db.commit()
+            if isinstance(exc, HTTPException):
+                raise
             raise
 
-        except Exception as e:
-            transcription_record.status = "failed"
-            transcription_record.error_message = str(e)
-            db.commit()
-            raise
+    except UploadValidationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     except HTTPException:
         raise
 
-    except Exception as e:
-        logger.error(f"Error processing transcription: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Error processing synchronous transcription")
+        raise HTTPException(status_code=500, detail="Unable to process transcription")
 
     finally:
         await file.close()
         await remove_temp_file_with_retry(temp_input_path)
         await remove_temp_file_with_retry(temp_wav_path)
-
-
-@router.post("/transcriptions/jobs", status_code=202)
-async def create_transcription_job(
-    file: UploadFile = File(...),
-    use_diarization: bool = Form(False),
-    transcription_model: Optional[str] = Form(None),
-    db: Session = Depends(get_db),
-    current_user: Optional[TokenData] = Depends(
-        require_scope_when("transcribe", settings.AUTH_PROTECT_PROCESSING)
-    ),
-):
-    """Cria um job local assíncrono de transcrição e retorna imediatamente."""
-    temp_input_path: Optional[str] = None
-
-    try:
-        file_ext = file.filename.split(".")[-1].lower()
-        if file_ext not in settings.allowed_extensions_list:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"File extension '{file_ext}' not allowed. "
-                    f"Allowed: {settings.ALLOWED_EXTENSIONS}"
-                ),
-            )
-
-        unique_name = f"upload_{uuid.uuid4()}.{file_ext}"
-        temp_input_path = f"temp/{unique_name}"
-        async with aiofiles.open(temp_input_path, "wb") as f:
-            content = await file.read()
-            if len(content) > settings.max_upload_size_bytes:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"File size exceeds maximum allowed ({settings.MAX_UPLOAD_SIZE_MB} MB)",
-                )
-            await f.write(content)
-
-        file_size_mb = len(content) / (1024 * 1024)
-
-        if not transcription_model:
-            transcription_model = "whisper" if engine_registry.whisper_engine else "assemblyai"
-
-        transcription_record = Transcription(
-            filename=file.filename,
-            original_filename=file.filename,
-            file_size_mb=file_size_mb,
-            duration_seconds=0.0,
-            transcription_model=transcription_model,
-            use_diarization=use_diarization,
-            status="queued",
-            segments=[],
-        )
-        db.add(transcription_record)
-        db.commit()
-        db.refresh(transcription_record)
-
-        create_transcription_owner(db, transcription_record.id, current_user)
-
-        job = TranscriptionJob(
-            transcription_id=transcription_record.id,
-            input_path=temp_input_path,
-            use_diarization=use_diarization,
-            transcription_model=transcription_model,
-            status="queued",
-        )
-        db.add(job)
-        db.commit()
-
-        await enqueue_transcription_job(transcription_record.id)
-
-        return {
-            "id": transcription_record.id,
-            "status": "queued",
-            "message": "Transcription job queued successfully",
-            "status_url": f"/transcriptions/jobs/{transcription_record.id}/status",
-            "result_url": f"/transcriptions/{transcription_record.id}",
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating transcription job: {e}")
-        await remove_temp_file_with_retry(temp_input_path)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        await file.close()
-
-
-@router.get("/transcriptions/jobs/{transcription_id}/status")
-async def get_transcription_job_status(
-    transcription_id: int,
-    db: Session = Depends(get_db),
-    current_user: Optional[TokenData] = Depends(
-        require_scope_when("read_transcriptions", settings.AUTH_PROTECT_READS)
-    ),
-):
-    """Consulta status do job de transcrição assíncrono local."""
-    transcription = db.query(Transcription).filter(Transcription.id == transcription_id).first()
-    if not transcription:
-        raise HTTPException(status_code=404, detail="Transcription not found")
-
-    if settings.AUTH_PROTECT_READS:
-        enforce_transcription_access(db, transcription_id, current_user, write=False)
-
-    job = (
-        db.query(TranscriptionJob)
-        .filter(TranscriptionJob.transcription_id == transcription_id)
-        .first()
-    )
-
-    return {
-        "id": transcription_id,
-        "transcription_status": transcription.status,
-        "job_status": job.status if job else None,
-        "error_message": transcription.error_message or (job.error_message if job else None),
-        "queue_size": await get_transcription_job_queue_size(),
-        "completed": transcription.status == "completed",
-        "failed": transcription.status == "failed",
-    }
 
 
 # ---------------------------------------------------------------------------

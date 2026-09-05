@@ -19,10 +19,13 @@ if backend_src.exists():
     sys.path.insert(0, str(backend_src.parent))
 
 from rq import Worker
-from redis import Redis
 
-from src.workers.config import get_redis_url, is_redis_available
-from src.workers.transcription_worker import process_transcription_job_sync
+from src.workers.config import (
+    get_redis_connection,
+    get_transcription_queue,
+    is_redis_available,
+)
+from src.workers.transcription_worker import initialize_worker_engines, recover_pending_jobs
 
 # Configurar logging
 logging.basicConfig(
@@ -36,7 +39,8 @@ def main():
     """Inicia o worker RQ."""
     
     # Verifica Redis
-    if not is_redis_available():
+    redis_conn = get_redis_connection()
+    if not is_redis_available(redis_conn):
         logger.error("❌ Redis não está disponível!")
         logger.error("Instale Redis: https://redis.io/download")
         logger.error("Ou use Docker: docker run -d -p 6379:6379 redis:latest")
@@ -44,16 +48,20 @@ def main():
     
     logger.info("✅ Redis disponível")
     
-    # Conecta ao Redis
-    redis_url = get_redis_url()
-    redis_conn = Redis.from_url(redis_url, decode_responses=False)
-    
-    logger.info(f"📦 Worker iniciado (Redis: {redis_url})")
+    logger.info("Worker connected to Redis")
+    queue = get_transcription_queue(redis_conn)
+
+    try:
+        initialize_worker_engines()
+        recover_pending_jobs(queue)
+    except Exception:
+        logger.exception("Worker initialization failed")
+        sys.exit(1)
+
     logger.info("👂 Aguardando jobs na fila 'transcriptions'...")
-    
-    # Cria e inicia worker
+
     worker = Worker(
-        ["transcriptions"],  # Nome da fila
+        [queue],
         connection=redis_conn,
         name="transcription-worker-1",
         job_monitoring_interval=5,

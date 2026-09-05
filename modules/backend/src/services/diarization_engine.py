@@ -7,9 +7,14 @@ import os
 import numpy as np
 import librosa
 from huggingface_hub import hf_hub_download
+import torch
+
+# Desabilita TF32 antes de importar pyannote para evitar o ReproducibilityWarning
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
+
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
-import torch
 from huggingface_hub.utils import GatedRepoError, HfHubHTTPError
 from pydub import AudioSegment
 from ..config import settings

@@ -105,7 +105,7 @@ class TranscriptionJob(Base):
     input_path = Column(String(500), nullable=False)
     use_diarization = Column(Boolean, default=False)
     transcription_model = Column(String(50), nullable=False)
-    status = Column(String(20), default="queued")  # queued, processing, done, failed
+    status = Column(String(20), default="queued")  # queued, processing, completed, failed
     error_message = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

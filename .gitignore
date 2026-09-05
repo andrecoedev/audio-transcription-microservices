@@ -8,6 +8,7 @@ __pycache__/
 transcription_history.json
 *.mp3
 node_modules/
+dist/
 docker-compose.yml
 Dockerfile
 .dockerignore

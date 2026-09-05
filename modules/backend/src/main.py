@@ -126,16 +126,6 @@ async def load_models():
         logger.info("MODELOS CARREGADOS - API PRONTA!")
         logger.info("=" * 60)
 
-    await transcribe.start_transcription_worker()
-    await transcribe.recover_pending_transcription_jobs()
-
-
-@app.on_event("shutdown")
-async def shutdown_workers():
-    """Encerra workers locais de background."""
-    await transcribe.stop_transcription_worker()
-
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
