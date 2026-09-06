@@ -84,7 +84,39 @@ class Settings(BaseSettings):
     )
     WHISPER_DTYPE: str = Field(
         default="auto",
-        description="Whisper model dtype (auto, float16, float32)"
+        description="Legacy Hugging Face Whisper dtype",
+    )
+    TRANSCRIPTION_ENGINE: Literal["faster-whisper", "huggingface"] = Field(
+        default="faster-whisper",
+        description="Local Whisper implementation used by the worker",
+    )
+    WHISPER_MODEL: str = Field(
+        default="large-v3",
+        description="Faster-Whisper model size or converted model path",
+    )
+    WHISPER_DEVICE: Literal["auto", "cpu", "cuda"] = Field(
+        default="auto",
+        description="CTranslate2 execution device",
+    )
+    WHISPER_COMPUTE_TYPE: str = Field(
+        default="auto",
+        description="CTranslate2 compute type; auto selects float16 CUDA or int8 CPU",
+    )
+    WHISPER_LANGUAGE: Literal["pt", "en", "auto"] = Field(
+        default="pt",
+        description="Transcription language; auto enables detection",
+    )
+    WHISPER_BEAM_SIZE: int = Field(
+        default=1,
+        description="Beam size used by both benchmarkable Whisper engines",
+    )
+    WHISPER_MAX_DECODE_CHUNK_SECONDS: float = Field(
+        default=300.0,
+        description="Maximum PCM window held in memory during Faster-Whisper inference",
+    )
+    WHISPER_CPU_THREADS: int = Field(
+        default=0,
+        description="CTranslate2 CPU threads; zero uses its default",
     )
 
     # Auth rollout controls
@@ -158,6 +190,32 @@ class Settings(BaseSettings):
 
         if not (0.1 <= self.GPU_MEMORY_FRACTION <= 1.0):
             errors.append("GPU_MEMORY_FRACTION must be between 0.1 and 1.0")
+
+        if not self.WHISPER_MODEL.strip():
+            errors.append("WHISPER_MODEL is required")
+
+        if self.WHISPER_COMPUTE_TYPE not in {
+            "auto",
+            "default",
+            "float32",
+            "float16",
+            "bfloat16",
+            "int16",
+            "int8",
+            "int8_float32",
+            "int8_float16",
+            "int8_bfloat16",
+        }:
+            errors.append("WHISPER_COMPUTE_TYPE is not supported")
+
+        if self.WHISPER_BEAM_SIZE <= 0:
+            errors.append("WHISPER_BEAM_SIZE must be greater than zero")
+
+        if self.WHISPER_MAX_DECODE_CHUNK_SECONDS <= 0:
+            errors.append("WHISPER_MAX_DECODE_CHUNK_SECONDS must be greater than zero")
+
+        if self.WHISPER_CPU_THREADS < 0:
+            errors.append("WHISPER_CPU_THREADS cannot be negative")
 
         if self.ACCESS_TOKEN_EXPIRE_MINUTES <= 0:
             errors.append("ACCESS_TOKEN_EXPIRE_MINUTES must be greater than 0")
@@ -235,6 +293,11 @@ def sanitize_settings_snapshot() -> dict:
         "hf_token_configured": bool(settings.HF_TOKEN),
         "aai_api_key_configured": bool(settings.AAI_API_KEY),
         "gemini_api_key_configured": bool(settings.GEMINI_API_KEY),
+        "transcription_engine": settings.TRANSCRIPTION_ENGINE,
+        "whisper_model": settings.WHISPER_MODEL,
+        "whisper_device": settings.WHISPER_DEVICE,
+        "whisper_compute_type": settings.WHISPER_COMPUTE_TYPE,
+        "whisper_language": settings.WHISPER_LANGUAGE,
         "secret_key_configured": bool(settings.SECRET_KEY),
         "auth_mode": settings.AUTH_MODE,
         "auth_protect_api_keys": settings.AUTH_PROTECT_API_KEYS,

@@ -227,14 +227,15 @@ primary-900: #4c1d95
 ```javascript
 GET    /health                    # Status do sistema
 GET    /stats                     # Estatísticas gerais
-POST   /transcribe                # Upload e transcrição
+POST   /transcriptions/jobs       # Upload e job assíncrono
+GET    /transcriptions/jobs/:id/status # Polling do job
 GET    /transcriptions            # Listar transcrições
 GET    /transcriptions/:id        # Detalhes da transcrição
 DELETE /transcriptions/:id        # Excluir transcrição
-POST   /diarize                   # Diarização direta
-POST   /whisper/transcribe_segment    # Transcrição Whisper
-POST   /assemblyai/transcribe_segment # Transcrição AssemblyAI
 ```
+
+Os antigos endpoints síncronos de processamento foram removidos na P1-A. O
+frontend não conhece qual implementação interna do Whisper é usada pelo worker.
 
 ## 🚀 Scripts Disponíveis
 

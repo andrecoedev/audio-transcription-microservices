@@ -23,9 +23,12 @@ librosa==0.10.2.post1
 numpy<2
 
 # ML Models
+faster-whisper==1.2.1
+ctranslate2==4.8.2
 torch==2.2.2
 torchvision==0.17.2
 torchaudio==2.2.2
+# Temporary rollback engine until real parity benchmarks are available.
 transformers==4.49.0
 accelerate>=0.26.0
 assemblyai==0.40.2

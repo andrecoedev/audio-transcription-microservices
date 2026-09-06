@@ -162,9 +162,25 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
         db.commit()
 
         logger.info(
-            "Transcription job %s completed in %.2fs",
+            "Transcription job completed job_id=%s audio_duration=%.3f "
+            "processing_time=%.3f rtf=%.4f diarization_enabled=%s "
+            "conversion_time=%.3f diarization_time=%.3f transcription_time=%.3f "
+            "temporary_files=%s temporary_bytes=%s engine=%s",
             transcription_id,
+            result.duration_seconds,
             processing_time,
+            (
+                processing_time / result.duration_seconds
+                if result.duration_seconds > 0
+                else 0.0
+            ),
+            job.use_diarization,
+            result.conversion_seconds,
+            result.diarization_seconds,
+            result.transcription_seconds,
+            result.temporary_files,
+            result.temporary_bytes,
+            result.engine_metadata,
         )
         return {
             "status": "completed",

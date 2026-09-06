@@ -28,7 +28,10 @@ def test_web_application_import_and_startup_do_not_import_ml_stack():
 import importlib.abc
 import sys
 
-blocked = {"assemblyai", "librosa", "pydub", "pyannote", "torch", "transformers"}
+blocked = {
+    "assemblyai", "ctranslate2", "faster_whisper", "librosa",
+    "pydub", "pyannote", "torch", "transformers"
+}
 
 class BlockHeavyImports(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):

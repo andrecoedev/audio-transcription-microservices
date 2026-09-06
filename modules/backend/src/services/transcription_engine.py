@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 class WhisperEngine:
     """Motor de transcrição usando Whisper (local)."""
+
+    engine_name = "huggingface-whisper"
     
     def __init__(self, hf_token: str, model_name: str = "openai/whisper-large-v3"):
         self.hf_token = hf_token
@@ -183,7 +185,11 @@ class WhisperEngine:
                 
                 final_transcription = " ".join(transcriptions)
                 elapsed = time.time() - start_time
-                logger.info(f"Transcrição Whisper completa em {elapsed:.2f}s ({len(transcriptions)} chunks): {final_transcription[:100]}...")
+                logger.info(
+                    "Transcrição Whisper legada concluída em %.2fs (%s chunks)",
+                    elapsed,
+                    len(transcriptions),
+                )
                 
                 return final_transcription
         
@@ -249,7 +255,7 @@ class WhisperEngine:
                 )
             
             transcription = self.processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
-            logger.info(f"Chunk {start:.1f}s-{end:.1f}s transcrito: {transcription[:80]}...")
+            logger.info("Chunk %.1fs-%.1fs transcrito", start, end)
             
             return transcription
         
@@ -265,6 +271,15 @@ class WhisperEngine:
         elif self.model:
             return str(self.model.device)
         return "not loaded"
+
+    def get_metadata(self) -> dict[str, str]:
+        return {
+            "engine": self.engine_name,
+            "model": self.model_name,
+            "device": self.get_device(),
+            "compute_type": str(getattr(self.model, "dtype", settings.WHISPER_DTYPE)),
+            "language": "pt",
+        }
 
 
 class AssemblyAIEngine:
@@ -332,7 +347,7 @@ class AssemblyAIEngine:
                 transcription = transcript.text.strip() if transcript.text else ""
                 
                 elapsed = time.time() - start_time
-                logger.info(f"Transcrição AssemblyAI concluída em {elapsed:.2f}s: {transcription[:100]}...")
+                logger.info("Transcrição AssemblyAI concluída em %.2fs", elapsed)
                 
                 return transcription
             

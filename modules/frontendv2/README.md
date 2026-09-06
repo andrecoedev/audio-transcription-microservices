@@ -138,7 +138,8 @@ src/
 #### Endpoints Utilizados:
 - `GET /health` - Status do sistema
 - `GET /stats` - Estatísticas gerais
-- `POST /transcribe` - Upload e transcrição
+- `POST /transcriptions/jobs` - Upload e criação do job assíncrono
+- `GET /transcriptions/jobs/:id/status` - Polling do job
 - `GET /transcriptions` - Listar transcrições
 - `GET /transcriptions/:id` - Detalhes da transcrição
 - `DELETE /transcriptions/:id` - Excluir transcrição

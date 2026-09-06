@@ -294,7 +294,7 @@ export default function Settings() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               🤗 Hugging Face Token
-              <span className="text-xs text-gray-500 ml-2">(Para Whisper e Pyannote)</span>
+              <span className="text-xs text-gray-500 ml-2">(Para Pyannote e rollback Hugging Face)</span>
             </label>
             <div className="relative">
               <input

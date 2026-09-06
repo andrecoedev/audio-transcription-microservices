@@ -51,7 +51,7 @@ def _configured_models(processing: dict) -> dict:
             "device": worker_device,
         },
         "whisper": {
-            "configured": bool(settings.HF_TOKEN),
+            "configured": bool(settings.WHISPER_MODEL),
             "loaded": None,
             "device": worker_device,
         },

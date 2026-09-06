@@ -58,7 +58,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-This application uploads audio or video files, transcribes them using Hugging Face Whisper or AssemblyAI, and can perform speaker diarization with Pyannote. Since P1-A, FastAPI is a lightweight HTTP/job service and all audio, ML, CUDA, FFmpeg and processing-client work belongs to a separate RQ worker.
+This application uploads audio or video files, transcribes them using Faster-Whisper/CTranslate2 or AssemblyAI, and can perform speaker diarization with Pyannote. FastAPI is a lightweight HTTP/job service and all audio, ML, CUDA, FFmpeg and processing-client work belongs to a separate RQ worker. The former Hugging Face Transformers engine remains temporarily available behind a rollback flag while real parity fixtures are pending.
 
 ### API / Worker Architecture
 
@@ -74,7 +74,7 @@ FastAPI (auth, upload, database, jobs, queries)
 Redis queue: transcriptions
         |
         v
-RQ Worker (FFmpeg, Whisper, Pyannote, AssemblyAI, Gemini)
+RQ Worker (FFmpeg, Faster-Whisper, Pyannote, AssemblyAI, Gemini)
         |
         v
 Database
@@ -96,7 +96,8 @@ Relevant backend layout:
 │   │   ├── security.py                # JWT authentication
 │   │   ├── 📁 services/
 │   │   │   ├── diarization_engine.py  # GPU-optimized Pyannote
-│   │   │   ├── transcription_engine.py # Whisper + AssemblyAI engines
+│   │   │   ├── faster_whisper_engine.py # CTranslate2 adapter
+│   │   │   ├── transcription_engine.py # Temporary HF rollback engine
 │   │   │   ├── processing_engines.py  # Worker-only engine initialization
 │   │   │   └── transcription_processing_service.py # Heavy pipeline
 │   │   ├── 📁 workers/                # RQ jobs and persistence
@@ -121,6 +122,11 @@ worker. Updating API keys requires restarting the worker, not FastAPI. See the
 [P1-A architecture audit](modules/backend/P1A_ARCHITECTURE.md) for the complete
 boundary and compatibility notes.
 
+See the [P1-B benchmark guide](modules/backend/benchmarks/README.md) and the
+[results recorded for this environment](modules/backend/benchmarks/P1B_RESULTS.md).
+The [P1-B engine migration audit](modules/backend/P1B_ENGINE_MIGRATION.md)
+documents the before/after pipeline and rollback decision.
+
 ### Core Features
 
 - **Automatic Transcription**: Support for local Whisper and cloud-based AssemblyAI with model selection.
@@ -132,11 +138,12 @@ boundary and compatibility notes.
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Built With
-- **Python 3.11+** - Core runtime
+- **Python 3.10+** - Core runtime
 - **Streamlit** - Interactive web interface
 - **FastAPI** - Backend REST API
-- **PyTorch + CUDA** - ML framework with GPU acceleration
-- **Transformers (Hugging Face)** - Whisper Large v3
+- **Faster-Whisper + CTranslate2** - Default local Whisper Large v3 inference
+- **PyTorch + CUDA** - Required by Pyannote
+- **Transformers (Hugging Face)** - Temporary rollback engine
 - **Pyannote.audio** - Speaker diarization
 - **AssemblyAI** - Cloud transcription (alternative)
 - **SQLAlchemy** - ORM for persistence
@@ -184,7 +191,7 @@ boundary and compatibility notes.
 2. **Upload**: Frontend → FastAPI → database and Redis
 3. **Processing**: The separate RQ worker reuses its engines
 4. **Diarization**: Pyannote identifies speakers on GPU
-5. **Transcription**: Whisper processes segments in float16
+5. **Transcription**: Faster-Whisper uses bounded in-memory PCM windows
 6. **Response**: Aggregated results persisted
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -193,14 +200,14 @@ boundary and compatibility notes.
 ## Getting Started
 
 ### Prerequisites
-- **Python 3.11+** (recommended for best compatibility)
+- **Python 3.10+** (3.11 or 3.12 recommended for local development)
 - **Hugging Face account** (token required for Pyannote)
 - **AssemblyAI account** (optional, for cloud transcription)
 - **FFmpeg** (audio/video conversion)
 - **NVIDIA GPU** (recommended):
-  - CUDA Toolkit 11.8 or 12.x
-  - cuDNN 8.9+
-  - NVIDIA Driver 531+ (for RTX series)
+  - CUDA 12 runtime libraries
+  - cuDNN 9
+  - a recent NVIDIA driver compatible with CUDA 12
   - **Minimum VRAM**: 8GB
 
 ### Installation
@@ -227,6 +234,11 @@ pip uninstall -y torch torchvision torchaudio
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
+The PyTorch command above is for Pyannote. Faster-Whisper uses CTranslate2 and
+has its own CUDA 12/cuDNN 9 runtime requirement. On a local Windows host, make
+sure `cublas64_12.dll` and the cuDNN 9 libraries are visible on `PATH`. The
+worker Docker image already starts from a CUDA 12.3/cuDNN 9 runtime image.
+
 **3. Configure API Keys:**
 ```powershell
 # Copy and edit the .env file in the project root
@@ -245,7 +257,12 @@ AAI_API_KEY=your_assemblyai_token_here
 # GPU Settings (optional)
 FORCE_CPU=false
 GPU_MEMORY_FRACTION=0.8
-WHISPER_DTYPE=auto
+TRANSCRIPTION_ENGINE=faster-whisper
+WHISPER_MODEL=large-v3
+WHISPER_DEVICE=auto
+WHISPER_COMPUTE_TYPE=auto
+WHISPER_LANGUAGE=pt
+WHISPER_MAX_DECODE_CHUNK_SECONDS=300
 ```
 
 **4. Run API, worker and frontend:**
@@ -260,6 +277,14 @@ Terminal 2 - RQ Worker (loads FFmpeg/Whisper/Pyannote):
 ```powershell
 cd modules\backend
 python run_worker.py
+```
+
+Docker Compose defaults to a CPU/auto worker. To explicitly expose an NVIDIA
+GPU and select CUDA/FP16, apply the GPU overlay:
+
+```powershell
+docker compose -f modules/backend/docker-compose.yml `
+  -f modules/backend/docker-compose.gpu.yml up --build
 ```
 
 Terminal 3 - Frontend:
@@ -278,11 +303,11 @@ streamlit run app.py
 Verify models are working:
 
 ```powershell
-# Test PyTorch + CUDA
-python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+# Test CTranslate2 devices/compute types
+python -c "import ctranslate2; print(ctranslate2.get_cuda_device_count()); print(ctranslate2.get_supported_compute_types('cpu'))"
 
-# Check essential dependencies
-python -c "import transformers, pyannote.audio, librosa; print('All dependencies OK')"
+# Check worker dependencies
+python -c "import faster_whisper, ctranslate2, pyannote.audio; print('Worker dependencies OK')"
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -320,13 +345,11 @@ Full transcription:
 Good morning everyone, let's start today's meeting. Perfect, I have some important points to discuss. I completely agree with this approach...
 ```
 
-### Expected Performance
+### Performance
 
-| Configuration | Whisper Large | Pyannote | 2min File |
-|-------------|---------------|----------|--------------|
-| **RTX 3060** | approximately 8s | approximately 15s | **approximately 25s total** |
-| **RTX 4090** | approximately 4s | approximately 8s | **approximately 15s total** |
-| **CPU only** | approximately 120s | approximately 300s | **approximately 7min total** |
+No project-specific performance numbers are claimed without repeatable local
+measurements. Use `modules/backend/benchmarks/benchmark_transcription.py` and
+consult `modules/backend/benchmarks/P1B_RESULTS.md`.
 
 ### REST API (Optional)
 
@@ -348,8 +371,7 @@ curl -X POST "http://localhost:2020/transcriptions/jobs" \
 
 ### Completed
 - [x] **Isolated architecture** - Lightweight FastAPI plus a separate RQ worker
-- [x] **Complete GPU optimization** - CUDA, cuDNN, half-precision
-- [x] **Whisper Large GPU** - approximately 10x faster than CPU
+- [x] **Configurable Faster-Whisper runtime** - CUDA/FP16 or CPU/INT8
 - [x] **Pyannote GPU** - Accelerated diarization
 - [x] **Streamlit interface** - Health checks and progress
 - [x] **Automated scripts** - PowerShell for Windows
@@ -361,6 +383,7 @@ curl -X POST "http://localhost:2020/transcriptions/jobs" \
 - [x] **Split Docker runtimes** - API image without ML and full worker image
 
 ### In Progress
+- [ ] **Real P1-B parity/performance evidence** - requires representative speech fixtures
 - [ ] **Rate limiting** - API protection
 
 ### Planned
@@ -410,6 +433,8 @@ Project: [https://github.com/Dec0XD/audio-transcription-microservices](https://g
 - AssemblyAI
 - Pyannote
 - PyTorch
+- Faster-Whisper
+- CTranslate2
 - NVIDIA CUDA
 - FFmpeg
 

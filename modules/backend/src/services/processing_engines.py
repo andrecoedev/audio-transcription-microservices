@@ -1,12 +1,39 @@
-"""Inicializa e mantém os engines usados exclusivamente pelo processo worker."""
+"""Initialize and retain engines exclusively in the RQ worker process."""
 
 import logging
 from collections.abc import Callable
 from typing import Any
 
 from .. import engine_registry
+from ..config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _default_factories() -> dict[str, Callable[..., Any]]:
+    if settings.TRANSCRIPTION_ENGINE == "faster-whisper":
+        from .faster_whisper_engine import FasterWhisperEngine
+
+        whisper_factory = FasterWhisperEngine
+    else:
+        from .transcription_engine import WhisperEngine
+
+        whisper_factory = WhisperEngine
+
+    factories: dict[str, Callable[..., Any]] = {"whisper": whisper_factory}
+    if settings.HF_TOKEN:
+        from .diarization_engine import DiarizationEngine
+
+        factories["diarization"] = DiarizationEngine
+    if settings.AAI_API_KEY:
+        from .assemblyai_engine import AssemblyAIEngine
+
+        factories["assemblyai"] = AssemblyAIEngine
+    if settings.GEMINI_API_KEY:
+        from .meeting_minutes import MeetingMinutesGenerator
+
+        factories["gemini"] = MeetingMinutesGenerator
+    return factories
 
 
 def initialize_processing_engines(
@@ -15,35 +42,29 @@ def initialize_processing_engines(
     gemini_api_key: str | None,
     factories: dict[str, Callable[..., Any]] | None = None,
 ) -> dict[str, bool]:
-    """Inicializa cada engine uma única vez e reutiliza as instâncias existentes."""
-    if factories is None:
-        from .diarization_engine import DiarizationEngine
-        from .meeting_minutes import MeetingMinutesGenerator
-        from .transcription_engine import AssemblyAIEngine, WhisperEngine
+    """Initialize each configured engine once and reuse it across worker jobs."""
+    factories = factories or _default_factories()
 
-        factories = {
-            "diarization": DiarizationEngine,
-            "whisper": WhisperEngine,
-            "assemblyai": AssemblyAIEngine,
-            "gemini": MeetingMinutesGenerator,
-        }
+    if hf_token and engine_registry.diarization_engine is None:
+        try:
+            engine_registry.diarization_engine = factories["diarization"](hf_token)
+            logger.info("Diarization engine initialized in worker")
+        except Exception:
+            logger.exception("Unable to initialize diarization engine in worker")
+    elif not hf_token:
+        logger.warning("HF_TOKEN is not configured; diarization is unavailable")
 
-    if hf_token:
-        if engine_registry.diarization_engine is None:
-            try:
-                engine_registry.diarization_engine = factories["diarization"](hf_token)
-                logger.info("Diarization engine initialized in worker")
-            except Exception:
-                logger.exception("Unable to initialize diarization engine in worker")
-
-        if engine_registry.whisper_engine is None:
-            try:
-                engine_registry.whisper_engine = factories["whisper"](hf_token)
-                logger.info("Whisper engine initialized in worker")
-            except Exception:
-                logger.exception("Unable to initialize Whisper engine in worker")
-    else:
-        logger.warning("HF_TOKEN is not configured in worker")
+    if engine_registry.whisper_engine is None:
+        try:
+            engine_registry.whisper_engine = factories["whisper"](hf_token)
+            metadata_getter = getattr(
+                engine_registry.whisper_engine,
+                "get_metadata",
+                lambda: {"engine": settings.TRANSCRIPTION_ENGINE},
+            )
+            logger.info("Whisper engine ready in worker: %s", metadata_getter())
+        except Exception:
+            logger.exception("Unable to initialize Whisper engine in worker")
 
     if aai_api_key and engine_registry.assemblyai_engine is None:
         try:
