@@ -1,72 +1,59 @@
-"""
-Worker de processamento de transcrição com RQ.
+"""Jobs RQ de transcrição executados fora do processo FastAPI."""
 
-Consome jobs da fila Redis e executa o processamento.
-Este worker roda em um processo separado.
-"""
-
-import asyncio
 import logging
 import time
-import uuid
 from pathlib import Path
-from typing import Optional
 
 from rq.exceptions import NoSuchJobError
 from rq.job import Job
 
-from .. import engine_registry
-from ..config import settings
+from ..api_keys_manager import api_keys_manager
+from ..config import apply_persisted_secrets, settings
 from ..database import SessionLocal
 from ..models import Transcription, TranscriptionJob
-from ..utils.audio import convert_to_wav, remove_temp_file_with_retry
-from ..routers.transcribe import _process_with_diarization, _process_without_diarization
+from ..services.processing_engines import initialize_processing_engines
+from ..services.transcription_processing_service import (
+    TranscriptionProcessingService,
+)
 
 logger = logging.getLogger(__name__)
-_TEMP_DIRECTORY = Path(__file__).resolve().parents[2] / "temp"
+_processing_service: TranscriptionProcessingService | None = None
 
 
-def initialize_worker_engines() -> None:
-    """Carrega no processo RQ apenas os engines necessários para transcrição."""
-    from ..api_keys_manager import api_keys_manager
-    from ..config import apply_persisted_secrets
-    from ..services.diarization_engine import DiarizationEngine
-    from ..services.transcription_engine import AssemblyAIEngine, WhisperEngine
-    from ..utils.gpu_utils import log_device_info, optimize_gpu_settings
+def initialize_worker_engines(
+    factories=None,
+) -> dict[str, bool]:
+    """Inicializa engines uma vez no processo worker, antes de consumir a fila."""
+    global _processing_service
 
     apply_persisted_secrets(api_keys_manager.get_all())
     validation_errors = settings.validate_startup()
     if validation_errors:
         raise RuntimeError("Invalid worker configuration: " + "; ".join(validation_errors))
 
-    log_device_info()
-    optimize_gpu_settings()
+    if factories is None:
+        from ..utils.gpu_utils import log_device_info, optimize_gpu_settings
 
-    if settings.HF_TOKEN:
-        if engine_registry.diarization_engine is None:
-            try:
-                engine_registry.diarization_engine = DiarizationEngine(settings.HF_TOKEN)
-                logger.info("Diarization engine loaded in RQ worker")
-            except Exception:
-                logger.exception("Unable to load diarization engine in RQ worker")
-        if engine_registry.whisper_engine is None:
-            try:
-                engine_registry.whisper_engine = WhisperEngine(settings.HF_TOKEN)
-                logger.info("Whisper engine loaded in RQ worker")
-            except Exception:
-                logger.exception("Unable to load Whisper engine in RQ worker")
-    else:
-        logger.warning("HF_TOKEN is not configured; Whisper and diarization are unavailable")
+        log_device_info()
+        optimize_gpu_settings()
 
-    if settings.AAI_API_KEY:
-        if engine_registry.assemblyai_engine is None:
-            try:
-                engine_registry.assemblyai_engine = AssemblyAIEngine(settings.AAI_API_KEY)
-                logger.info("AssemblyAI engine loaded in RQ worker")
-            except Exception:
-                logger.exception("Unable to load AssemblyAI engine in RQ worker")
-    else:
-        logger.warning("AAI_API_KEY is not configured; AssemblyAI is unavailable")
+    status = initialize_processing_engines(
+        hf_token=settings.HF_TOKEN,
+        aai_api_key=settings.AAI_API_KEY,
+        gemini_api_key=settings.GEMINI_API_KEY,
+        factories=factories,
+    )
+    if _processing_service is None:
+        _processing_service = TranscriptionProcessingService()
+    logger.info("Worker processing engines initialized: %s", status)
+    return status
+
+
+def get_processing_service() -> TranscriptionProcessingService:
+    global _processing_service
+    if _processing_service is None:
+        _processing_service = TranscriptionProcessingService()
+    return _processing_service
 
 
 def recover_pending_jobs(queue) -> int:
@@ -74,8 +61,6 @@ def recover_pending_jobs(queue) -> int:
     db = SessionLocal()
     recovered = 0
     try:
-        # O cleanup do RQ move entradas "started" expiradas para o estado terminal;
-        # jobs realmente ativos permanecem protegidos contra reenfileiramento.
         queue.started_job_registry.cleanup()
         pending_jobs = (
             db.query(TranscriptionJob)
@@ -129,26 +114,9 @@ def recover_pending_jobs(queue) -> int:
 
 
 def process_transcription_job_sync(transcription_id: int) -> dict:
-    """
-    Processa um job de transcrição de forma síncrona (chamado por RQ worker).
-    
-    RQ não suporta async nativamente, então usamos asyncio.run() para executar
-    a lógica assíncrona.
-    
-    Args:
-        transcription_id: ID da transcrição a processar
-        
-    Returns:
-        Dict com status e resultado do processamento
-    """
-    return asyncio.run(_process_transcription_job_async(transcription_id))
-
-
-async def _process_transcription_job_async(transcription_id: int) -> dict:
-    """Processa um job de transcrição pendente e persiste o resultado."""
+    """Executa o pipeline pesado e persiste seu resultado."""
     db = SessionLocal()
-    temp_wav_path: Optional[str] = None
-    input_path: Optional[str] = None
+    input_path: str | None = None
 
     try:
         job = (
@@ -156,89 +124,57 @@ async def _process_transcription_job_async(transcription_id: int) -> dict:
             .filter(TranscriptionJob.transcription_id == transcription_id)
             .first()
         )
-        transcription = (
-            db.query(Transcription)
-            .filter(Transcription.id == transcription_id)
-            .first()
-        )
-
+        transcription = db.get(Transcription, transcription_id)
         input_path = job.input_path if job else None
 
         if not job or not transcription:
-            logger.warning(f"Job ou transcrição não encontrado para id={transcription_id}")
-            return {"status": "failed", "error": "Job ou transcrição não encontrado"}
+            logger.warning("Job or transcription not found for id=%s", transcription_id)
+            return {"status": "failed", "error": "Transcription job not found"}
 
         if job.status in {"completed", "done"}:
-            logger.info(f"Job {transcription_id} já foi processado")
+            logger.info("Transcription job %s was already completed", transcription_id)
             return {"status": "already_done"}
 
-        start_time = time.time()
-        loop = asyncio.get_running_loop()
-        # Atualiza status
+        started_at = time.time()
         job.status = "processing"
         transcription.status = "processing"
         db.commit()
-        logger.info(f"Processando transcrição {transcription_id}")
+        logger.info("Transcription job %s started", transcription_id)
 
-        # Converte para WAV
-        wav_output_path = str(_TEMP_DIRECTORY / f"wav_{uuid.uuid4()}.wav")
-        temp_wav_path, duration = await loop.run_in_executor(
-            None,
-            convert_to_wav,
-            input_path,
-            wav_output_path,
+        result = get_processing_service().process_transcription(
+            file_path=job.input_path,
+            use_diarization=job.use_diarization,
+            transcription_model=job.transcription_model,
         )
+        processing_time = time.time() - started_at
 
-        # Processa com ou sem diarização
-        if job.use_diarization:
-            segments, num_speakers = await _process_with_diarization(
-                temp_wav_path,
-                job.transcription_model,
-                loop,
-            )
-        else:
-            segments, num_speakers = await _process_without_diarization(
-                temp_wav_path,
-                duration,
-                job.transcription_model,
-                loop,
-            )
-
-        # Calcula estatísticas
-        word_count = sum(len(seg["text"].split()) for seg in segments)
-        processing_time = time.time() - start_time
-
-        # Persiste resultado
-        transcription.duration_seconds = duration
+        transcription.duration_seconds = result.duration_seconds
         transcription.transcription_model = job.transcription_model
         transcription.use_diarization = job.use_diarization
-        transcription.segments = segments
-        transcription.num_speakers = num_speakers
-        transcription.word_count = word_count
+        transcription.segments = result.segments
+        transcription.num_speakers = result.num_speakers
+        transcription.word_count = result.word_count
         transcription.processing_time_seconds = processing_time
         transcription.status = "completed"
         transcription.error_message = None
-
         job.status = "completed"
         job.error_message = None
         db.commit()
 
-        logger.info("Transcription job %s completed in %.2fs", transcription_id, processing_time)
+        logger.info(
+            "Transcription job %s completed in %.2fs",
+            transcription_id,
+            processing_time,
+        )
         return {
             "status": "completed",
             "transcription_id": transcription_id,
             "processing_time": processing_time,
-            "word_count": word_count,
+            "word_count": result.word_count,
         }
-
     except Exception:
         public_error = "Transcription processing failed"
-        # Registra erro no banco
-        transcription = (
-            db.query(Transcription)
-            .filter(Transcription.id == transcription_id)
-            .first()
-        )
+        transcription = db.get(Transcription, transcription_id)
         job = (
             db.query(TranscriptionJob)
             .filter(TranscriptionJob.transcription_id == transcription_id)
@@ -251,16 +187,20 @@ async def _process_transcription_job_async(transcription_id: int) -> dict:
             job.status = "failed"
             job.error_message = public_error
         db.commit()
-
         logger.exception("Transcription job %s failed", transcription_id)
         return {
             "status": "failed",
             "transcription_id": transcription_id,
             "error": public_error,
         }
-
     finally:
-        # Limpeza de arquivos temporários
-        await remove_temp_file_with_retry(input_path)
-        await remove_temp_file_with_retry(temp_wav_path)
+        if input_path:
+            try:
+                Path(input_path).unlink(missing_ok=True)
+            except OSError as exc:
+                logger.warning(
+                    "Unable to remove input for transcription %s: %s",
+                    transcription_id,
+                    exc,
+                )
         db.close()

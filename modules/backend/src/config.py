@@ -68,6 +68,10 @@ class Settings(BaseSettings):
         default=-30,
         description="Silence threshold in dB"
     )
+    MEETING_MINUTES_TIMEOUT_SECONDS: int = Field(
+        default=600,
+        description="Maximum wait for the compatibility meeting-minutes endpoint",
+    )
     
     # GPU/Device Configuration
     FORCE_CPU: bool = Field(
@@ -94,7 +98,7 @@ class Settings(BaseSettings):
     )
     AUTH_PROTECT_PROCESSING: bool = Field(
         default=True,
-        description="Protect processing endpoints (/transcribe, /meeting-minutes, compat)",
+        description="Protect job creation and meeting-minutes endpoints",
     )
     AUTH_PROTECT_READS: bool = Field(
         default=False,

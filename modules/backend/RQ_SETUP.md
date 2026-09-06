@@ -1,6 +1,6 @@
 # RQ (Redis Queue) - Implementação de Fila Assíncrona Local
 
-Este projeto agora usa **RQ** (Redis Queue) para processar jobs de transcrição de forma assíncrona.
+Este projeto usa **RQ** (Redis Queue) para processar jobs de transcrição de forma assíncrona. A FastAPI não carrega engines de ML: somente `run_worker.py` importa e inicializa Whisper, Pyannote, Torch/CUDA, AssemblyAI, Gemini e o processamento FFmpeg.
 
 ## 🚀 Como Funciona
 
@@ -63,7 +63,11 @@ redis-cli ping
 
 ```bash
 cd modules/backend
+# Ambiente do worker/desenvolvimento:
 pip install -r requirements.txt
+
+# Em um ambiente exclusivo da API:
+pip install -r requirements.api.txt
 ```
 
 ### 3. Configurar variável de ambiente (opcional)
@@ -115,7 +119,7 @@ curl -X POST http://localhost:2020/transcriptions/jobs \
 # Resposta (202 Accepted):
 {
   "transcription_id": 42,
-  "status_url": "/transcriptions/42",
+  "status_url": "/transcriptions/jobs/42/status",
   "result_url": "/transcriptions/42",
   "message": "Job enfileirado com sucesso"
 }
@@ -123,7 +127,7 @@ curl -X POST http://localhost:2020/transcriptions/jobs \
 
 ### 2. Consultar status (GET)
 ```bash
-curl http://localhost:2020/transcriptions/42/status
+curl http://localhost:2020/transcriptions/jobs/42/status
 
 # Resposta:
 {
@@ -234,7 +238,9 @@ O contrato de API permanece o mesmo! Nenhuma mudança no frontend.
 
 ## 📝 Notas
 
-- Jobs que não foram processados são recuperados automaticamente no startup
+- Jobs que não foram processados são recuperados no startup do worker
+- Engines são inicializados uma vez por processo worker e reutilizados
+- Alterar chaves pela API exige reiniciar os workers
 - Arquivos temporários são limpados após processamento
 - Suporta até ~100 jobs/min em um PC (suficiente para uso pessoal)
 - Sem banco de dados adicional necessário (SQLite é suficiente)

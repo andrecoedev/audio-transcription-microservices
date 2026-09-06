@@ -30,7 +30,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.database import get_db
 from src.models import Base
-from src.routers import transcribe, transcriptions
+from src.routers import transcriptions
 from src.security import create_access_token
 
 
@@ -69,7 +69,6 @@ def db_context(tmp_path, monkeypatch):
     Base.metadata.create_all(bind=engine)
 
     app = FastAPI()
-    app.include_router(transcribe.router)
     app.include_router(transcriptions.router)
 
     def override_get_db():

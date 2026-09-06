@@ -1,8 +1,7 @@
-from unittest.mock import AsyncMock
-
 from rq.exceptions import NoSuchJobError
 
 from src.models import Transcription, TranscriptionJob
+from src.services.transcription_processing_service import ProcessingResult
 from src.workers import transcription_worker
 
 
@@ -61,8 +60,6 @@ def test_worker_persists_queued_processing_completed(
 ):
     input_path = tmp_path / "input.wav"
     input_path.write_bytes(b"audio")
-    converted_path = tmp_path / "converted.wav"
-    converted_path.write_bytes(b"wav")
     transcription_id = _seed_worker_job(
         db_context["session_factory"], input_path
     )
@@ -73,20 +70,26 @@ def test_worker_persists_queued_processing_completed(
         "SessionLocal",
         _recording_factory(db_context["session_factory"], snapshots),
     )
-    monkeypatch.setattr(
-        transcription_worker,
-        "convert_to_wav",
-        lambda *_args: (str(converted_path), 12.5),
-    )
-    monkeypatch.setattr(
-        transcription_worker,
-        "_process_without_diarization",
-        AsyncMock(
-            return_value=(
-                [{"start": 0.0, "end": 12.5, "speaker": "SPEAKER_00", "text": "hello world"}],
-                1,
+    class SuccessfulProcessingService:
+        def process_transcription(self, **_kwargs):
+            return ProcessingResult(
+                segments=[
+                    {
+                        "start": 0.0,
+                        "end": 12.5,
+                        "speaker": "SPEAKER_00",
+                        "text": "hello world",
+                    }
+                ],
+                duration_seconds=12.5,
+                num_speakers=1,
+                word_count=2,
             )
-        ),
+
+    monkeypatch.setattr(
+        transcription_worker,
+        "get_processing_service",
+        lambda: SuccessfulProcessingService(),
     )
 
     result = transcription_worker.process_transcription_job_sync(transcription_id)
@@ -122,10 +125,14 @@ def test_worker_persists_queued_processing_failed(
         "SessionLocal",
         _recording_factory(db_context["session_factory"], snapshots),
     )
+    class FailingProcessingService:
+        def process_transcription(self, **_kwargs):
+            raise RuntimeError("internal detail")
+
     monkeypatch.setattr(
         transcription_worker,
-        "convert_to_wav",
-        lambda *_args: (_ for _ in ()).throw(RuntimeError("internal detail")),
+        "get_processing_service",
+        lambda: FailingProcessingService(),
     )
 
     result = transcription_worker.process_transcription_job_sync(transcription_id)

@@ -58,7 +58,9 @@ export default function Settings() {
       setLoadingGpu(true)
       const data = await audioService.getSystemGpu()
       setGpuDiag(data)
-      if (data.gpu_being_used) {
+      if (data.deprecated) {
+        toast('O diagnóstico de GPU agora pertence aos logs do worker.', { icon: 'ℹ️' })
+      } else if (data.gpu_being_used) {
         toast.success('✅ GPU detectada e em uso!')
       } else if (data.gpu?.cuda_available) {
         toast('⚠️ GPU detectada mas não está sendo usada pelos engines.', { icon: '⚠️' })
@@ -148,8 +150,8 @@ export default function Settings() {
       }
 
       // ── 4. Sucesso total — nenhum erro ─────────────────────────────────────
-      if (result.success) {
-        toast.success('🎉 Todos os modelos estão ativos!', { duration: 5000 })
+      if (result.worker_restart_required) {
+        toast('ℹ️ Reinicie o RQ worker para aplicar as chaves.', { duration: 6000 })
       }
 
       // Atualizar status do sistema
@@ -233,22 +235,22 @@ export default function Settings() {
             <>
               <ModelStatus
                 name="Pyannote (Diarização)"
-                loaded={health.models?.diarization?.loaded}
+                configured={health.models?.diarization?.configured}
                 device={health.models?.diarization?.device}
               />
               <ModelStatus
                 name="Whisper (Transcrição Local)"
-                loaded={health.models?.whisper?.loaded}
+                configured={health.models?.whisper?.configured}
                 device={health.models?.whisper?.device}
               />
               <ModelStatus
                 name="AssemblyAI (Transcrição Cloud)"
-                loaded={health.models?.assemblyai?.loaded}
+                configured={health.models?.assemblyai?.configured}
                 device={health.models?.assemblyai?.device}
               />
               <ModelStatus
                 name="Gemini (Geração de Atas)"
-                loaded={health.models?.gemini?.loaded}
+                configured={health.models?.gemini?.configured}
                 device={health.models?.gemini?.device}
               />
             </>
@@ -269,7 +271,7 @@ export default function Settings() {
         <CardContent className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
             <p className="text-sm text-blue-800">
-              <strong>💡 Como funciona:</strong> Digite suas chaves abaixo e clique em "Salvar e Ativar". Os modelos serão recarregados automaticamente sem necessidade de reiniciar o servidor!
+              <strong>💡 Como funciona:</strong> A API salva as chaves com segurança. Reinicie o RQ worker para carregar os engines com a nova configuração.
             </p>
           </div>
 
@@ -371,12 +373,12 @@ export default function Settings() {
 
           {/* Instruções */}
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="text-sm font-semibold text-green-900 mb-2">✨ Funcionalidade Automática:</h4>
+            <h4 className="text-sm font-semibold text-green-900 mb-2">✨ Ativação no Worker:</h4>
             <ul className="text-sm text-green-800 space-y-1 list-disc list-inside">
               <li>Digite suas chaves nos campos acima</li>
-              <li>Clique em "Salvar e Ativar"</li>
-              <li>Os modelos serão carregados automaticamente</li>
-              <li>Sem necessidade de reiniciar o servidor! 🎉</li>
+              <li>Clique em "Salvar chaves"</li>
+              <li>Reinicie somente o processo RQ worker</li>
+              <li>A API permanece leve durante o carregamento</li>
             </ul>
           </div>
 
@@ -387,7 +389,7 @@ export default function Settings() {
             icon={Save}
             className="w-full"
           >
-            {savingKeys ? 'Salvando e Recarregando...' : 'Salvar e Ativar Modelos'}
+            {savingKeys ? 'Salvando...' : 'Salvar chaves'}
           </Button>
         </CardContent>
       </Card>
@@ -409,7 +411,11 @@ export default function Settings() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!gpuDiag ? (
+          {gpuDiag?.deprecated ? (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+              O diagnóstico de CUDA/PyTorch foi removido da API. Consulte os logs do RQ worker para verificar GPU e engines.
+            </div>
+          ) : !gpuDiag ? (
             <div className="text-center py-8 text-gray-400">
               <Cpu className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p className="text-sm">Clique em <strong>Verificar GPU</strong> para ver o diagnóstico de hardware</p>
@@ -610,17 +616,17 @@ export default function Settings() {
   )
 }
 
-function ModelStatus({ name, loaded, device }) {
+function ModelStatus({ name, configured, device }) {
   return (
     <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
       <div>
         <p className="font-medium text-gray-900">{name}</p>
-        <p className="text-sm text-gray-500">{device || 'Não carregado'}</p>
+        <p className="text-sm text-gray-500">{device || 'Não configurado'}</p>
       </div>
       <span
-        className={`badge ${loaded ? 'badge-success' : 'badge-error'}`}
+        className={`badge ${configured ? 'badge-success' : 'badge-error'}`}
       >
-        {loaded ? 'Ativo' : 'Inativo'}
+        {configured ? 'Configurado' : 'Não configurado'}
       </span>
     </div>
   )

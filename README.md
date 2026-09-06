@@ -58,26 +58,54 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-This application enables users to upload audio or video files, convert them to .wav format, transcribe them using OpenAI's Whisper or AssemblyAI, and optionally perform speaker diarization with Pyannote. The system has been **completely redesigned with an integrated architecture**, running all services in a single optimized FastAPI process, with a Streamlit frontend for an intuitive user experience. The project is **highly optimized for NVIDIA GPUs** (RTX 3060, RTX 4090, etc.), leveraging CUDA and half-precision to significantly accelerate Whisper and Pyannote processing.
+This application uploads audio or video files, transcribes them using Hugging Face Whisper or AssemblyAI, and can perform speaker diarization with Pyannote. Since P1-A, FastAPI is a lightweight HTTP/job service and all audio, ML, CUDA, FFmpeg and processing-client work belongs to a separate RQ worker.
 
-### Integrated Architecture
+### API / Worker Architecture
 
-The project has been **fully restructured** for maximum simplicity and performance:
+The official flow is:
+
+```text
+React or Streamlit
+        |
+        v
+FastAPI (auth, upload, database, jobs, queries)
+        |
+        v
+Redis queue: transcriptions
+        |
+        v
+RQ Worker (FFmpeg, Whisper, Pyannote, AssemblyAI, Gemini)
+        |
+        v
+Database
+```
+
+The API process does not import or initialize Torch, Transformers, Whisper,
+Pyannote, librosa, pydub or AssemblyAI. The worker initializes engines once
+before consuming the queue and reuses them between jobs.
+
+Relevant backend layout:
 
 ```
 📁 Transcricao-de-audio/
 ├── 📁 modules/backend/
 │   ├── 📁 src/
-│   │   ├── main.py                    # Integrated API Gateway (Port 2020)
+│   │   ├── main.py                    # Lightweight FastAPI (Port 2020)
 │   │   ├── config.py                  # Configuration (.env, GPU settings)
 │   │   ├── models.py                  # SQLAlchemy models
 │   │   ├── security.py                # JWT authentication
 │   │   ├── 📁 services/
 │   │   │   ├── diarization_engine.py  # GPU-optimized Pyannote
 │   │   │   ├── transcription_engine.py # Whisper + AssemblyAI engines
+│   │   │   ├── processing_engines.py  # Worker-only engine initialization
+│   │   │   └── transcription_processing_service.py # Heavy pipeline
+│   │   ├── 📁 workers/                # RQ jobs and persistence
 │   │   └── 📁 utils/
 │   │       └── gpu_utils.py           # CUDA/cuDNN optimizations
-│   ├── requirements.txt               # Python dependencies
+│   ├── requirements.api.txt           # API dependencies, no ML stack
+│   ├── requirements.txt               # Full worker/test dependencies
+│   ├── Dockerfile.api                 # CPU-only HTTP runtime
+│   ├── Dockerfile.worker              # FFmpeg and ML runtime
 │   ├── .env.example                   # Configuration template
 │   └── 📁 database/                   # SQLite database
 ├── 📁 frontend/
@@ -85,14 +113,13 @@ The project has been **fully restructured** for maximum simplicity and performan
 └── .env                               # Main configuration
 ```
 
-**Key Improvements:**
-- **Single Process** - One command starts everything (port 2020)
-- **GPU First** - Automatic CUDA detection and optimization
-- **Performance** - Whisper Large on GPU approximately 10x faster
-- **Simple Setup** - Automated PowerShell scripts
-- **Memory Optimized** - Half-precision (float16) for RTX series
-- **Health Checks** - Real-time model monitoring
-- **Detailed Logs** - GPU info, VRAM usage, and timing metrics
+The four unconsumed synchronous processing endpoints (`/transcribe`,
+`/diarize`, `/whisper/transcribe_segment`, and
+`/assemblyai/transcribe_segment`) were removed. `/system/gpu` remains only as
+a deprecated lightweight compatibility response; GPU details are logged by the
+worker. Updating API keys requires restarting the worker, not FastAPI. See the
+[P1-A architecture audit](modules/backend/P1A_ARCHITECTURE.md) for the complete
+boundary and compatibility notes.
 
 ### Core Features
 
@@ -126,36 +153,36 @@ The project has been **fully restructured** for maximum simplicity and performan
        │ HTTP REST
        ▼
 ┌────────────────────────────────────────────┐
-│         Integrated Backend                 │ FastAPI (Port 2020)
+│         Lightweight API                    │ FastAPI (Port 2020)
 │  ┌──────────────────────────────────────┐  │
-│  │  Models Loaded at Startup            │  │
+│  │  No ML models loaded                  │  │
 │  │  ┌────────────┐ ┌────────────────┐  │  │
-│  │  │ Pyannote   │ │ Whisper Large  │  │  │
-│  │  │ (GPU/CUDA) │ │ (GPU/float16)  │  │  │
+│  │  │ Auth/HTTP  │ │ Jobs/Queries   │  │  │
+│  │  │ Upload/DB  │ │ Redis client   │  │  │
 │  │  └────────────┘ └────────────────┘  │  │
 │  │  ┌────────────────────────────────┐  │  │
-│  │  │     AssemblyAI Client          │  │  │
+│  │  │     Lightweight health         │  │  │
 │  │  └────────────────────────────────┘  │  │
 │  └──────────────────────────────────────┘  │
-│  • Integrated Orchestration                │
+│  • RQ job orchestration                    │
 │  • JWT Authentication                      │
 │  • SQLite Persistence                      │
 │  • Health Checks                           │
-│  • GPU Optimization                        │
+│  • No Torch/CUDA imports                   │
 └────────────────────┬───────────────────────┘
                      │
                      ▼
             ┌────────────────┐
-            │ NVIDIA GPU     │
-            │ CUDA + cuDNN   │ 
-            │ (RTX 3060+)    │
+            │ Redis / RQ     │
+            │ Worker + ML    │
+            │ CUDA optional  │
             └────────────────┘
 ```
 
-**Optimized Workflow:**
-1. **Startup**: Models loaded once into GPU
-2. **Upload**: Frontend → Unified backend
-3. **Processing**: Internal engines (no HTTP overhead)
+**Worker Workflow:**
+1. **API startup**: No models or CUDA stack are loaded
+2. **Upload**: Frontend → FastAPI → database and Redis
+3. **Processing**: The separate RQ worker reuses its engines
 4. **Diarization**: Pyannote identifies speakers on GPU
 5. **Transcription**: Whisper processes segments in float16
 6. **Response**: Aggregated results persisted
@@ -191,7 +218,9 @@ cd audio-transcription-microservices
 cd modules\backend
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements.txt  # worker + desenvolvimento/testes
+# Para executar somente a API em outro ambiente:
+# pip install -r requirements.api.txt
 
 # For NVIDIA GPU (recommended)
 pip uninstall -y torch torchvision torchaudio
@@ -219,7 +248,7 @@ GPU_MEMORY_FRACTION=0.8
 WHISPER_DTYPE=auto
 ```
 
-**4. Run (only 2 commands!):**
+**4. Run API, worker and frontend:**
 
 Terminal 1 - Backend:
 ```powershell
@@ -227,9 +256,15 @@ cd modules\backend
 python -m uvicorn src.main:app --host 0.0.0.0 --port 2020
 ```
 
-Terminal 2 - Frontend:
+Terminal 2 - RQ Worker (loads FFmpeg/Whisper/Pyannote):
 ```powershell
-cd frontend
+cd modules\backend
+python run_worker.py
+```
+
+Terminal 3 - Frontend:
+```powershell
+cd modules\frontend
 streamlit run app.py
 ```
 
@@ -299,10 +334,11 @@ Good morning everyone, let's start today's meeting. Perfect, I have some importa
 # Health check
 curl http://localhost:2020/health
 
-# Upload and transcription
-curl -X POST "http://localhost:2020/transcribe" \
+# Create asynchronous transcription job
+curl -X POST "http://localhost:2020/transcriptions/jobs" \
   -F "file=@audio.mp3" \
-  -F "enable_diarization=true"
+  -F "use_diarization=true" \
+  -F "transcription_model=whisper"
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -311,7 +347,7 @@ curl -X POST "http://localhost:2020/transcribe" \
 ## Roadmap
 
 ### Completed
-- [x] **Integrated architecture** - Single process on port 2020
+- [x] **Isolated architecture** - Lightweight FastAPI plus a separate RQ worker
 - [x] **Complete GPU optimization** - CUDA, cuDNN, half-precision
 - [x] **Whisper Large GPU** - approximately 10x faster than CPU
 - [x] **Pyannote GPU** - Accelerated diarization
@@ -321,10 +357,10 @@ curl -X POST "http://localhost:2020/transcribe" \
 - [x] **SQLite persistence** - Transcription history
 - [x] **.env configuration** - GPU settings, API keys
 - [x] **Detailed logging** - VRAM, timings, device info
+- [x] **Automated boundary tests** - Job lifecycle and API/worker isolation
+- [x] **Split Docker runtimes** - API image without ML and full worker image
 
 ### In Progress
-- [ ] **Automated tests** - Full coverage
-- [ ] **Simplified Docker** - Single container
 - [ ] **Rate limiting** - API protection
 
 ### Planned
@@ -332,7 +368,6 @@ curl -X POST "http://localhost:2020/transcribe" \
 - [ ] **INT8 quantization** - Lower VRAM usage
 - [ ] **Streaming transcription** - Real-time
 - [ ] **Whisper fine-tuning** - Brazilian Portuguese
-- [ ] **Web interface** - React/Vue alternative
 - [ ] **Batch processing** - Multiple files
 - [ ] **Export formats** - SRT, VTT, JSON
 - [ ] **Real-time diarization** - Live microphone

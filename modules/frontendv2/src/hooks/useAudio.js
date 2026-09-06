@@ -2,43 +2,6 @@ import { useState, useEffect } from 'react'
 import { audioService } from '../services/audioService'
 import toast from 'react-hot-toast'
 
-export function useAudioUpload() {
-  const [uploading, setUploading] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [error, setError] = useState(null)
-
-  const uploadAudio = async (file, options = {}) => {
-    try {
-      setUploading(true)
-      setProgress(0)
-      setError(null)
-
-      const result = await audioService.transcribeAudio(file, {
-        ...options,
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          )
-          setProgress(percentCompleted)
-        },
-      })
-
-      toast.success('Transcrição concluída!')
-      return result
-    } catch (err) {
-      const message = err.message || 'Erro ao fazer upload'
-      setError(message)
-      toast.error(message)
-      throw err
-    } finally {
-      setUploading(false)
-      setProgress(0)
-    }
-  }
-
-  return { uploading, progress, error, uploadAudio }
-}
-
 export function useTranscriptions(options = {}) {
   const [transcriptions, setTranscriptions] = useState([])
   const [loading, setLoading] = useState(true)

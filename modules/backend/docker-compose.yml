@@ -2,7 +2,7 @@ services:
   app:
     build:
       context: ../..
-      dockerfile: modules/backend/Dockerfile
+      dockerfile: modules/backend/Dockerfile.api
     container_name: transcription-app
     ports:
       - "2020:2020"
@@ -20,7 +20,7 @@ services:
   worker:
     build:
       context: ../..
-      dockerfile: modules/backend/Dockerfile
+      dockerfile: modules/backend/Dockerfile.worker
     command: ["python", "run_worker.py"]
     working_dir: /app/modules/backend
     env_file:

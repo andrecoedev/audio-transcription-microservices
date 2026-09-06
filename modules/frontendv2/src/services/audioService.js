@@ -7,26 +7,6 @@ export const audioService = {
     return data
   },
 
-  // Upload e transcrição de áudio
-  async transcribeAudio(file, options = {}) {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('use_diarization', options.useDiarization || false)
-    
-    if (options.transcriptionModel) {
-      formData.append('transcription_model', options.transcriptionModel)
-    }
-
-    const { data } = await api.post('/transcribe', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: options.onUploadProgress,
-    })
-    
-    return data
-  },
-
   // Upload e criação de job assíncrono local
   async createTranscriptionJob(file, options = {}) {
     const formData = new FormData()
@@ -77,22 +57,6 @@ export const audioService = {
     return data
   },
 
-  // Diarização direta
-  async diarizeAudio(file, options = {}) {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('min_duration', options.minDuration || 0.7)
-    formData.append('silence_threshold', options.silenceThreshold || -30)
-
-    const { data } = await api.post('/diarize', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-    
-    return data
-  },
-
   // Obter status das API Keys (sem expor valores completos)
   async getApiKeysStatus() {
     const { data } = await api.get('/api-keys')
@@ -127,9 +91,9 @@ export const audioService = {
     return data
   },
 
-  // Diagnóstico completo de GPU e RAM
   async getSystemGpu() {
     const { data } = await api.get('/system/gpu')
     return data
   },
+
 }
