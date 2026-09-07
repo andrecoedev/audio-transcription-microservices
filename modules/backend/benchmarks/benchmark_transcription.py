@@ -12,7 +12,7 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import psutil
@@ -37,6 +37,13 @@ def _package_version(name: str) -> str | None:
 
 
 def _git_state() -> dict:
+    revision_override = os.getenv("BENCHMARK_GIT_REVISION")
+    dirty_override = os.getenv("BENCHMARK_GIT_DIRTY")
+    dirty_from_env = (
+        dirty_override.lower() in {"1", "true", "yes"}
+        if dirty_override is not None
+        else None
+    )
     try:
         revision = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -52,9 +59,12 @@ def _git_state() -> dict:
             text=True,
             timeout=5,
         ).stdout
-        return {"revision": revision, "dirty": bool(status.strip())}
+        return {
+            "revision": revision_override or revision,
+            "dirty": dirty_from_env if dirty_from_env is not None else bool(status.strip()),
+        }
     except (OSError, subprocess.SubprocessError):
-        return {"revision": None, "dirty": None}
+        return {"revision": revision_override, "dirty": dirty_from_env}
 
 
 def _sha256_file(path: Path) -> str:
@@ -126,6 +136,14 @@ def _process_vram_mb(pid: int) -> float | None:
     return total if found else None
 
 
+def _total_gpu_vram_mb() -> float | None:
+    rows = _run_nvidia_smi("memory.used")
+    if not rows:
+        return None
+    match = re.search(r"[\d.]+", rows[0])
+    return float(match.group()) if match else None
+
+
 class ResourceSampler:
     def __init__(self, interval: float = 0.05):
         self.interval = interval
@@ -133,6 +151,10 @@ class ResourceSampler:
         self.ram_start = self.process.memory_info().rss
         self.ram_peak = self.ram_start
         self.vram_start = _process_vram_mb(self.process.pid)
+        self.vram_measurement = "process"
+        if self.vram_start is None:
+            self.vram_start = _total_gpu_vram_mb()
+            self.vram_measurement = "gpu_total" if self.vram_start is not None else None
         self.vram_peak = self.vram_start
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._sample, daemon=True)
@@ -150,7 +172,11 @@ class ResourceSampler:
     def _sample(self):
         while not self._stop.wait(self.interval):
             self.ram_peak = max(self.ram_peak, self.process.memory_info().rss)
-            vram = _process_vram_mb(self.process.pid)
+            vram = (
+                _process_vram_mb(self.process.pid)
+                if self.vram_measurement == "process"
+                else _total_gpu_vram_mb()
+            )
             if vram is not None:
                 self.vram_peak = max(self.vram_peak or 0.0, vram)
 
@@ -223,6 +249,7 @@ def _create_whisper_engine(args):
     return WhisperEngine(
         settings.HF_TOKEN,
         model_name=args.legacy_model,
+        language=args.language,
     )
 
 
@@ -282,7 +309,7 @@ def run(args) -> dict:
     metadata = getattr(whisper_engine, "get_metadata", lambda: {})()
     output = {
         "schema_version": 1,
-        "measured_at": datetime.now(UTC).isoformat(),
+        "measured_at": datetime.now(timezone.utc).isoformat(),
         "source": _git_state(),
         "fixture": audio_path.name,
         "fixture_sha256": _sha256_file(audio_path),
@@ -308,9 +335,16 @@ def run(args) -> dict:
         ),
         "vram_start_mb": resources.vram_start,
         "vram_peak_mb": resources.vram_peak,
+        "vram_peak_delta_mb": (
+            round(resources.vram_peak - resources.vram_start, 2)
+            if resources.vram_peak is not None and resources.vram_start is not None
+            else None
+        ),
+        "vram_measurement": resources.vram_measurement,
         "temporary_files": temporary_files,
         "temporary_bytes": temporary_bytes,
         "segment_count": len(result.segments),
+        "num_speakers": result.num_speakers,
         "word_count": result.word_count,
         "timestamps": [
             {

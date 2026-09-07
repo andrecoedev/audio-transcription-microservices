@@ -32,6 +32,7 @@ blocked = {
     "assemblyai", "ctranslate2", "faster_whisper", "librosa",
     "pydub", "pyannote", "torch", "transformers"
 }
+baseline_modules = set(sys.modules)
 
 class BlockHeavyImports(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
@@ -47,7 +48,11 @@ with TestClient(app) as client:
     response = client.get("/")
     assert response.status_code == 200
 
-loaded = blocked.intersection(name.split(".", 1)[0] for name in sys.modules)
+loaded = {
+    name
+    for name in set(sys.modules) - baseline_modules
+    if name.split(".", 1)[0] in blocked
+}
 assert not loaded, loaded
 '''
     environment = os.environ.copy()

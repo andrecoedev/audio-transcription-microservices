@@ -54,7 +54,7 @@ def main():
             before["ram_peak_mb"], after["ram_peak_mb"]
         ),
         "vram_peak_change_percent": _percent_change(
-            before.get("vram_peak_mb"), after.get("vram_peak_mb")
+            before.get("vram_peak_delta_mb"), after.get("vram_peak_delta_mb")
         ),
         "temporary_files_change": (
             after["temporary_files"] - before["temporary_files"]

@@ -11,9 +11,9 @@ node_modules/
 dist/
 docker-compose.yml
 Dockerfile
-.dockerignore
 modules/backend/database
 modules/backend/temp
 modules/backend/benchmarks/fixtures/*
 !modules/backend/benchmarks/fixtures/README.md
 modules/backend/benchmarks/results/*.json
+modules/backend/benchmarks/*.md

@@ -20,9 +20,15 @@ class WhisperEngine:
 
     engine_name = "huggingface-whisper"
     
-    def __init__(self, hf_token: str, model_name: str = "openai/whisper-large-v3"):
+    def __init__(
+        self,
+        hf_token: str,
+        model_name: str = "openai/whisper-large-v3",
+        language: str | None = None,
+    ):
         self.hf_token = hf_token
         self.model_name = model_name
+        self.language = language or settings.WHISPER_LANGUAGE
         self.model = None
         self.processor = None
         self._load_model()
@@ -242,16 +248,23 @@ class WhisperEngine:
             
             # Gerar transcrição com configurações otimizadas
             with torch.no_grad():
-                # Forçar língua portuguesa nos IDs gerados
-                forced_decoder_ids = self.processor.get_decoder_prompt_ids(language="pt", task="transcribe")
+                # Configurar o idioma quando ele foi selecionado explicitamente.
+                generation_kwargs = {}
+                if self.language != "auto":
+                    generation_kwargs["forced_decoder_ids"] = (
+                        self.processor.get_decoder_prompt_ids(
+                            language=self.language,
+                            task="transcribe",
+                        )
+                    )
                 
                 predicted_ids = self.model.generate(
                     input_features["input_features"],
                     attention_mask=input_features["attention_mask"],
-                    forced_decoder_ids=forced_decoder_ids,
                     max_new_tokens=444,  # 448 (limite) - 4 (tokens especiais) = 444
                     num_beams=1,  # Greedy search para velocidade (ou 5 para melhor qualidade)
                     temperature=0.0,  # Determinístico
+                    **generation_kwargs,
                 )
             
             transcription = self.processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
@@ -278,7 +291,7 @@ class WhisperEngine:
             "model": self.model_name,
             "device": self.get_device(),
             "compute_type": str(getattr(self.model, "dtype", settings.WHISPER_DTYPE)),
-            "language": "pt",
+            "language": self.language,
         }
 
 
