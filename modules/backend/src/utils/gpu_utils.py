@@ -146,31 +146,6 @@ def check_memory_requirements(model_name: str = "whisper-large") -> Dict[str, An
     return result
 
 
-def get_optimal_whisper_dtype() -> torch.dtype:
-    """
-    Determina o melhor dtype para Whisper baseado na GPU disponível.
-    
-    Returns:
-        torch.dtype otimizado
-    """
-    if not torch.cuda.is_available():
-        return torch.float32
-    
-    # Verificar VRAM disponível
-    props = torch.cuda.get_device_properties(0)
-    total_gb = props.total_memory / 1024**3
-    
-    if total_gb >= 8:
-        # GPU com bastante VRAM - pode usar float32 para melhor qualidade
-        return torch.float32
-    elif total_gb >= 6:
-        # GPU média - float16 para economizar VRAM
-        return torch.float16
-    else:
-        # GPU pequena - float16 obrigatório
-        return torch.float16
-
-
 def clear_gpu_memory():
     """Limpa cache de memória GPU."""
     if torch.cuda.is_available():

@@ -11,16 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 def _default_factories() -> dict[str, Callable[..., Any]]:
-    if settings.TRANSCRIPTION_ENGINE == "faster-whisper":
-        from .faster_whisper_engine import FasterWhisperEngine
+    from .faster_whisper_engine import FasterWhisperEngine
 
-        whisper_factory = FasterWhisperEngine
-    else:
-        from .transcription_engine import WhisperEngine
-
-        whisper_factory = WhisperEngine
-
-    factories: dict[str, Callable[..., Any]] = {"whisper": whisper_factory}
+    factories: dict[str, Callable[..., Any]] = {"whisper": FasterWhisperEngine}
     if settings.HF_TOKEN:
         from .diarization_engine import DiarizationEngine
 
@@ -60,7 +53,7 @@ def initialize_processing_engines(
             metadata_getter = getattr(
                 engine_registry.whisper_engine,
                 "get_metadata",
-                lambda: {"engine": settings.TRANSCRIPTION_ENGINE},
+                lambda: {"engine": "faster-whisper"},
             )
             logger.info("Whisper engine ready in worker: %s", metadata_getter())
         except Exception:

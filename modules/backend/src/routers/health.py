@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
-from ..workers.config import get_redis_connection, is_redis_available
+from ..workers.config import (
+    TRANSCRIPTION_QUEUE_NAME,
+    get_redis_connection,
+    is_redis_available,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -23,7 +27,7 @@ def _processing_status() -> dict:
         logger.warning("Redis healthcheck failed: %s", exc)
         return {
             "redis": "unavailable",
-            "queue": settings.RQ_QUEUE_NAME,
+            "queue": TRANSCRIPTION_QUEUE_NAME,
             "worker_available": False,
             "worker_count": 0,
         }
@@ -38,7 +42,7 @@ def _processing_status() -> dict:
         "redis": "connected" if redis_available else "unavailable",
         "worker_available": worker_count > 0,
         "worker_count": worker_count,
-        "queue": settings.RQ_QUEUE_NAME,
+        "queue": TRANSCRIPTION_QUEUE_NAME,
     }
 
 

@@ -25,12 +25,11 @@ numpy<2
 # ML Models
 faster-whisper==1.2.1
 ctranslate2==4.8.2
+# Pyannote 3.3.2 still calls the pre-1.0 `use_auth_token` Hub API.
+huggingface-hub==0.29.3
 torch==2.2.2
 torchvision==0.17.2
 torchaudio==2.2.2
-# Temporary rollback engine until real parity benchmarks are available.
-transformers==4.49.0
-accelerate>=0.26.0
 assemblyai==0.40.2
 pyannote.audio==3.3.2
 pyannote.core==5.0.0

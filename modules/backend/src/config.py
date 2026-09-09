@@ -61,12 +61,12 @@ class Settings(BaseSettings):
         description="Default transcription model (whisper or assemblyai)"
     )
     MIN_SEGMENT_DURATION: float = Field(
-        default=0.7,
-        description="Minimum segment duration in seconds"
+        default=0.5,
+        description="Minimum Pyannote segment duration retained by the worker"
     )
-    SILENCE_THRESHOLD: int = Field(
-        default=-30,
-        description="Silence threshold in dB"
+    SILENCE_THRESHOLD: float = Field(
+        default=-40.0,
+        description="Minimum RMS dBFS retained after Pyannote diarization"
     )
     MEETING_MINUTES_TIMEOUT_SECONDS: int = Field(
         default=600,
@@ -81,14 +81,6 @@ class Settings(BaseSettings):
     GPU_MEMORY_FRACTION: float = Field(
         default=0.8,
         description="Fraction of GPU memory to use (0.1-1.0)"
-    )
-    WHISPER_DTYPE: str = Field(
-        default="auto",
-        description="Legacy Hugging Face Whisper dtype",
-    )
-    TRANSCRIPTION_ENGINE: Literal["faster-whisper", "huggingface"] = Field(
-        default="faster-whisper",
-        description="Local Whisper implementation used by the worker",
     )
     WHISPER_MODEL: str = Field(
         default="large-v3",
@@ -214,6 +206,12 @@ class Settings(BaseSettings):
         if self.WHISPER_MAX_DECODE_CHUNK_SECONDS <= 0:
             errors.append("WHISPER_MAX_DECODE_CHUNK_SECONDS must be greater than zero")
 
+        if self.MIN_SEGMENT_DURATION < 0:
+            errors.append("MIN_SEGMENT_DURATION cannot be negative")
+
+        if not (-100.0 <= self.SILENCE_THRESHOLD <= 0.0):
+            errors.append("SILENCE_THRESHOLD must be between -100 and 0 dBFS")
+
         if self.WHISPER_CPU_THREADS < 0:
             errors.append("WHISPER_CPU_THREADS cannot be negative")
 
@@ -293,7 +291,7 @@ def sanitize_settings_snapshot() -> dict:
         "hf_token_configured": bool(settings.HF_TOKEN),
         "aai_api_key_configured": bool(settings.AAI_API_KEY),
         "gemini_api_key_configured": bool(settings.GEMINI_API_KEY),
-        "transcription_engine": settings.TRANSCRIPTION_ENGINE,
+        "transcription_engine": "faster-whisper",
         "whisper_model": settings.WHISPER_MODEL,
         "whisper_device": settings.WHISPER_DEVICE,
         "whisper_compute_type": settings.WHISPER_COMPUTE_TYPE,

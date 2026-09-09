@@ -58,7 +58,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-This application uploads audio or video files, transcribes them using Faster-Whisper/CTranslate2 or AssemblyAI, and can perform speaker diarization with Pyannote. FastAPI is a lightweight HTTP/job service and all audio, ML, CUDA, FFmpeg and processing-client work belongs to a separate RQ worker. The former Hugging Face Transformers engine remains temporarily available behind a rollback flag while real parity fixtures are pending.
+This application uploads audio or video files, transcribes them using Faster-Whisper/CTranslate2 or AssemblyAI, and can perform speaker diarization with Pyannote. FastAPI is a lightweight HTTP/job service and all audio, ML, CUDA, FFmpeg and processing-client work belongs to a separate RQ worker. Faster-Whisper is the only local Whisper implementation; the former Hugging Face Transformers engine was removed after the P1-B PT-BR parity validation.
 
 ### API / Worker Architecture
 
@@ -97,7 +97,6 @@ Relevant backend layout:
 │   │   ├── 📁 services/
 │   │   │   ├── diarization_engine.py  # GPU-optimized Pyannote
 │   │   │   ├── faster_whisper_engine.py # CTranslate2 adapter
-│   │   │   ├── transcription_engine.py # Temporary HF rollback engine
 │   │   │   ├── processing_engines.py  # Worker-only engine initialization
 │   │   │   └── transcription_processing_service.py # Heavy pipeline
 │   │   ├── 📁 workers/                # RQ jobs and persistence
@@ -122,10 +121,8 @@ worker. Updating API keys requires restarting the worker, not FastAPI. See the
 [P1-A architecture audit](modules/backend/P1A_ARCHITECTURE.md) for the complete
 boundary and compatibility notes.
 
-See the [P1-B benchmark guide](modules/backend/benchmarks/README.md) and the
-[results recorded for this environment](modules/backend/benchmarks/P1B_RESULTS.md).
-The [P1-B engine migration audit](modules/backend/P1B_ENGINE_MIGRATION.md)
-documents the before/after pipeline and rollback decision.
+See the [final P1-B validation](modules/backend/P1B_FINAL_VALIDATION.md) for the
+PT-BR quality, performance, diarization and engine-removal evidence.
 
 ### Core Features
 
@@ -143,7 +140,6 @@ documents the before/after pipeline and rollback decision.
 - **FastAPI** - Backend REST API
 - **Faster-Whisper + CTranslate2** - Default local Whisper Large v3 inference
 - **PyTorch + CUDA** - Required by Pyannote
-- **Transformers (Hugging Face)** - Temporary rollback engine
 - **Pyannote.audio** - Speaker diarization
 - **AssemblyAI** - Cloud transcription (alternative)
 - **SQLAlchemy** - ORM for persistence
@@ -241,12 +237,11 @@ worker Docker image already starts from a CUDA 12.3/cuDNN 9 runtime image.
 
 **3. Configure API Keys:**
 ```powershell
-# Copy and edit the .env file in the project root
-copy modules\backend\.env.example .env
-# OR edit existing .env in the root
+# From modules\backend, copy and edit the worker/API environment file
+copy .env.example .env
 ```
 
-**.env (required - located in project root):**
+**.env (required - located in `modules/backend`):**
 ```ini
 # Hugging Face (required for Pyannote)
 HF_TOKEN=your_huggingface_token_here
@@ -257,12 +252,13 @@ AAI_API_KEY=your_assemblyai_token_here
 # GPU Settings (optional)
 FORCE_CPU=false
 GPU_MEMORY_FRACTION=0.8
-TRANSCRIPTION_ENGINE=faster-whisper
 WHISPER_MODEL=large-v3
 WHISPER_DEVICE=auto
 WHISPER_COMPUTE_TYPE=auto
 WHISPER_LANGUAGE=pt
 WHISPER_MAX_DECODE_CHUNK_SECONDS=300
+MIN_SEGMENT_DURATION=0.5
+SILENCE_THRESHOLD=-40
 ```
 
 **4. Run API, worker and frontend:**
@@ -286,6 +282,10 @@ GPU and select CUDA/FP16, apply the GPU overlay:
 docker compose -f modules/backend/docker-compose.yml `
   -f modules/backend/docker-compose.gpu.yml up --build
 ```
+
+These files under `modules/backend/` are the only supported Compose
+configuration. The obsolete root Compose, which started a monolithic backend
+without the Redis/RQ boundary, was removed.
 
 Terminal 3 - Frontend:
 ```powershell
@@ -347,9 +347,10 @@ Good morning everyone, let's start today's meeting. Perfect, I have some importa
 
 ### Performance
 
-No project-specific performance numbers are claimed without repeatable local
-measurements. Use `modules/backend/benchmarks/benchmark_transcription.py` and
-consult `modules/backend/benchmarks/P1B_RESULTS.md`.
+Repeatable measurements are documented in
+`modules/backend/P1B_FINAL_VALIDATION.md`. Use
+`modules/backend/benchmarks/benchmark_transcription.py` for Faster-Whisper and
+`modules/backend/benchmarks/diagnose_diarization.py` for filter diagnostics.
 
 ### REST API (Optional)
 
@@ -383,7 +384,7 @@ curl -X POST "http://localhost:2020/transcriptions/jobs" \
 - [x] **Split Docker runtimes** - API image without ML and full worker image
 
 ### In Progress
-- [ ] **Real P1-B parity/performance evidence** - requires representative speech fixtures
+- [x] **P1-B PT-BR parity/performance evidence** - validated with public FLEURS speech
 - [ ] **Rate limiting** - API protection
 
 ### Planned

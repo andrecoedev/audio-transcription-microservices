@@ -229,26 +229,13 @@ class TemporaryFileSampler:
 
 
 def _create_whisper_engine(args):
-    if args.engine == "faster-whisper":
-        from src.services.faster_whisper_engine import FasterWhisperEngine
+    from src.services.faster_whisper_engine import FasterWhisperEngine
 
-        return FasterWhisperEngine(
-            settings.HF_TOKEN,
-            model_name=args.model,
-            device=args.device,
-            compute_type=args.compute_type,
-            language=args.language,
-        )
-
-    from src.services.transcription_engine import WhisperEngine
-
-    settings.FORCE_CPU = args.device == "cpu"
-    settings.WHISPER_DTYPE = (
-        "auto" if args.compute_type == "auto" else args.compute_type
-    )
-    return WhisperEngine(
+    return FasterWhisperEngine(
         settings.HF_TOKEN,
-        model_name=args.legacy_model,
+        model_name=args.model,
+        device=args.device,
+        compute_type=args.compute_type,
         language=args.language,
     )
 
@@ -269,7 +256,6 @@ def _hardware() -> dict:
                 "faster-whisper",
                 "ctranslate2",
                 "torch",
-                "transformers",
                 "pyannote.audio",
             )
         },
@@ -289,6 +275,16 @@ def run(args) -> dict:
         whisper_engine = _create_whisper_engine(args)
         model_load_seconds = time.perf_counter() - model_started
         engine_registry.whisper_engine = whisper_engine
+
+        warmup_seconds = 0.0
+        if args.warmup_seconds > 0:
+            warmup_started = time.perf_counter()
+            whisper_engine.transcribe_segment(
+                str(audio_path),
+                start=0.0,
+                end=args.warmup_seconds,
+            )
+            warmup_seconds = time.perf_counter() - warmup_started
 
         if args.diarization:
             from src.services.diarization_engine import DiarizationEngine
@@ -313,14 +309,15 @@ def run(args) -> dict:
         "source": _git_state(),
         "fixture": audio_path.name,
         "fixture_sha256": _sha256_file(audio_path),
-        "engine": metadata.get("engine", "huggingface-whisper"),
-        "model": metadata.get("model", args.legacy_model),
+        "engine": metadata.get("engine", "faster-whisper"),
+        "model": metadata.get("model", args.model),
         "device": metadata.get("device", whisper_engine.get_device()),
-        "compute_type": metadata.get("compute_type", settings.WHISPER_DTYPE),
+        "compute_type": metadata.get("compute_type", args.compute_type),
         "language": metadata.get("language", args.language),
         "diarization_enabled": args.diarization,
         "audio_duration_seconds": round(result.duration_seconds, 6),
         "model_load_seconds": round(model_load_seconds, 6),
+        "warmup_seconds": round(warmup_seconds, 6),
         "processing_seconds": round(processing_seconds, 6),
         "conversion_seconds": round(result.conversion_seconds, 6),
         "diarization_seconds": round(result.diarization_seconds, 6),
@@ -365,18 +362,19 @@ def run(args) -> dict:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--audio", required=True)
-    parser.add_argument(
-        "--engine",
-        choices=("huggingface", "faster-whisper"),
-        required=True,
-    )
+    parser.add_argument("--engine", choices=("faster-whisper",), default="faster-whisper")
     parser.add_argument("--model", default=settings.WHISPER_MODEL)
-    parser.add_argument("--legacy-model", default="openai/whisper-large-v3")
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--compute-type", default="auto")
     parser.add_argument("--language", choices=("pt", "en", "auto"), default="pt")
     parser.add_argument("--diarization", action="store_true")
     parser.add_argument("--include-text", action="store_true")
+    parser.add_argument(
+        "--warmup-seconds",
+        type=float,
+        default=0.0,
+        help="Untimed prefix inference used to warm kernels before measurement",
+    )
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
@@ -388,7 +386,24 @@ def main():
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(serialized + "\n", encoding="utf-8")
-    print(serialized)
+        print(json.dumps({
+            key: result[key]
+            for key in (
+                "fixture",
+                "engine",
+                "model",
+                "device",
+                "compute_type",
+                "audio_duration_seconds",
+                "warmup_seconds",
+                "processing_seconds",
+                "rtf",
+                "num_speakers",
+                "segment_count",
+            )
+        }, indent=2))
+    else:
+        print(serialized)
 
 
 if __name__ == "__main__":

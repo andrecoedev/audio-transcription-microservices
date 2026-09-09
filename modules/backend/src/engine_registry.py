@@ -47,8 +47,8 @@ class DiarizationEngineProtocol(Protocol):
     def diarize(
         self,
         audio_path: str,
-        min_duration: float = 0.7,
-        silence_threshold: int = -30,
+        min_duration: Optional[float] = None,
+        silence_threshold: Optional[float] = None,
     ) -> dict:
         ...
 

@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from src import engine_registry
 from src.main import app
+from src.routers import health
 from src.services import processing_engines
 from src.workers import transcription_worker
 
@@ -171,3 +172,20 @@ def test_official_job_endpoints_and_deprecated_gpu_endpoint_remain():
     assert response.status_code == 200
     assert response.headers["Deprecation"] == "true"
     assert response.json()["deprecated"] is True
+
+
+def test_health_degrades_cleanly_when_redis_is_unavailable(monkeypatch):
+    monkeypatch.setattr(health, "get_redis_connection", object)
+    monkeypatch.setattr(health, "is_redis_available", lambda _connection: False)
+
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "degraded"
+    assert response.json()["processing"] == {
+        "redis": "unavailable",
+        "worker_available": False,
+        "worker_count": 0,
+        "queue": "transcriptions",
+    }

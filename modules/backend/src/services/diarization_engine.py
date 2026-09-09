@@ -168,8 +168,8 @@ class DiarizationEngine:
         audio_path: str,
         start: float,
         end: float,
-        min_duration: float = 0.7,
-        silence_threshold: int = -30
+        min_duration: float,
+        silence_threshold: float,
     ) -> bool:
         """Verifica se segmento é válido (não muito curto ou silencioso)."""
         try:
@@ -196,7 +196,12 @@ class DiarizationEngine:
             logger.error(f"Erro ao verificar segmento {start:.2f}s-{end:.2f}s: {e}")
             return False
     
-    def diarize(self, audio_path: str, min_duration: float = 0.7, silence_threshold: int = -30) -> dict:
+    def diarize(
+        self,
+        audio_path: str,
+        min_duration: float | None = None,
+        silence_threshold: float | None = None,
+    ) -> dict:
         """
         Realiza diarização do arquivo de áudio.
         
@@ -205,6 +210,15 @@ class DiarizationEngine:
         """
         if self.pipeline is None:
             raise RuntimeError("Pipeline de diarização não carregado")
+
+        min_duration = (
+            settings.MIN_SEGMENT_DURATION if min_duration is None else min_duration
+        )
+        silence_threshold = (
+            settings.SILENCE_THRESHOLD
+            if silence_threshold is None
+            else silence_threshold
+        )
         
         try:
             logger.info(f"Iniciando diarização de: {audio_path}")
