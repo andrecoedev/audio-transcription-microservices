@@ -98,3 +98,36 @@ def test_diarization_sorts_clamps_and_preserves_speakers(monkeypatch, tmp_path):
     ]
     assert result.num_speakers == 3
     assert all(0 <= item["start"] < item["end"] <= 10.0 for item in result.segments)
+
+
+def test_diarization_overlap_preserves_both_tracks_and_transcribes_both(
+    monkeypatch, tmp_path
+):
+    class Diarization:
+        def diarize(self, _path):
+            return {
+                "segments": [
+                    {"start": 0.0, "end": 2.0, "speaker": "SPEAKER_00"},
+                    {"start": 1.0, "end": 3.0, "speaker": "SPEAKER_01"},
+                ],
+                "num_speakers": 2,
+            }
+
+    engine = RecordingWhisper()
+    monkeypatch.setattr(engine_registry, "whisper_engine", engine)
+    monkeypatch.setattr(engine_registry, "diarization_engine", Diarization())
+    monkeypatch.setattr(processing_module, "_TEMP_DIRECTORY", tmp_path)
+    monkeypatch.setattr(processing_module, "convert_to_wav", _fake_conversion)
+
+    result = TranscriptionProcessingService().process_transcription(
+        "input.mp3", True, "whisper"
+    )
+
+    assert engine.calls == [
+        (engine.calls[0][0], 0.0, 2.0),
+        (engine.calls[0][0], 1.0, 3.0),
+    ]
+    assert [row["speaker"] for row in result.segments] == [
+        "SPEAKER_00",
+        "SPEAKER_01",
+    ]

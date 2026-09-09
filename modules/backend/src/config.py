@@ -61,12 +61,16 @@ class Settings(BaseSettings):
         description="Default transcription model (whisper or assemblyai)"
     )
     MIN_SEGMENT_DURATION: float = Field(
-        default=0.5,
-        description="Minimum Pyannote segment duration retained by the worker"
+        default=0.0,
+        description=(
+            "Optional minimum Pyannote turn duration; zero preserves short speech"
+        )
     )
     SILENCE_THRESHOLD: float = Field(
-        default=-40.0,
-        description="Minimum RMS dBFS retained after Pyannote diarization"
+        default=-100.0,
+        description=(
+            "Optional RMS dBFS post-filter; -100 disables redundant filtering"
+        )
     )
     MEETING_MINUTES_TIMEOUT_SECONDS: int = Field(
         default=600,

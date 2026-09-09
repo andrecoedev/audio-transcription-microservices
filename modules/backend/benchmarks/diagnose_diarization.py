@@ -26,7 +26,8 @@ from src.services.diarization_engine import DiarizationEngine
 
 CONFIGURATIONS = (
     ("raw", 0.0, None),
-    ("current-0.7s--30dbfs", 0.7, -30.0),
+    ("production-0.0s--100dbfs", 0.0, -100.0),
+    ("legacy-0.5s--40dbfs", 0.5, -40.0),
     ("0.5s--30dbfs", 0.5, -30.0),
     ("0.3s--30dbfs", 0.3, -30.0),
     ("0.7s--35dbfs", 0.7, -35.0),

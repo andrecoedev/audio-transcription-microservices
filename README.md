@@ -124,10 +124,19 @@ boundary and compatibility notes.
 See the [final P1-B validation](modules/backend/P1B_FINAL_VALIDATION.md) for the
 PT-BR quality, performance, diarization and engine-removal evidence.
 
+The P1-C robustness validation uses `pyannote/speaker-diarization-3.1` without
+changing models. Real AMI meeting excerpts demonstrated that the former
+`0.5s/-40 dBFS` post-filter discarded legitimate short and far-field speech.
+The production defaults are therefore `MIN_SEGMENT_DURATION=0` and
+`SILENCE_THRESHOLD=-100`: Pyannote remains the speech detector and its turns
+are preserved. Both values remain configurable for explicitly calibrated
+deployments. See [P1-C validation](P1C_VALIDATION.md) for DER, overlap,
+speaker-count, performance and three-job stability evidence.
+
 ### Core Features
 
 - **Automatic Transcription**: Support for local Whisper and cloud-based AssemblyAI with model selection.
-- **Speaker Diarization**: Identifies who speaks and when using Pyannote, with filtering for short or silent segments for improved robustness.
+- **Speaker Diarization**: Identifies who speaks and when using Pyannote while preserving short and low-volume turns by default.
 - **Intuitive Interface**: Streamlit provides a simple UI with model availability verification.
 - **CPU/GPU Optimization**: Works on CPUs with adjusted processing times or GPUs for faster performance.
 - **Terminal Progress**: Displays diarization progress in the terminal.
@@ -257,8 +266,8 @@ WHISPER_DEVICE=auto
 WHISPER_COMPUTE_TYPE=auto
 WHISPER_LANGUAGE=pt
 WHISPER_MAX_DECODE_CHUNK_SECONDS=300
-MIN_SEGMENT_DURATION=0.5
-SILENCE_THRESHOLD=-40
+MIN_SEGMENT_DURATION=0
+SILENCE_THRESHOLD=-100
 ```
 
 **4. Run API, worker and frontend:**

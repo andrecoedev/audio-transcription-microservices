@@ -124,6 +124,55 @@ def test_invalid_faster_whisper_timestamps_are_rejected(monkeypatch):
         engine.transcribe_segment("audio.wav", end=3.0)
 
 
+def test_padded_timestamp_keeps_confident_short_speech(monkeypatch):
+    model = FakeModel(
+        segments=[
+            SimpleNamespace(
+                start=0.0,
+                end=4.32,
+                text="and",
+                no_speech_prob=0.53,
+            )
+        ]
+    )
+    engine, _, _ = _engine(monkeypatch, model=model)
+
+    assert engine.transcribe_segment("audio.wav", end=0.827) == "and"
+
+
+def test_padded_timestamp_discards_high_no_speech_hallucination(monkeypatch):
+    model = FakeModel(
+        segments=[
+            SimpleNamespace(
+                start=0.0,
+                end=29.98,
+                text="Thank you",
+                no_speech_prob=0.934,
+            )
+        ]
+    )
+    engine, _, _ = _engine(monkeypatch, model=model)
+
+    assert engine.transcribe_segment("audio.wav", end=0.338) == ""
+
+
+def test_floating_point_tail_does_not_decode_zero_length_window(monkeypatch):
+    decoded_windows = []
+    engine = FasterWhisperEngine(
+        model_factory=lambda *_args, **_kwargs: FakeModel(segments=[]),
+        cuda_device_count=lambda: 0,
+        supported_compute_types=lambda _device: {"int8"},
+        segment_decoder=lambda _path, **window: (
+            decoded_windows.append(window) or np.ones(10, dtype=np.float32)
+        ),
+    )
+
+    engine.transcribe_segment("audio.wav", start=9.734094, end=27.081594)
+
+    assert len(decoded_windows) == 1
+    assert decoded_windows[0]["duration"] > 17.0
+
+
 def test_model_initialization_error_is_wrapped(monkeypatch):
     def fail(*_args, **_kwargs):
         raise RuntimeError("private model detail")

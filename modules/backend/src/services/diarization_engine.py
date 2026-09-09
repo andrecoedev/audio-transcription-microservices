@@ -219,6 +219,7 @@ class DiarizationEngine:
             if silence_threshold is None
             else silence_threshold
         )
+        post_filter_enabled = min_duration > 0.0 or silence_threshold > -100.0
         
         try:
             logger.info(f"Iniciando diarização de: {audio_path}")
@@ -229,7 +230,7 @@ class DiarizationEngine:
             speakers = set()
             
             for turn, _, speaker in diarization.itertracks(yield_label=True):
-                if self.is_valid_segment(
+                if not post_filter_enabled or self.is_valid_segment(
                     audio_path, turn.start, turn.end, min_duration, silence_threshold
                 ):
                     duration = turn.end - turn.start

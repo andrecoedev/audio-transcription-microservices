@@ -155,7 +155,7 @@ class FasterWhisperEngine:
 
         texts: list[str] = []
         current_start = start
-        while current_start < end:
+        while end - current_start > 1e-6:
             window_duration = min(
                 self.max_decode_chunk_seconds,
                 end - current_start,
@@ -201,11 +201,23 @@ class FasterWhisperEngine:
                 segment_start < -0.05
                 or segment_end < segment_start
                 or segment_start + 0.05 < previous_start
-                or segment_end > window_duration + 1.0
             ):
                 raise FasterWhisperEngineError(
-                    "Faster-Whisper returned invalid segment timestamps"
+                    "Faster-Whisper returned invalid segment timestamps "
+                    f"start={segment_start:.3f} end={segment_end:.3f} "
+                    f"previous_start={previous_start:.3f} "
+                    f"window_duration={window_duration:.3f}"
                 )
+            # Whisper timestamps use a padded 30-second decoding grid and can
+            # exceed a very short PCM window.  They are not exposed by this
+            # adapter, so an overrun is not structurally invalid.  High
+            # no-speech confidence on such an overrun is, however, a strong
+            # hallucination signal observed on short diarization boundaries.
+            if (
+                segment_end > window_duration + 1.0
+                and float(getattr(segment, "no_speech_prob", 0.0)) >= 0.6
+            ):
+                continue
             previous_start = max(previous_start, segment_start)
             text = str(segment.text).strip()
             if text:
