@@ -31,6 +31,7 @@ vi.mock('./services/audioService', () => ({
     updateMeetingTitle: vi.fn(),
     renameMeetingSpeaker: vi.fn(),
     deleteMeeting: vi.fn(),
+    getMeetingActions: vi.fn(),
     getMeetingIntelligenceStatus: vi.fn(),
     getMeetingIntelligenceResult: vi.fn(),
     requestMeetingIntelligence: vi.fn(),
@@ -49,6 +50,7 @@ beforeEach(() => {
   audioService.getStats.mockResolvedValue({ total_transcriptions: 0 })
   audioService.listTranscriptions.mockResolvedValue({ transcriptions: [] })
   audioService.getMeetingIntelligenceStatus.mockResolvedValue({ configured: true, generation: null, completed_revision: null })
+  audioService.getMeetingActions.mockResolvedValue({ action_items: [] })
 })
 
 afterEach(() => {
