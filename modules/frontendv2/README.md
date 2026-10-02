@@ -3,7 +3,19 @@
 React 18, React Router 7, Vite 8, Tailwind, Zustand, Axios, Lucide, Dropzone
 e React Hot Toast. Versões exatas são as do package-lock.json.
 
-## Executar e validar
+## Iniciar a aplicação completa
+
+Na raiz do repositório, com `modules/backend/.env` configurado:
+
+```powershell
+docker compose -p usagidev --env-file modules/backend/.env up --build -d
+```
+
+Abra http://localhost:3000. A imagem frontend compila com Node 22 e serve o
+React via Nginx. A API é acessada pelo mesmo host em `/api`; o proxy interno
+encaminha para o serviço `api`. Nenhuma chave é enviada ao build do frontend.
+
+## Desenvolvimento local e validação
 
 Da raiz do repositório:
 ```powershell
@@ -20,9 +32,9 @@ VITE_API_URL configura somente a URL pública da API, padrão localhost:2020.
 Nenhum secret/provider key pode ser colocado no frontend ou em variável VITE_*.
 
 O backend/Redis/Worker/PostgreSQL devem estar ativos conforme
-[operações](../../docs/operations.md). Vite usa porta 3000; build vai para dist
-(ignorado). nginx.conf permanece como configuração opcional de hosting SPA;
-não há serviço frontend Docker no Compose suportado.
+[operações](../../docs/operations.md). O Vite local usa porta 3000 e a API
+diretamente em localhost:2020; build vai para dist (ignorado). O Compose da
+raiz também inclui o frontend Docker.
 
 ## Fluxos
 

@@ -6,17 +6,22 @@ Execute da raiz, escolhendo explicitamente o projeto e o destino. Não use
 containers/volumes desconhecidos nem consulte bancos de terceiros.
 
 ```powershell
-docker compose -p usagidev --env-file modules/backend/.env -f modules/backend/docker-compose.yml up --build -d
-docker compose -p usagidev --env-file modules/backend/.env -f modules/backend/docker-compose.yml -f modules/backend/docker-compose.gpu.yml up --build -d
+docker compose -p usagidev --env-file modules/backend/.env up --build -d
+docker compose -p usagidev --env-file modules/backend/.env -f compose.gpu.yaml up --build -d
 ```
 
-O segundo comando habilita GPU e CUDA/FP16. Ambos usam a matriz estável.
+Use um comando por vez. O segundo habilita GPU e CUDA/FP16; ambos usam a matriz
+estável. Os arquivos da raiz incluem o Compose existente do backend, sem duplicar
+seus serviços. O nome `usagidev` preserva a associação aos volumes deste projeto.
 Configure secrets localmente a partir dos exemplos; não publique .env, saída
 expandida de Compose/inspect nem credenciais em argumentos.
 
-Serviços: postgres, redis, migrate (one-shot), api e worker. API/Worker aguardam
+Serviços: frontend, postgres, redis, migrate (one-shot), api e worker. API/Worker aguardam
 Alembic. PostgreSQL não publica porta host. Volumes de banco, uploads e cache de
-modelos são separados. Dockerfiles suportados: API, Worker e test.
+modelos são separados. Dockerfiles suportados: API, Worker, test e frontend.
+O frontend é servido pelo Nginx em localhost:3000, publicado apenas na interface
+local por padrão. `/api` aponta para o serviço
+`api` na rede Compose; a imagem React usa Node 22 somente na etapa de build.
 API instala requirements.api.txt; Worker instala requirements.txt.
 Windows executa o Worker no container Linux/WSL, pois o supervisor faz fork.
 
