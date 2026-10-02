@@ -111,7 +111,7 @@ describe('public React flow', () => {
         </Routes>
       </MemoryRouter>
     )
-    fireEvent.change(screen.getByPlaceholderText('admin'), {
+    fireEvent.change(screen.getByLabelText('Usuário'), {
       target: { value: 'alice' },
     })
     fireEvent.change(screen.getByPlaceholderText('********'), {

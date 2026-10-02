@@ -42,6 +42,9 @@ export default function Settings() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Configurações</h1>
         <p className="text-gray-600 mt-1">Perfil local e estado dos serviços</p>
+        {user?.registration_source === 'public' && <p className="text-sm text-gray-600 mt-2">
+          Provider configurado no servidor não significa acesso às credenciais USAGI. Conectar credenciais próprias (BYOK) ainda não está disponível.
+        </p>}
       </div>
 
       <Card>

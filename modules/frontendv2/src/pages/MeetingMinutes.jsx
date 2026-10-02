@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { FileText, Calendar, Users, Sparkles, Download, Loader2 } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import Button from '../components/Button'
 import { audioService } from '../services/audioService'
 import toast from 'react-hot-toast'
+import { useAuthStore } from '../stores/authStore'
 
 export default function MeetingMinutes() {
+  const publicAccount = useAuthStore((state) => state.user?.registration_source === 'public')
   const [transcriptions, setTranscriptions] = useState([])
   const [selectedTranscription, setSelectedTranscription] = useState('')
   const [meetingData, setMeetingData] = useState({
@@ -19,18 +21,13 @@ export default function MeetingMinutes() {
   const [loadingTranscriptions, setLoadingTranscriptions] = useState(true)
   const [geminiAvailable, setGeminiAvailable] = useState(false)
 
-  useEffect(() => {
-    loadTranscriptions()
-    checkGeminiStatus()
-  }, [])
-
-  const checkGeminiStatus = async () => {
+  const checkGeminiStatus = useCallback(async () => {
     try {
       const status = await audioService.getMeetingMinutesStatus()
       setGeminiAvailable(status.available)
       if (!status.available) {
         toast.error(
-          'Gemini indisponível. Solicite ao administrador a configuração do worker.',
+          publicAccount ? 'Providers externos exigirão sua própria credencial. BYOK ainda não disponível.' : 'Gemini indisponível. Solicite ao administrador a configuração do worker.',
           { duration: 6000 }
         )
       }
@@ -38,7 +35,12 @@ export default function MeetingMinutes() {
       console.error('Erro ao verificar status do Gemini:', error)
       setGeminiAvailable(false)
     }
-  }
+  }, [publicAccount])
+
+  useEffect(() => {
+    loadTranscriptions()
+    checkGeminiStatus()
+  }, [checkGeminiStatus])
 
   const loadTranscriptions = async () => {
     try {
