@@ -24,6 +24,7 @@ def get_transcription_queue(connection: Redis | None = None) -> Queue:
     return Queue(
         TRANSCRIPTION_QUEUE_NAME,
         connection=connection or get_redis_connection(),
+        default_timeout=settings.TRANSCRIPTION_JOB_TIMEOUT_SECONDS,
     )
 
 
@@ -31,6 +32,6 @@ def is_redis_available(connection: Redis | None = None) -> bool:
     try:
         (connection or get_redis_connection()).ping()
         return True
-    except Exception as exc:
-        logger.warning("Redis unavailable: %s", exc)
+    except Exception:
+        logger.warning("Redis unavailable")
         return False

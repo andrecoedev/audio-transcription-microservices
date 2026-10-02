@@ -1,6 +1,9 @@
+import pytest
 from rq.exceptions import NoSuchJobError
 
-from src.models import Transcription, TranscriptionJob
+from sqlalchemy import event
+
+from src.models import AuditEvent, Meeting, MeetingSpeaker, Transcription, TranscriptionJob
 from src.services.transcription_processing_service import ProcessingResult
 from src.workers import transcription_worker
 
@@ -106,6 +109,12 @@ def test_worker_persists_queued_processing_completed(
         transcription = db.query(Transcription).one()
         assert job.error_message is None
         assert transcription.word_count == 2
+        meeting = db.get(Meeting, transcription_id)
+        assert meeting is not None
+        assert meeting.title == "meeting.wav"
+        assert [speaker.speaker_id for speaker in meeting.speakers] == ["SPEAKER_00"]
+        assert transcription.segments[0]["order"] == 0
+        assert db.query(AuditEvent).filter_by(event="transcription.completed").count() == 1
     finally:
         db.close()
 
@@ -135,13 +144,9 @@ def test_worker_persists_queued_processing_failed(
         lambda: FailingProcessingService(),
     )
 
-    result = transcription_worker.process_transcription_job_sync(transcription_id)
-
-    assert result == {
-        "status": "failed",
-        "transcription_id": transcription_id,
-        "error": "Transcription processing failed",
-    }
+    with pytest.raises(RuntimeError, match="Transcription processing failed") as failure:
+        transcription_worker.process_transcription_job_sync(transcription_id)
+    assert "internal detail" not in str(failure.value)
     assert snapshots == [
         ("queued", "queued"),
         ("processing", "processing"),
@@ -154,8 +159,83 @@ def test_worker_persists_queued_processing_failed(
         assert job.error_message == "Transcription processing failed"
         assert transcription.error_message == "Transcription processing failed"
         assert "internal detail" not in job.error_message
+        assert db.get(Meeting, transcription_id) is None
+        assert db.query(AuditEvent).filter_by(event="transcription.failed").count() == 1
     finally:
         db.close()
+
+
+def test_meeting_persistence_rolls_back_with_completed_status(
+    db_context, monkeypatch, tmp_path
+):
+    input_path = tmp_path / "input.wav"
+    input_path.write_bytes(b"audio")
+    transcription_id = _seed_worker_job(db_context["session_factory"], input_path)
+    monkeypatch.setattr(
+        transcription_worker, "SessionLocal", db_context["session_factory"]
+    )
+
+    class SuccessfulService:
+        def process_transcription(self, **_kwargs):
+            return ProcessingResult(
+                segments=[{"start": 0, "end": 1, "speaker": "SPEAKER_00", "text": "olá"}],
+                duration_seconds=1,
+                num_speakers=1,
+                word_count=1,
+            )
+
+    monkeypatch.setattr(transcription_worker, "get_processing_service", lambda: SuccessfulService())
+
+    def reject_speaker(_mapper, _connection, _target):
+        raise RuntimeError("private persistence detail")
+
+    event.listen(MeetingSpeaker, "before_insert", reject_speaker)
+    try:
+        with pytest.raises(RuntimeError, match="Transcription processing failed"):
+            transcription_worker.process_transcription_job_sync(transcription_id)
+    finally:
+        event.remove(MeetingSpeaker, "before_insert", reject_speaker)
+
+    db = db_context["session_factory"]()
+    try:
+        transcription = db.get(Transcription, transcription_id)
+        assert transcription.status == transcription.job.status == "failed"
+        assert transcription.segments == []
+        assert db.get(Meeting, transcription_id) is None
+        assert db.query(MeetingSpeaker).count() == 0
+    finally:
+        db.close()
+
+
+def test_worker_keeps_rq_failure_public_when_failure_persistence_breaks(
+    db_context, monkeypatch, tmp_path
+):
+    input_path = tmp_path / "input.wav"
+    input_path.write_bytes(b"audio")
+    transcription_id = _seed_worker_job(db_context["session_factory"], input_path)
+    monkeypatch.setattr(
+        transcription_worker, "SessionLocal", db_context["session_factory"]
+    )
+
+    class FailingProcessingService:
+        def process_transcription(self, **_kwargs):
+            raise RuntimeError("private processing detail")
+
+    monkeypatch.setattr(
+        transcription_worker,
+        "get_processing_service",
+        lambda: FailingProcessingService(),
+    )
+
+    def failed_persistence(*_args):
+        raise RuntimeError("private database detail")
+
+    monkeypatch.setattr(
+        transcription_worker, "_persist_failed_job", failed_persistence
+    )
+    with pytest.raises(RuntimeError, match="Transcription processing failed") as failure:
+        transcription_worker.process_transcription_job_sync(transcription_id)
+    assert "private" not in str(failure.value)
 
 
 def test_worker_requeues_stale_processing_job(db_context, monkeypatch, tmp_path):

@@ -1,16 +1,16 @@
 # Runtime HTTP da API (sem stack de ML/audio)
-fastapi==0.115.12
+fastapi==0.141.1
+starlette==1.6.0
 uvicorn==0.34.2
-python-dotenv==1.1.0
+python-dotenv==1.2.2
 
 sqlalchemy==2.0.36
 alembic==1.14.0
 psycopg[binary]==3.2.9
 
-python-jose[cryptography]>=3.4.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.18
-cryptography>=41.0.0
+PyJWT==2.14.0
+bcrypt==4.0.1
+python-multipart==0.0.31
 
 pydantic==2.10.6
 pydantic-settings==2.7.1

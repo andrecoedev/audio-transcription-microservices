@@ -2,16 +2,19 @@
 
 import logging
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from rq.exceptions import NoSuchJobError
 from rq.job import Job
 
-from ..api_keys_manager import api_keys_manager
-from ..config import apply_persisted_secrets, settings
+from ..config import settings
 from ..database import SessionLocal
-from ..models import Transcription, TranscriptionJob
+from ..models import Meeting, MeetingSpeaker, Transcription, TranscriptionJob
 from ..services.processing_engines import initialize_processing_engines
+from ..services.audit import append_audit_event
+from ..services.meeting_projection import ordered_segments, speaker_ids
+from ..services.storage_lifecycle import delete_file_idempotently
 from ..services.transcription_processing_service import (
     TranscriptionProcessingService,
 )
@@ -23,11 +26,10 @@ _processing_service: TranscriptionProcessingService | None = None
 def initialize_worker_engines(
     factories=None,
 ) -> dict[str, bool]:
-    """Inicializa engines uma vez no processo worker, antes de consumir a fila."""
+    """Initialize engines inside a forked RQ work horse, never its parent."""
     global _processing_service
 
-    apply_persisted_secrets(api_keys_manager.get_all())
-    validation_errors = settings.validate_startup()
+    validation_errors = settings.validate_startup(require_api_security=False)
     if validation_errors:
         raise RuntimeError("Invalid worker configuration: " + "; ".join(validation_errors))
 
@@ -52,7 +54,8 @@ def initialize_worker_engines(
 def get_processing_service() -> TranscriptionProcessingService:
     global _processing_service
     if _processing_service is None:
-        _processing_service = TranscriptionProcessingService()
+        initialize_worker_engines()
+    assert _processing_service is not None
     return _processing_service
 
 
@@ -92,8 +95,13 @@ def recover_pending_jobs(queue) -> int:
 
             db_job.status = "queued"
             db_job.error_message = None
+            db_job.started_at = None
+            db_job.completed_at = None
+            db_job.failed_at = None
             transcription.status = "queued"
             transcription.error_message = None
+            # Make the durable state visible before publishing the RQ message.
+            db.commit()
             queue.enqueue(
                 process_transcription_job_sync,
                 db_job.transcription_id,
@@ -113,11 +121,9 @@ def recover_pending_jobs(queue) -> int:
         db.close()
 
 
-def process_transcription_job_sync(transcription_id: int) -> dict:
-    """Executa o pipeline pesado e persiste seu resultado."""
+def _claim_transcription_job(transcription_id: int) -> dict | None:
+    """Atomically claim a queued job in a short database transaction."""
     db = SessionLocal()
-    input_path: str | None = None
-
     try:
         job = (
             db.query(TranscriptionJob)
@@ -125,41 +131,184 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             .first()
         )
         transcription = db.get(Transcription, transcription_id)
-        input_path = job.input_path if job else None
-
         if not job or not transcription:
             logger.warning("Job or transcription not found for id=%s", transcription_id)
-            return {"status": "failed", "error": "Transcription job not found"}
+            return None
 
         if job.status in {"completed", "done"}:
             logger.info("Transcription job %s was already completed", transcription_id)
-            return {"status": "already_done"}
+            return {"claim_status": "already_done"}
 
-        started_at = time.time()
-        job.status = "processing"
-        transcription.status = "processing"
-        db.commit()
-        logger.info("Transcription job %s started", transcription_id)
-
-        result = get_processing_service().process_transcription(
-            file_path=job.input_path,
-            use_diarization=job.use_diarization,
-            transcription_model=job.transcription_model,
+        now = datetime.now(timezone.utc)
+        claimed = (
+            db.query(TranscriptionJob)
+            .filter(
+                TranscriptionJob.transcription_id == transcription_id,
+                TranscriptionJob.status == "queued",
+            )
+            .update(
+                {
+                    TranscriptionJob.status: "processing",
+                    TranscriptionJob.error_message: None,
+                    TranscriptionJob.started_at: now,
+                    TranscriptionJob.completed_at: None,
+                    TranscriptionJob.failed_at: None,
+                },
+                synchronize_session="fetch",
+            )
         )
-        processing_time = time.time() - started_at
+        if claimed != 1:
+            db.rollback()
+            logger.info("Transcription job %s is already being processed", transcription_id)
+            return {"claim_status": "already_processing"}
 
+        db.query(Transcription).filter(Transcription.id == transcription_id).update(
+            {
+                Transcription.status: "processing",
+                Transcription.error_message: None,
+            },
+            synchronize_session="fetch",
+        )
+        db.commit()
+        return {
+            "claim_status": "claimed",
+            "input_path": job.input_path,
+            "use_diarization": job.use_diarization,
+            "transcription_model": job.transcription_model,
+        }
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _persist_completed_job(transcription_id: int, result, processing_time: float) -> None:
+    """Persist transcript, meeting and both completed statuses in one commit."""
+    db = SessionLocal()
+    try:
+        job = (
+            db.query(TranscriptionJob)
+            .filter(TranscriptionJob.transcription_id == transcription_id)
+            .one()
+        )
+        transcription = db.get(Transcription, transcription_id)
         transcription.duration_seconds = result.duration_seconds
         transcription.transcription_model = job.transcription_model
         transcription.use_diarization = job.use_diarization
-        transcription.segments = result.segments
+        transcription.segments = ordered_segments(result.segments)
         transcription.num_speakers = result.num_speakers
         transcription.word_count = result.word_count
         transcription.processing_time_seconds = processing_time
         transcription.status = "completed"
         transcription.error_message = None
+        meeting = db.get(Meeting, transcription_id)
+        if meeting is None:
+            language = result.engine_metadata.get("language") if result.engine_metadata else None
+            if not isinstance(language, str) or language == "auto" or len(language) > 16:
+                language = None
+            meeting = Meeting(
+                id=transcription_id,
+                title=transcription.original_filename,
+                language=language,
+            )
+            db.add(meeting)
+            db.flush()
+        known_speakers = {speaker.speaker_id for speaker in meeting.speakers}
+        for speaker_id in speaker_ids(transcription.segments):
+            if speaker_id not in known_speakers:
+                meeting.speakers.append(MeetingSpeaker(speaker_id=speaker_id))
         job.status = "completed"
         job.error_message = None
+        job.completed_at = datetime.now(timezone.utc)
+        job.failed_at = None
+        append_audit_event(
+            db,
+            event="transcription.completed",
+            actor_type="system",
+            resource_type="transcription",
+            resource_id=transcription_id,
+            metadata={"provider": job.transcription_model},
+        )
+        append_audit_event(
+            db,
+            event="meeting.created",
+            actor_type="system",
+            resource_type="meeting",
+            resource_id=transcription_id,
+        )
         db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _persist_failed_job(transcription_id: int, public_error: str) -> None:
+    """Persist a safe public failure message in one short transaction."""
+    db = SessionLocal()
+    try:
+        transcription = db.get(Transcription, transcription_id)
+        job = (
+            db.query(TranscriptionJob)
+            .filter(TranscriptionJob.transcription_id == transcription_id)
+            .first()
+        )
+        if transcription:
+            transcription.status = "failed"
+            transcription.error_message = public_error
+        if job:
+            job.status = "failed"
+            job.error_message = public_error
+            job.failed_at = datetime.now(timezone.utc)
+            job.completed_at = None
+        append_audit_event(
+            db,
+            event="transcription.failed",
+            actor_type="system",
+            resource_type="transcription",
+            resource_id=transcription_id,
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error(
+            "Unable to persist failure for transcription %s (%s)",
+            transcription_id,
+            type(exc).__name__,
+        )
+        raise
+    finally:
+        db.close()
+
+
+def process_transcription_job_sync(transcription_id: int) -> dict:
+    """Run ML without an open DB transaction, then persist the result atomically."""
+    input_path: str | None = None
+    claimed = False
+
+    try:
+        claim = _claim_transcription_job(transcription_id)
+        if claim is None:
+            return {"status": "failed", "error": "Transcription job not found"}
+        if claim["claim_status"] == "already_done":
+            return {"status": "already_done"}
+        if claim["claim_status"] == "already_processing":
+            return {"status": "already_processing"}
+
+        claimed = True
+        input_path = claim["input_path"]
+        logger.info("Transcription job %s started", transcription_id)
+        started_at = time.monotonic()
+
+        result = get_processing_service().process_transcription(
+            file_path=input_path,
+            use_diarization=claim["use_diarization"],
+            transcription_model=claim["transcription_model"],
+        )
+        processing_time = time.monotonic() - started_at
+        _persist_completed_job(transcription_id, result, processing_time)
 
         logger.info(
             "Transcription job completed job_id=%s audio_duration=%.3f "
@@ -174,7 +323,7 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
                 if result.duration_seconds > 0
                 else 0.0
             ),
-            job.use_diarization,
+            claim["use_diarization"],
             result.conversion_seconds,
             result.diarization_seconds,
             result.transcription_seconds,
@@ -188,35 +337,20 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             "processing_time": processing_time,
             "word_count": result.word_count,
         }
-    except Exception:
+    except Exception as exc:
         public_error = "Transcription processing failed"
-        transcription = db.get(Transcription, transcription_id)
-        job = (
-            db.query(TranscriptionJob)
-            .filter(TranscriptionJob.transcription_id == transcription_id)
-            .first()
-        )
-        if transcription:
-            transcription.status = "failed"
-            transcription.error_message = public_error
-        if job:
-            job.status = "failed"
-            job.error_message = public_error
-        db.commit()
-        logger.exception("Transcription job %s failed", transcription_id)
-        return {
-            "status": "failed",
-            "transcription_id": transcription_id,
-            "error": public_error,
-        }
-    finally:
-        if input_path:
+        if claimed:
             try:
-                Path(input_path).unlink(missing_ok=True)
-            except OSError as exc:
-                logger.warning(
-                    "Unable to remove input for transcription %s: %s",
-                    transcription_id,
-                    exc,
-                )
-        db.close()
+                _persist_failed_job(transcription_id, public_error)
+            except Exception:
+                # A database outage must not expose query parameters through
+                # RQ's stored traceback. Recovery reconciles the durable job.
+                pass
+        logger.error("Transcription job %s failed (%s)", transcription_id, type(exc).__name__)
+        # RQ must record failure too. Do not propagate the original exception:
+        # its repr/traceback could contain credentials or transcript fragments.
+        raise RuntimeError(public_error) from None
+    finally:
+        if claimed and input_path:
+            if not delete_file_idempotently(input_path):
+                logger.warning("Input cleanup incomplete for transcription %s", transcription_id)

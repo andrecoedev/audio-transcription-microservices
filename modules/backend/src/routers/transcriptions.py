@@ -1,10 +1,10 @@
 """Rotas de consulta e do fluxo assíncrono oficial de transcrição."""
 
 import logging
-from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.routing import APIRoute
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -14,13 +14,33 @@ from ..database import get_db
 from ..models import Transcription, TranscriptionJob, TranscriptionOwnership
 from ..schemas import JobResponse, JobStatusResponse
 from ..security import TokenData, require_scope_when
+from ..services.audit import append_audit_event
+from ..services.transcription_deletion import ActiveTranscriptionError, delete_transcription_data
+from ..services.rate_limit import enforce_rate_limit
+from ..services.storage_lifecycle import delete_file_idempotently, upload_directory
 from ..utils.uploads import UploadValidationError, save_validated_upload
 from ..workers.config import get_transcription_queue, is_redis_available
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
 
-_UPLOAD_DIRECTORY = Path(__file__).resolve().parents[2] / "database" / "uploads"
+
+class UploadLimitedRoute(APIRoute):
+    """Enforce the IP upload budget before FastAPI parses multipart bodies."""
+
+    def get_route_handler(self):
+        original = super().get_route_handler()
+
+        async def limited(request: Request):
+            if request.method == "POST" and request.url.path == "/transcriptions/jobs":
+                enforce_rate_limit(request, "upload-ip")
+            return await original(request)
+
+        return limited
+
+
+router = APIRouter(route_class=UploadLimitedRoute)
+
+_UPLOAD_DIRECTORY = upload_directory()
 
 
 @router.get("/transcriptions")
@@ -36,20 +56,20 @@ async def list_transcriptions(
     """Lista transcrições com paginação e filtro opcional de status."""
     query = db.query(Transcription)
 
-    if settings.AUTH_PROTECT_READS and current_user and not is_admin(current_user):
-        query = query.outerjoin(
+    if current_user and not is_admin(current_user):
+        query = query.join(
             TranscriptionOwnership,
             TranscriptionOwnership.transcription_id == Transcription.id,
         )
-        if settings.is_auth_strict:
-            query = query.filter(TranscriptionOwnership.owner_sub == current_user.username)
-        else:
-            query = query.filter(
-                or_(
-                    TranscriptionOwnership.owner_sub == current_user.username,
-                    TranscriptionOwnership.owner_sub.is_(None),
-                )
+        query = query.filter(
+            or_(
+                TranscriptionOwnership.user_id == current_user.user_id,
+                (
+                    TranscriptionOwnership.user_id.is_(None)
+                    & (TranscriptionOwnership.owner_sub == current_user.username)
+                ),
             )
+        )
 
     if status:
         query = query.filter(Transcription.status == status)
@@ -79,8 +99,7 @@ async def get_transcription(
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
-    if settings.AUTH_PROTECT_READS:
-        enforce_transcription_access(db, transcription_id, current_user, write=False)
+    enforce_transcription_access(db, transcription_id, current_user, write=False)
     return transcription.to_dict()
 
 
@@ -97,33 +116,14 @@ async def delete_transcription(
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
-    if settings.AUTH_PROTECT_PROCESSING:
-        enforce_transcription_access(db, transcription_id, current_user, write=True)
+    enforce_transcription_access(db, transcription_id, current_user, write=True)
 
-    job = (
-        db.query(TranscriptionJob)
-        .filter(TranscriptionJob.transcription_id == transcription_id)
-        .first()
-    )
-    owner = (
-        db.query(TranscriptionOwnership)
-        .filter(TranscriptionOwnership.transcription_id == transcription_id)
-        .first()
-    )
-    input_path = Path(job.input_path) if job else None
-
-    if owner:
-        db.delete(owner)
-    if job:
-        db.delete(job)
-    db.delete(transcription)
-    db.commit()
-
-    if input_path:
-        try:
-            input_path.unlink(missing_ok=True)
-        except OSError as exc:
-            logger.warning("Unable to remove input for transcription %s: %s", transcription_id, exc)
+    try:
+        delete_transcription_data(
+            db, transcription, current_user.user_id if current_user else None
+        )
+    except ActiveTranscriptionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     logger.info("Transcription %s deleted", transcription_id)
     return {"message": "Transcription deleted successfully"}
 
@@ -136,10 +136,21 @@ async def get_statistics(
     ),
 ):
     """Obtém estatísticas gerais do sistema."""
-    total = db.query(Transcription).count()
-    completed = db.query(Transcription).filter(Transcription.status == "completed").count()
-    failed = db.query(Transcription).filter(Transcription.status == "failed").count()
-    processing = db.query(Transcription).filter(Transcription.status == "processing").count()
+    query = db.query(Transcription)
+    if current_user and not is_admin(current_user):
+        query = query.join(TranscriptionOwnership).filter(
+            or_(
+                TranscriptionOwnership.user_id == current_user.user_id,
+                (
+                    TranscriptionOwnership.user_id.is_(None)
+                    & (TranscriptionOwnership.owner_sub == current_user.username)
+                ),
+            )
+        )
+    total = query.count()
+    completed = query.filter(Transcription.status == "completed").count()
+    failed = query.filter(Transcription.status == "failed").count()
+    processing = query.filter(Transcription.status == "processing").count()
     return {
         "total_transcriptions": total,
         "completed": completed,
@@ -150,6 +161,7 @@ async def get_statistics(
 
 @router.post("/transcriptions/jobs", response_model=JobResponse, status_code=202)
 async def create_transcription_job(
+    request: Request,
     file: UploadFile = File(...),
     use_diarization: bool = Form(False),
     transcription_model: str = Form("whisper"),
@@ -159,15 +171,16 @@ async def create_transcription_job(
     ),
 ):
     """Valida o upload, persiste o job e o enfileira no RQ."""
+    enforce_rate_limit(request, "job-user", str(current_user.user_id if current_user else "anonymous"))
     if transcription_model not in {"whisper", "assemblyai"}:
         await file.close()
         raise HTTPException(status_code=400, detail="Invalid transcription model")
 
     try:
         queue = get_transcription_queue()
-    except Exception:
+    except Exception as exc:
         await file.close()
-        logger.exception("Unable to configure Redis queue")
+        logger.error("Unable to configure Redis queue (%s)", type(exc).__name__)
         raise HTTPException(
             status_code=503,
             detail="Job queue is temporarily unavailable",
@@ -210,13 +223,26 @@ async def create_transcription_job(
             status="queued",
         )
         db.add(job)
-        if current_user and current_user.username:
-            db.add(
-                TranscriptionOwnership(
-                    transcription_id=transcription.id,
-                    owner_sub=current_user.username,
-                )
+        if not current_user or current_user.user_id is None or not current_user.username:
+            raise RuntimeError("Persistent authenticated identity is required")
+        db.add(
+            TranscriptionOwnership(
+                transcription_id=transcription.id,
+                owner_sub=current_user.username,
+                user_id=current_user.user_id,
             )
+        )
+        append_audit_event(
+            db,
+            event="transcription.created",
+            actor_user_id=current_user.user_id,
+            resource_type="transcription",
+            resource_id=transcription.id,
+            metadata={
+                "provider": transcription_model,
+                "diarization": use_diarization,
+            },
+        )
         db.commit()
 
         try:
@@ -225,14 +251,26 @@ async def create_transcription_job(
                 transcription.id,
                 job_id=f"transcription_{transcription.id}",
             )
-        except Exception:
-            logger.exception("Redis enqueue failed for transcription %s", transcription.id)
+        except Exception as exc:
+            logger.error(
+                "Redis enqueue failed for transcription %s (%s)",
+                transcription.id,
+                type(exc).__name__,
+            )
             transcription.status = "failed"
             transcription.error_message = "Job queue is temporarily unavailable"
             job.status = "failed"
             job.error_message = transcription.error_message
+            append_audit_event(
+                db,
+                event="transcription.failed",
+                actor_type="system",
+                resource_type="transcription",
+                resource_id=transcription.id,
+                metadata={"stage": "enqueue"},
+            )
             db.commit()
-            saved_upload.path.unlink(missing_ok=True)
+            delete_file_idempotently(saved_upload.path)
             raise HTTPException(
                 status_code=503,
                 detail="Job queue is temporarily unavailable",
@@ -250,11 +288,14 @@ async def create_transcription_job(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
         db.rollback()
         if saved_upload:
-            saved_upload.path.unlink(missing_ok=True)
-        logger.exception("Unexpected error while creating transcription job")
+            delete_file_idempotently(saved_upload.path)
+        logger.error(
+            "Unexpected error while creating transcription job (%s)",
+            type(exc).__name__,
+        )
         raise HTTPException(
             status_code=500,
             detail="Unable to create transcription job",
@@ -288,16 +329,15 @@ async def get_job_status(
     if not transcription or not job:
         raise HTTPException(status_code=404, detail="Transcription job not found")
 
-    if settings.AUTH_PROTECT_READS:
-        enforce_transcription_access(db, transcription_id, current_user, write=False)
+    enforce_transcription_access(db, transcription_id, current_user, write=False)
 
     queue_size = 0
     try:
         queue = get_transcription_queue()
         if is_redis_available(queue.connection):
             queue_size = len(queue)
-    except Exception as exc:
-        logger.warning("Unable to read Redis queue size: %s", exc)
+    except Exception:
+        logger.warning("Unable to read Redis queue size")
 
     return JobStatusResponse(
         transcription_id=transcription_id,

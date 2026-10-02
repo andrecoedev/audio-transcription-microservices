@@ -42,8 +42,8 @@ def initialize_processing_engines(
         try:
             engine_registry.diarization_engine = factories["diarization"](hf_token)
             logger.info("Diarization engine initialized in worker")
-        except Exception:
-            logger.exception("Unable to initialize diarization engine in worker")
+        except Exception as exc:
+            logger.error("Unable to initialize diarization engine in worker (%s)", type(exc).__name__)
     elif not hf_token:
         logger.warning("HF_TOKEN is not configured; diarization is unavailable")
 
@@ -56,15 +56,15 @@ def initialize_processing_engines(
                 lambda: {"engine": "faster-whisper"},
             )
             logger.info("Whisper engine ready in worker: %s", metadata_getter())
-        except Exception:
-            logger.exception("Unable to initialize Whisper engine in worker")
+        except Exception as exc:
+            logger.error("Unable to initialize Whisper engine in worker (%s)", type(exc).__name__)
 
     if aai_api_key and engine_registry.assemblyai_engine is None:
         try:
             engine_registry.assemblyai_engine = factories["assemblyai"](aai_api_key)
             logger.info("AssemblyAI engine initialized in worker")
-        except Exception:
-            logger.exception("Unable to initialize AssemblyAI engine in worker")
+        except Exception as exc:
+            logger.error("Unable to initialize AssemblyAI engine in worker (%s)", type(exc).__name__)
 
     if gemini_api_key and engine_registry.meeting_minutes_generator is None:
         try:
@@ -72,8 +72,8 @@ def initialize_processing_engines(
                 gemini_api_key
             )
             logger.info("Gemini client initialized in worker")
-        except Exception:
-            logger.exception("Unable to initialize Gemini client in worker")
+        except Exception as exc:
+            logger.error("Unable to initialize Gemini client in worker (%s)", type(exc).__name__)
 
     return {
         "diarization": engine_registry.diarization_engine is not None,

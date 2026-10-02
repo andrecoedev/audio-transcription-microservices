@@ -1,34 +1,49 @@
-"""FastAPI leve: HTTP, autenticação, banco, uploads e filas."""
+"""Light FastAPI process: HTTP, auth, database, uploads and queueing only."""
 
 import logging
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api_keys_manager import api_keys_manager
-from .config import apply_persisted_secrets, sanitize_settings_snapshot, settings
-from .database import engine as db_engine  # noqa: F401 - garante o schema atual
+from .config import sanitize_settings_snapshot, settings
+from .logging_config import configure_logging
 from .routers import api_keys, auth, health, meeting_minutes, transcriptions
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+
+configure_logging()
 logger = logging.getLogger(__name__)
+
+
+async def validate_api_startup() -> None:
+    validation_errors = settings.validate_startup()
+    if validation_errors:
+        for error in validation_errors:
+            logger.error("Startup config error: %s", error)
+        raise RuntimeError("Invalid API configuration")
+    logger.info("API ready without loading processing engines: %s", sanitize_settings_snapshot())
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    await validate_api_startup()
+    yield
+
 
 app = FastAPI(
     title="Transcription API",
-    description="API HTTP e fila RQ para processamento de transcrições",
-    version="2.1.0",
+    description="HTTP API and RQ queue for transcription processing",
+    version="2.2.0",
     debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: restringir origens em produção
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.cors_allowed_origins_list,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(health.router)
@@ -38,21 +53,16 @@ app.include_router(api_keys.router)
 app.include_router(meeting_minutes.router)
 
 
-@app.on_event("startup")
-async def validate_api_startup() -> None:
-    """Carrega configuração leve; engines pertencem exclusivamente ao worker."""
-    applied_keys = apply_persisted_secrets(api_keys_manager.get_all())
-    if applied_keys:
-        logger.info("Persisted API key configuration loaded: %s", applied_keys)
-
-    validation_errors = settings.validate_startup()
-    if validation_errors:
-        for error in validation_errors:
-            logger.error("Startup config error: %s", error)
-        raise RuntimeError("Invalid API configuration")
-
-    logger.info("API ready without loading processing engines: %s", sanitize_settings_snapshot())
-
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if request.url.path.startswith(("/auth", "/transcriptions", "/meetings", "/meeting-minutes")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 if __name__ == "__main__":
     import uvicorn

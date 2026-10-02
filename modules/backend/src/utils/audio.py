@@ -82,7 +82,7 @@ def convert_to_wav(input_path: str, output_path: str) -> tuple[str, float]:
         return str(destination), duration
     except (OSError, subprocess.CalledProcessError, AudioProcessingError) as exc:
         destination.unlink(missing_ok=True)
-        logger.exception("Audio conversion failed")
+        logger.error("Audio conversion failed (%s)", type(exc).__name__)
         raise AudioProcessingError("Unable to convert audio to WAV") from exc
 
 
@@ -141,11 +141,11 @@ async def remove_temp_file_with_retry(
         try:
             os.remove(path)
             return
-        except PermissionError as exc:
+        except PermissionError:
             if attempt == attempts:
-                logger.warning("Could not remove temp file %s: %s", path, exc)
+                logger.warning("Could not remove temporary audio file")
             else:
                 await asyncio.sleep(delay)
-        except OSError as exc:
-            logger.warning("Could not remove temp file %s: %s", path, exc)
+        except OSError:
+            logger.warning("Could not remove temporary audio file")
             return

@@ -1,92 +1,41 @@
-"""Persistência de chaves; somente o worker as usa para inicializar engines."""
+"""Read-only provider credential status.
 
-import logging
-import os
-from typing import Optional
+Provider keys are infrastructure secrets supplied to API/worker processes by
+the deployment environment. The former shared JSON write path is deliberately
+retired; returning even a key prefix is avoided.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..api_keys_manager import api_keys_manager
 from ..config import settings
-from ..schemas import ApiKeysUpdate
-from ..security import TokenData, require_admin_when
+from ..security import TokenData, require_admin
 
-logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
 def _key_status() -> dict:
     return {
-        "hf_token": {
-            "configured": bool(settings.HF_TOKEN),
-            "value": f"{settings.HF_TOKEN[:8]}..." if settings.HF_TOKEN else None,
-        },
-        "aai_api_key": {
-            "configured": bool(settings.AAI_API_KEY),
-            "value": (
-                f"{settings.AAI_API_KEY[:8]}..." if settings.AAI_API_KEY else None
-            ),
-        },
-        "gemini_api_key": {
-            "configured": bool(settings.GEMINI_API_KEY),
-            "value": (
-                f"{settings.GEMINI_API_KEY[:8]}..."
-                if settings.GEMINI_API_KEY
-                else None
-            ),
-        },
+        "source": "environment",
+        "mutable": False,
+        "hf_token": {"configured": settings.HF_TOKEN_CONFIGURED or bool(settings.HF_TOKEN)},
+        "aai_api_key": {"configured": settings.AAI_API_KEY_CONFIGURED or bool(settings.AAI_API_KEY)},
+        "gemini_api_key": {"configured": settings.GEMINI_API_KEY_CONFIGURED or bool(settings.GEMINI_API_KEY)},
     }
 
 
 @router.get("/api-keys")
 async def get_api_keys_status(
-    current_user: Optional[TokenData] = Depends(
-        require_admin_when(settings.AUTH_PROTECT_API_KEYS)
-    ),
+    _current_user: TokenData = Depends(require_admin),
 ):
-    """Retorna somente metadados seguros das chaves configuradas."""
     return _key_status()
 
 
-@router.post("/api-keys")
-async def update_api_keys(
-    keys: ApiKeysUpdate,
-    current_user: Optional[TokenData] = Depends(
-        require_admin_when(settings.AUTH_PROTECT_API_KEYS)
-    ),
+@router.post("/api-keys", status_code=410)
+async def update_api_keys_retired(
+    _current_user: TokenData = Depends(require_admin),
 ):
-    """Persiste chaves sem importar ou inicializar engines no processo HTTP."""
-    keys_to_save = {
-        setting_name: value.strip()
-        for setting_name, value in {
-            "HF_TOKEN": keys.hf_token,
-            "AAI_API_KEY": keys.aai_api_key,
-            "GEMINI_API_KEY": keys.gemini_api_key,
-        }.items()
-        if value and value.strip()
-    }
-    if not keys_to_save:
-        raise HTTPException(status_code=400, detail="No API keys were provided")
-
-    try:
-        api_keys_manager.set_multiple(keys_to_save)
-        for setting_name, value in keys_to_save.items():
-            setattr(settings, setting_name, value)
-            os.environ[setting_name] = value
-        logger.info("API key configuration updated: %s", list(keys_to_save))
-    except Exception:
-        logger.exception("Unable to persist API key configuration")
-        raise HTTPException(
-            status_code=500,
-            detail="Unable to persist API key configuration",
-        )
-
-    return {
-        "success": True,
-        "keys_saved": True,
-        "worker_restart_required": True,
-        "message": "Keys saved. Restart RQ workers to load the new configuration.",
-        "updated_models": [],
-        "errors": [],
-        "current_status": _key_status(),
-    }
+    raise HTTPException(
+        status_code=410,
+        detail="Runtime credential updates were retired; configure provider secrets in the deployment environment and restart workers",
+    )

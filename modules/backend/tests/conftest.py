@@ -24,19 +24,31 @@ os.environ.update(
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.database import get_db
-from src.models import Base
-from src.routers import transcriptions
+from src.models import Base, User
+from src.routers import meeting_minutes, transcriptions
 from src.security import create_access_token
 
 
 class FakeRedisConnection:
+    def __init__(self):
+        self.counts = {}
+
     def ping(self):
         return True
+
+    def eval(self, _script, key_count, *values):
+        keys, arguments = values[:key_count], values[key_count:]
+        for index, key in enumerate(keys):
+            if self.counts.get(key, 0) >= arguments[index * 2]:
+                return index + 1
+        for key in keys:
+            self.counts[key] = self.counts.get(key, 0) + 1
+        return 0
 
 
 class FakeStartedJobRegistry:
@@ -60,16 +72,34 @@ class FakeQueue:
 
 @pytest.fixture
 def db_context(tmp_path, monkeypatch):
+    from src.services import rate_limit
+    monkeypatch.setattr(rate_limit, "get_redis_connection", lambda: FakeRedisConnection())
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    @event.listens_for(engine, "connect")
+    def enable_sqlite_foreign_keys(dbapi_connection, _connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
     testing_session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
+    seed = testing_session()
+    seed.add_all(
+        [
+            User(id=1, username="alice", email="alice@example.test", hashed_password="unused"),
+            User(id=2, username="bob", email="bob@example.test", hashed_password="unused"),
+        ]
+    )
+    seed.commit()
+    seed.close()
 
     app = FastAPI()
     app.include_router(transcriptions.router)
+    app.include_router(meeting_minutes.router)
 
     def override_get_db():
         db = testing_session()
@@ -98,9 +128,11 @@ def db_context(tmp_path, monkeypatch):
 @pytest.fixture
 def auth_headers():
     def make(username="alice", scopes=None, roles=None):
+        user_ids = {"alice": 1, "bob": 2}
         token = create_access_token(
             {
-                "sub": username,
+                "sub": str(user_ids[username]),
+                "username": username,
                 "scopes": scopes
                 or ["transcribe", "read_transcriptions", "delete_transcriptions"],
                 "roles": roles or [],

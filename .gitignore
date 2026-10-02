@@ -4,6 +4,12 @@
 vtt_pyannote_whisper_assemblyai.ipynb
 Pegando legenda.ipynb
 __pycache__/
+.pytest_cache/
+.ruff_cache/
+coverage/
+*.dump
+*.sqlite
+*.sqlite3
 .streamlit/
 transcription_history.json
 *.mp3

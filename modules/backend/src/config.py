@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 import os
 from pathlib import Path
@@ -7,6 +7,14 @@ from typing import Literal, Optional
 
 class Settings(BaseSettings):
     """Configurações da aplicação."""
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",  # Keep accepting older .env keys during migration.
+        hide_input_in_errors=True,
+    )
+
     APP_ENV: Literal["dev", "prod", "test"] = Field(
         default="dev",
         description="Application environment (dev, prod, test)",
@@ -16,6 +24,11 @@ class Settings(BaseSettings):
     HF_TOKEN: Optional[str] = Field(default=None, description="Hugging Face API Token")
     AAI_API_KEY: Optional[str] = Field(default=None, description="AssemblyAI API Key")
     GEMINI_API_KEY: Optional[str] = Field(default=None, description="Google Gemini API Key")
+    HF_TOKEN_CONFIGURED: bool = Field(default=False)
+    AAI_API_KEY_CONFIGURED: bool = Field(default=False)
+    GEMINI_API_KEY_CONFIGURED: bool = Field(default=False)
+    GEMINI_MODEL: str = Field(default="gemini-2.5-flash", min_length=1, max_length=100)
+    INTELLIGENCE_MAX_INPUT_CHARACTERS: int = Field(default=200000, ge=1000, le=2000000)
     
     # Database
     DATABASE_URL: str = Field(
@@ -47,6 +60,21 @@ class Settings(BaseSettings):
         default=30,
         description="Access token expiration time"
     )
+    LOGIN_RATE_LIMIT_PER_IP: int = Field(default=30)
+    LOGIN_RATE_LIMIT_PER_ACCOUNT: int = Field(default=10)
+    UPLOAD_RATE_LIMIT_PER_IP: int = Field(default=300)
+    JOB_RATE_LIMIT_PER_USER: int = Field(default=30)
+    JWT_ISSUER: str = Field(default="usagi-api", description="Expected JWT issuer")
+    JWT_AUDIENCE: str = Field(default="usagi-web", description="Expected JWT audience")
+
+    CORS_ALLOWED_ORIGINS: str = Field(
+        default="http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+        description="Comma-separated browser origins allowed to call the API",
+    )
+    CORS_ALLOW_CREDENTIALS: bool = Field(
+        default=False,
+        description="Whether CORS may include browser credentials",
+    )
     
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = Field(
@@ -63,11 +91,32 @@ class Settings(BaseSettings):
         default="whisper",
         description="Default transcription model (whisper or assemblyai)"
     )
+    TRANSCRIPTION_JOB_TIMEOUT_SECONDS: int = Field(
+        default=3600,
+        ge=60,
+        description="RQ timeout for long-running transcription jobs and recovery",
+    )
     MIN_SEGMENT_DURATION: float = Field(
         default=0.0,
         description=(
             "Optional minimum Pyannote turn duration; zero preserves short speech"
         )
+    )
+    AUDIO_UPLOAD_DIRECTORY: str = Field(
+        default="database/uploads",
+        description="Worker-shared directory for original uploads",
+    )
+    AUDIO_ORPHAN_RETENTION_HOURS: int = Field(
+        default=24,
+        description="Minimum age before unreferenced uploads may be reconciled",
+    )
+    TRANSCRIPTION_RETENTION_DAYS: int = Field(
+        default=0,
+        description="Result retention; zero means no automatic expiry",
+    )
+    AUDIT_RETENTION_DAYS: int = Field(
+        default=0,
+        description="Audit retention; zero means no automatic expiry",
     )
     SILENCE_THRESHOLD: float = Field(
         default=-100.0,
@@ -118,9 +167,10 @@ class Settings(BaseSettings):
         description="CTranslate2 CPU threads; zero uses its default",
     )
 
-    # Auth rollout controls
+    # Authentication. Rollout flags remain readable for old deployments, but
+    # private routes no longer use them to permit anonymous access.
     AUTH_MODE: Literal["permissive", "strict"] = Field(
-        default="permissive",
+        default="strict",
         description="Authentication rollout mode",
     )
     AUTH_PROTECT_API_KEYS: bool = Field(
@@ -132,12 +182,16 @@ class Settings(BaseSettings):
         description="Protect job creation and meeting-minutes endpoints",
     )
     AUTH_PROTECT_READS: bool = Field(
-        default=False,
+        default=True,
         description="Protect read endpoints (/transcriptions, /stats)",
     )
     AUTH_ADMIN_USERNAME: str = Field(
         default="admin",
         description="Bootstrap admin username",
+    )
+    AUTH_ADMIN_EMAIL: str = Field(
+        default="admin@local.invalid",
+        description="Email stored for the bootstrap administrator",
     )
     AUTH_ADMIN_PASSWORD: Optional[str] = Field(
         default=None,
@@ -148,17 +202,10 @@ class Settings(BaseSettings):
         description="Bootstrap admin password hash (recommended)",
     )
     AUTH_ALLOW_DEMO_LOGIN: bool = Field(
-        default=True,
-        description="Allow demo login in permissive mode when admin credentials are absent",
+        default=False,
+        description="Allow first-login local users in dev only",
     )
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
-        # Tolera chaves antigas em arquivos .env durante a migração P0.
-        extra = "ignore"
-
     @property
     def is_production(self) -> bool:
         return self.APP_ENV == "prod"
@@ -171,18 +218,29 @@ class Settings(BaseSettings):
     def allowed_extensions_list(self) -> list[str]:
         """Retorna lista de extensões permitidas."""
         return [ext.strip() for ext in self.ALLOWED_EXTENSIONS.split(",")]
+
+    @property
+    def cors_allowed_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
     
     @property
     def max_upload_size_bytes(self) -> int:
         """Retorna tamanho máximo de upload em bytes."""
         return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
-    def validate_startup(self) -> list[str]:
+    def validate_startup(self, *, require_api_security: bool = True) -> list[str]:
         """Valida configurações obrigatórias para startup seguro."""
         errors: list[str] = []
 
         if not self.DATABASE_URL or not self.DATABASE_URL.strip():
             errors.append("DATABASE_URL is required")
+        if min(
+            self.LOGIN_RATE_LIMIT_PER_IP,
+            self.LOGIN_RATE_LIMIT_PER_ACCOUNT,
+            self.UPLOAD_RATE_LIMIT_PER_IP,
+            self.JOB_RATE_LIMIT_PER_USER,
+        ) <= 0:
+            errors.append("Rate limits must be greater than zero")
 
         if self.is_production and not self.DATABASE_URL.startswith(
             "postgresql+psycopg://"
@@ -242,11 +300,27 @@ class Settings(BaseSettings):
         if self.ACCESS_TOKEN_EXPIRE_MINUTES <= 0:
             errors.append("ACCESS_TOKEN_EXPIRE_MINUTES must be greater than 0")
 
+        if self.ALGORITHM not in {"HS256", "HS384", "HS512"}:
+            errors.append("ALGORITHM must be an HMAC SHA-2 JWT algorithm")
+
+        if not self.JWT_ISSUER.strip() or not self.JWT_AUDIENCE.strip():
+            errors.append("JWT_ISSUER and JWT_AUDIENCE are required")
+
+        if not self.cors_allowed_origins_list:
+            errors.append("CORS_ALLOWED_ORIGINS must contain at least one origin")
+
+        if self.AUDIO_ORPHAN_RETENTION_HOURS <= 0:
+            errors.append("AUDIO_ORPHAN_RETENTION_HOURS must be greater than zero")
+        if self.TRANSCRIPTION_RETENTION_DAYS < 0:
+            errors.append("TRANSCRIPTION_RETENTION_DAYS cannot be negative")
+        if self.AUDIT_RETENTION_DAYS < 0:
+            errors.append("AUDIT_RETENTION_DAYS cannot be negative")
+
         if self.AUTH_MODE not in {"permissive", "strict"}:
             errors.append("AUTH_MODE must be 'permissive' or 'strict'")
 
         # Security checks are strict in production only (low-risk migration).
-        if self.is_production:
+        if self.is_production and require_api_security:
             secret = (self.SECRET_KEY or "").strip()
             if not secret:
                 errors.append("SECRET_KEY is required when APP_ENV=prod")
@@ -267,6 +341,23 @@ class Settings(BaseSettings):
                 errors.append(
                     "AUTH_ADMIN_PASSWORD_HASH or AUTH_ADMIN_PASSWORD is required when APP_ENV=prod"
                 )
+
+            if self.AUTH_MODE != "strict":
+                errors.append("AUTH_MODE must be 'strict' when APP_ENV=prod")
+            if self.AUTH_ALLOW_DEMO_LOGIN:
+                errors.append("AUTH_ALLOW_DEMO_LOGIN must be false when APP_ENV=prod")
+            if not all(
+                (
+                    self.AUTH_PROTECT_API_KEYS,
+                    self.AUTH_PROTECT_PROCESSING,
+                    self.AUTH_PROTECT_READS,
+                )
+            ):
+                errors.append("All AUTH_PROTECT_* flags must be true in production")
+            if "*" in self.cors_allowed_origins_list:
+                errors.append("CORS_ALLOWED_ORIGINS cannot contain '*' in production")
+            if not self.AUTH_ADMIN_EMAIL.strip():
+                errors.append("AUTH_ADMIN_EMAIL is required when APP_ENV=prod")
 
         return errors
 
@@ -292,18 +383,6 @@ def resolve_env_file() -> str:
     return ".env"
 
 
-def apply_persisted_secrets(persisted_keys: dict[str, str]) -> list[str]:
-    """Aplica secrets persistidos ao settings e ao ambiente de processo."""
-    applied: list[str] = []
-    for key in ("HF_TOKEN", "AAI_API_KEY", "GEMINI_API_KEY"):
-        value = (persisted_keys.get(key) or "").strip()
-        if value:
-            setattr(settings, key, value)
-            os.environ[key] = value
-            applied.append(key)
-    return applied
-
-
 def sanitize_settings_snapshot() -> dict:
     """Retorna snapshot seguro para logs de startup (sem expor segredos)."""
     return {
@@ -312,9 +391,9 @@ def sanitize_settings_snapshot() -> dict:
         "api_port": settings.API_PORT,
         "debug": settings.DEBUG,
         "database_url_set": bool(settings.DATABASE_URL),
-        "hf_token_configured": bool(settings.HF_TOKEN),
-        "aai_api_key_configured": bool(settings.AAI_API_KEY),
-        "gemini_api_key_configured": bool(settings.GEMINI_API_KEY),
+        "hf_token_configured": settings.HF_TOKEN_CONFIGURED or bool(settings.HF_TOKEN),
+        "aai_api_key_configured": settings.AAI_API_KEY_CONFIGURED or bool(settings.AAI_API_KEY),
+        "gemini_api_key_configured": settings.GEMINI_API_KEY_CONFIGURED or bool(settings.GEMINI_API_KEY),
         "transcription_engine": "faster-whisper",
         "whisper_model": settings.WHISPER_MODEL,
         "whisper_device": settings.WHISPER_DEVICE,
@@ -325,6 +404,10 @@ def sanitize_settings_snapshot() -> dict:
         "auth_protect_api_keys": settings.AUTH_PROTECT_API_KEYS,
         "auth_protect_processing": settings.AUTH_PROTECT_PROCESSING,
         "auth_protect_reads": settings.AUTH_PROTECT_READS,
+        "cors_origins": settings.cors_allowed_origins_list,
+        "audio_orphan_retention_hours": settings.AUDIO_ORPHAN_RETENTION_HOURS,
+        "transcription_retention_days": settings.TRANSCRIPTION_RETENTION_DAYS,
+        "audit_retention_days": settings.AUDIT_RETENTION_DAYS,
     }
 
 

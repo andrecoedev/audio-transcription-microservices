@@ -122,11 +122,12 @@ class TranscriptionProcessingService:
             transcription_started = time.perf_counter()
             try:
                 text = transcribe(wav_path, start=start, end=end)
-            except Exception:
-                logger.exception(
-                    "Transcription failed for segment %.2f-%.2f",
+            except Exception as exc:
+                logger.error(
+                    "Transcription failed for segment %.2f-%.2f (%s)",
                     start,
                     end,
+                    type(exc).__name__,
                 )
                 text = "[erro na transcrição]"
             transcription_seconds += time.perf_counter() - transcription_started
@@ -190,6 +191,6 @@ class TranscriptionProcessingService:
                 return
             except PermissionError:
                 if attempt == attempts - 1:
-                    logger.warning("Unable to remove temporary WAV %s", path)
+                    logger.warning("Unable to remove temporary normalized audio")
                 else:
                     time.sleep(0.2)

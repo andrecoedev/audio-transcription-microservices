@@ -30,12 +30,12 @@ def _get_available_queue():
         if not Worker.all(connection=queue.connection):
             raise RuntimeError("RQ worker unavailable")
         return queue
-    except Exception as exc:
-        logger.warning("Meeting minutes queue unavailable: %s", exc)
+    except Exception:
+        logger.warning("Meeting minutes queue unavailable")
         raise HTTPException(
             status_code=503,
             detail="Processing worker is temporarily unavailable",
-        ) from exc
+        ) from None
 
 
 async def _wait_for_result(job):
@@ -66,7 +66,7 @@ async def generate_meeting_minutes(
     ),
 ):
     """Preserva o contrato síncrono, mas executa Gemini no processo worker."""
-    if not settings.GEMINI_API_KEY:
+    if not (settings.GEMINI_API_KEY_CONFIGURED or settings.GEMINI_API_KEY):
         raise HTTPException(
             status_code=503,
             detail="Meeting minutes generator is not configured",
@@ -75,8 +75,7 @@ async def generate_meeting_minutes(
     transcription = db.get(Transcription, request.transcription_id)
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
-    if settings.AUTH_PROTECT_PROCESSING:
-        enforce_transcription_access(db, request.transcription_id, current_user)
+    enforce_transcription_access(db, request.transcription_id, current_user)
     if transcription.status != "completed":
         raise HTTPException(
             status_code=400,
@@ -101,10 +100,11 @@ async def generate_meeting_minutes(
             "Meeting minutes job queued for transcription %s",
             request.transcription_id,
         )
-    except Exception:
-        logger.exception(
-            "Unable to enqueue meeting minutes for transcription %s",
+    except Exception as exc:
+        logger.error(
+            "Unable to enqueue meeting minutes for transcription %s (%s)",
             request.transcription_id,
+            type(exc).__name__,
         )
         raise HTTPException(
             status_code=503,
@@ -120,7 +120,7 @@ async def get_meeting_minutes_status(
         require_scope_when("meeting_minutes", settings.AUTH_PROTECT_READS)
     ),
 ):
-    configured = bool(settings.GEMINI_API_KEY)
+    configured = settings.GEMINI_API_KEY_CONFIGURED or bool(settings.GEMINI_API_KEY)
     worker_available = False
     if configured:
         try:
@@ -128,8 +128,8 @@ async def get_meeting_minutes_status(
             worker_available = is_redis_available(queue.connection) and bool(
                 Worker.all(connection=queue.connection)
             )
-        except Exception as exc:
-            logger.warning("Unable to inspect meeting minutes worker: %s", exc)
+        except Exception:
+            logger.warning("Unable to inspect meeting minutes worker")
 
     return {
         "available": configured and worker_available,

@@ -5,6 +5,13 @@ node_modules/
 __pycache__/
 **/__pycache__/
 *.pyc
+**/.pytest_cache/
+**/.ruff_cache/
+**/coverage/
+**/*.dump
+**/*.db
+**/*.sqlite
+**/*.sqlite3
 .venv
 **/.venv/
 venv/

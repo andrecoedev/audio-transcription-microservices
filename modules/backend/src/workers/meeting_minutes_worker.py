@@ -3,6 +3,7 @@
 import logging
 
 from .. import engine_registry
+from ..config import settings
 from ..database import SessionLocal
 from ..models import Transcription
 
@@ -13,12 +14,13 @@ def process_meeting_minutes_sync(
     transcription_id: int,
     context: dict,
 ) -> dict:
-    generator = engine_registry.meeting_minutes_generator
-    if generator is None:
-        raise RuntimeError("Meeting minutes engine is unavailable in worker")
-
     db = SessionLocal()
     try:
+        generator = engine_registry.meeting_minutes_generator
+        if generator is None:
+            from ..services.meeting_minutes import MeetingMinutesGenerator
+            engine_registry.meeting_minutes_generator = MeetingMinutesGenerator(settings.GEMINI_API_KEY)
+            generator = engine_registry.meeting_minutes_generator
         transcription = db.get(Transcription, transcription_id)
         if not transcription:
             raise RuntimeError("Transcription not found")
@@ -46,8 +48,12 @@ def process_meeting_minutes_sync(
             },
             "minutes": minutes,
         }
-    except Exception:
-        logger.exception("Meeting minutes processing failed for %s", transcription_id)
-        raise
+    except Exception as exc:
+        logger.error(
+            "Meeting minutes processing failed for %s (%s)",
+            transcription_id,
+            type(exc).__name__,
+        )
+        raise RuntimeError("Meeting minutes processing failed") from None
     finally:
         db.close()

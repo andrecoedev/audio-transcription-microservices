@@ -37,7 +37,7 @@ baseline_modules = set(sys.modules)
 
 class BlockHeavyImports(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname.split(".", 1)[0] in blocked:
+        if fullname.split(".", 1)[0] in blocked or fullname.startswith("google.generativeai"):
             raise RuntimeError(f"heavy import attempted: {fullname}")
         return None
 
@@ -55,6 +55,7 @@ loaded = {
     if name.split(".", 1)[0] in blocked
 }
 assert not loaded, loaded
+assert 'google.generativeai' not in sys.modules
 '''
     environment = os.environ.copy()
     environment.update(
@@ -115,7 +116,6 @@ def test_worker_initializes_and_reuses_engine_instances(monkeypatch):
         return create
 
     factories = {name: factory(name) for name in calls}
-    monkeypatch.setattr(transcription_worker.api_keys_manager, "get_all", lambda: {})
     monkeypatch.setattr(transcription_worker.settings, "HF_TOKEN", "hf_test")
     monkeypatch.setattr(transcription_worker.settings, "AAI_API_KEY", "aai_test")
     monkeypatch.setattr(transcription_worker.settings, "GEMINI_API_KEY", "gemini_test")
@@ -146,6 +146,24 @@ def test_worker_initializes_and_reuses_engine_instances(monkeypatch):
         _reset_engines()
 
 
+def test_worker_lazy_initialization_occurs_once_after_job_start(monkeypatch):
+    _reset_engines()
+    service = object()
+    calls = []
+
+    def initialize():
+        calls.append("initialized")
+        transcription_worker._processing_service = service
+
+    monkeypatch.setattr(transcription_worker, "initialize_worker_engines", initialize)
+    try:
+        assert transcription_worker.get_processing_service() is service
+        assert transcription_worker.get_processing_service() is service
+        assert calls == ["initialized"]
+    finally:
+        _reset_engines()
+
+
 @pytest.mark.parametrize(
     "path",
     [
@@ -156,12 +174,16 @@ def test_worker_initializes_and_reuses_engine_instances(monkeypatch):
     ],
 )
 def test_unconsumed_legacy_processing_endpoints_are_removed(path):
-    registered_paths = {route.path for route in app.routes}
+    registered_paths = set(app.openapi()["paths"])
     assert path not in registered_paths
 
 
 def test_official_job_endpoints_and_deprecated_gpu_endpoint_remain():
-    routes = {(route.path, method) for route in app.routes for method in route.methods}
+    routes = {
+        (path, method.upper())
+        for path, operations in app.openapi()["paths"].items()
+        for method in operations
+    }
     assert ("/transcriptions/jobs", "POST") in routes
     assert ("/transcriptions/jobs/{transcription_id}/status", "GET") in routes
     assert ("/transcriptions/{transcription_id}", "GET") in routes

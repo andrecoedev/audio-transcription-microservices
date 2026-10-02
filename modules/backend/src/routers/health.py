@@ -23,8 +23,8 @@ def _processing_status() -> dict:
     try:
         connection = get_redis_connection()
         redis_available = is_redis_available(connection)
-    except Exception as exc:
-        logger.warning("Redis healthcheck failed: %s", exc)
+    except Exception:
+        logger.warning("Redis healthcheck failed")
         return {
             "redis": "unavailable",
             "queue": TRANSCRIPTION_QUEUE_NAME,
@@ -35,8 +35,8 @@ def _processing_status() -> dict:
     if redis_available:
         try:
             worker_count = len(Worker.all(connection=connection))
-        except Exception as exc:
-            logger.warning("Unable to inspect RQ workers: %s", exc)
+        except Exception:
+            logger.warning("Unable to inspect RQ workers")
 
     return {
         "redis": "connected" if redis_available else "unavailable",
@@ -50,7 +50,7 @@ def _configured_models(processing: dict) -> dict:
     worker_device = "worker-managed" if processing["worker_available"] else "worker-offline"
     return {
         "diarization": {
-            "configured": bool(settings.HF_TOKEN),
+            "configured": settings.HF_TOKEN_CONFIGURED or bool(settings.HF_TOKEN),
             "loaded": None,
             "device": worker_device,
         },
@@ -60,12 +60,12 @@ def _configured_models(processing: dict) -> dict:
             "device": worker_device,
         },
         "assemblyai": {
-            "configured": bool(settings.AAI_API_KEY),
+            "configured": settings.AAI_API_KEY_CONFIGURED or bool(settings.AAI_API_KEY),
             "loaded": None,
             "device": worker_device,
         },
         "gemini": {
-            "configured": bool(settings.GEMINI_API_KEY),
+            "configured": settings.GEMINI_API_KEY_CONFIGURED or bool(settings.GEMINI_API_KEY),
             "loaded": None,
             "device": worker_device,
         },
@@ -87,9 +87,9 @@ async def health_check(db: Session = Depends(get_db)):
     database_status = "connected"
     try:
         db.execute(text("SELECT 1"))
-    except Exception as exc:
+    except Exception:
         database_status = "unavailable"
-        logger.warning("Database healthcheck failed: %s", exc)
+        logger.warning("Database healthcheck failed")
 
     processing = _processing_status()
     return {
@@ -100,6 +100,7 @@ async def health_check(db: Session = Depends(get_db)):
         ),
         "api": "ready",
         "database": database_status,
+        "postgresql": database_status,
         "processing": processing,
         "models": _configured_models(processing),
     }

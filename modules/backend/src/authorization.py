@@ -3,7 +3,6 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from .config import settings
 from .models import TranscriptionOwnership
 from .security import TokenData
 
@@ -21,9 +20,8 @@ def enforce_transcription_access(
     """
     Enforce owner-based authorization for a transcription.
 
-    Compat behavior:
-    - permissive mode: legacy rows without owner remain accessible
-    - strict mode: legacy rows without owner are denied for non-admin users
+    Cross-user and unresolved ownership both return 404 to avoid disclosing
+    whether another user's resource exists.
     """
     if not current_user or is_admin(current_user):
         return
@@ -35,15 +33,18 @@ def enforce_transcription_access(
     )
 
     if owner is None:
-        if settings.is_auth_strict:
-            raise HTTPException(
-                status_code=403,
-                detail="Legacy transcription without owner is not accessible in strict mode",
-            )
-        return
+        raise HTTPException(status_code=404, detail="Transcription not found")
 
-    if owner.owner_sub != current_user.username:
-        raise HTTPException(status_code=403, detail="You do not have access to this transcription")
+    stable_match = bool(
+        current_user.user_id is not None and owner.user_id == current_user.user_id
+    )
+    exact_legacy_match = bool(
+        owner.user_id is None
+        and current_user.username
+        and owner.owner_sub == current_user.username
+    )
+    if not (stable_match or exact_legacy_match):
+        raise HTTPException(status_code=404, detail="Transcription not found")
 
 
 def create_transcription_owner(
@@ -52,12 +53,12 @@ def create_transcription_owner(
     current_user: Optional[TokenData],
 ):
     """Persiste owner de novas transcrições quando usuário autenticado existir."""
-    if not current_user or not current_user.username:
-        return
+    if not current_user or current_user.user_id is None or not current_user.username:
+        raise ValueError("Authenticated persistent user is required for ownership")
 
     owner = TranscriptionOwnership(
         transcription_id=transcription_id,
         owner_sub=current_user.username,
+        user_id=current_user.user_id,
     )
     db.add(owner)
-    db.commit()

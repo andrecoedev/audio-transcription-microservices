@@ -53,6 +53,24 @@ def test_processing_service_uses_one_normalized_file_and_cleans_it(
     assert engine.calls[0][1:] == (0.0, 10.0)
 
 
+def test_explicit_local_provider_never_calls_cloud_engine(monkeypatch, tmp_path):
+    class ForbiddenCloud:
+        def transcribe_segment(self, *_args, **_kwargs):
+            raise AssertionError("local provider attempted a cloud call")
+
+    local = RecordingWhisper()
+    monkeypatch.setattr(engine_registry, "whisper_engine", local)
+    monkeypatch.setattr(engine_registry, "assemblyai_engine", ForbiddenCloud())
+    monkeypatch.setattr(processing_module, "_TEMP_DIRECTORY", tmp_path)
+    monkeypatch.setattr(processing_module, "convert_to_wav", _fake_conversion)
+
+    result = TranscriptionProcessingService().process_transcription(
+        "input.mp3", False, "whisper"
+    )
+    assert result.engine_metadata["engine"] == "faster-whisper"
+    assert len(local.calls) == 1
+
+
 def test_normalized_file_is_cleaned_when_transcription_fails(monkeypatch, tmp_path):
     monkeypatch.setattr(
         engine_registry,
