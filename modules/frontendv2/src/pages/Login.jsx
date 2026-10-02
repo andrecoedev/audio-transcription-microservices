@@ -31,7 +31,7 @@ export default function Login({ signup = false }) {
         : await authService.login(username, password)
       setSession(result.user, result.access_token)
       toast.success(signup ? 'Conta criada com sucesso' : 'Login realizado com sucesso')
-      navigate(searchParams.get('saveGuest') === '1' ? '/guest' : '/', { replace: true })
+      navigate('/', { replace: true })
     } catch (error) {
       toast.error(error.message || 'Falha no login')
     } finally {
@@ -43,7 +43,7 @@ export default function Login({ signup = false }) {
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-cyan-100 flex items-center justify-center p-6">
       <div className="w-full max-w-md bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-white/70 p-8">
         <h1 className="text-2xl font-bold text-slate-900 mb-2">{signup ? 'Criar conta' : 'Entrar'}</h1>
-        <p className="text-sm text-slate-600 mb-6">Autentique-se para acessar recursos protegidos.</p>
+        <p className="text-sm text-slate-600 mb-6">Salve suas transcrições e acompanhe suas reuniões.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -90,12 +90,12 @@ export default function Login({ signup = false }) {
             {signup ? 'Criar conta' : 'Entrar'}
           </Button>
         </form>
-        {signup && <p className="text-sm text-gray-600 mt-3">Senha: 12 a 72 bytes. Providers externos exigirão sua própria credencial; conectar credenciais ainda não está disponível.</p>}
+        {signup && <p className="text-sm text-gray-600 mt-3">Use uma senha forte, com pelo menos 12 caracteres. Serviços externos poderão ser conectados com sua própria credencial em breve.</p>}
         <div className="mt-4 flex justify-between text-primary-700">
           <Link to={`${signup ? '/login' : '/signup'}${searchParams.get('saveGuest') === '1' ? '?saveGuest=1' : ''}`}>
             {signup ? 'Já tenho conta' : 'Criar conta'}
           </Link>
-          <Link to="/guest">Continuar como visitante</Link>
+          <Link to="/">Continuar sem conta</Link>
         </div>
       </div>
     </div>

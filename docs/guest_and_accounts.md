@@ -2,12 +2,16 @@
 
 ## Experiência e identidade
 
-`/` abre uma experiência pública sem criar automaticamente uma identidade.
-`/guest` oferece upload local, polling, resultado temporário, exclusão e convite
-a entrar/criar conta. `/signup` cria usuário persistente não administrador;
+`/` e `/new-transcription` usam o Layout, navegação e upload do aplicativo,
+inclusive sem conta; `/guest` é somente um redirect compatível para `/`.
+Recursos privados mostram um convite para entrar/criar conta, sem montar telas
+que disparem requests privados. `/signup` cria usuário persistente não administrador;
 login mantém o JWT no navegador como antes e logout remove a sessão local.
 JWT já emitido permanece válido até expirar: logout não é revogação global.
 Email não é verificado nem usado para atribuir ownership nesta etapa.
+Login/signup entram imediatamente na área autenticada, inclusive com
+`saveGuest=1`. A prova temporária continua na aba, com ação explícita para salvar
+o resultado anterior na conta; autenticação não reclama ownership automaticamente.
 
 Uma sessão Guest tem UUID aleatório, expiração no PostgreSQL e JWT assinado
 com `purpose=guest`. Não é um usuário fictício. JWT de conta não serve como
@@ -18,7 +22,21 @@ Os resultados continuam no PostgreSQL, não no estado efêmero RQ.
 
 ## Operações e limites
 
-Guest permite somente Faster-Whisper, sem diarização nem providers externos.
+O provider desejado para Guest é exclusivamente AssemblyAI com detecção de
+falantes nativa. **Processamento Guest está bloqueado pela P4-04**, sem fallback
+para Whisper nem cobrança externa: política publica `can_create_job=false` e a
+API retorna 503. Sessão, leitura de resultados existentes, claim e exclusão
+continuam funcionando. Jobs Guest antigos/recovered também são rejeitados no
+Worker antes de carregar engines, com estado failed consistente.
+
+Auditoria do adapter atual: retorna somente texto, ignora status/error, não
+habilita speaker labels, e o pipeline usa Pyannote local com chamadas externas
+por segmento. Não atende a este contrato. P4-04 deve recuperar speakers/timestamps,
+falhas/timeouts, duração validada antes de upload ao provider e reserva atômica
+de orçamento platform (incluindo retries/recovery/claim), seguida de smoke real
+autorizado. Quotas de jobs não são orçamento financeiro; não existe opt-in de
+ambiente para liberar esse caminho inseguro. Não habilitar mediante presença da
+chave apenas. BYOK fica separado, sem consumo do orçamento platform.
 Contas públicas podem salvar e revisar reuniões, editar ações e usar os recursos
 P3 locais; não herdam credenciais externas da plataforma. A diarização local
 permanece permitida para contas autenticadas, conforme configuração existente.
@@ -31,11 +49,11 @@ Defaults operacionais configuráveis, não planos comerciais:
 | `GUEST_SESSION_RATE_LIMIT_PER_IP` | 5/h | Criação de sessão |
 | `GUEST_JOBS_PER_SESSION` | 1 | Reserva atômica persistente |
 | `GUEST_RETENTION_HOURS` | 24 | Desde criação da sessão |
-| `PUBLIC_MAX_UPLOAD_MB` | 10 MiB | Guest e conta pública |
-| `PUBLIC_MAX_AUDIO_SECONDS` | 60s | Snapshot no job |
+| `PUBLIC_MAX_UPLOAD_MB` | 100 MiB | Guest e conta pública |
+| `PUBLIC_MAX_AUDIO_SECONDS` | 600s | Snapshot no job |
 | `PUBLIC_JOB_TIMEOUT_SECONDS` | 300s | Snapshot no job/RQ/recovery |
 | `PUBLIC_JOB_RATE_LIMIT_PER_IP` | 3/h | Guest e conta pública |
-| `PUBLIC_JOB_RATE_LIMIT_GLOBAL` | 10/h | Orçamento local compartilhado |
+| `PUBLIC_JOB_RATE_LIMIT_GLOBAL` | 10/h | Quota de jobs públicos, não orçamento pago |
 
 Redis indisponível fecha criação de sessão, signup e upload/job com 503.
 Login, signup e claim limitam o corpo JSON real a 16 KiB antes de parsing.

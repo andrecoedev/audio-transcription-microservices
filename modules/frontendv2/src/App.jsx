@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/Layout'
@@ -12,8 +12,18 @@ import MeetingMinutes from './pages/MeetingMinutes'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
 import Guest from './pages/Guest'
+import Card, { CardContent, CardHeader, CardTitle } from './components/Card'
 import { authService } from './services/authService'
 import { useAuthStore } from './stores/authStore'
+
+function AccountRequired({ children }) {
+  const authenticated = useAuthStore((state) => state.isAuthenticated)
+  if (authenticated) return children
+  return <Card><CardHeader><CardTitle>Salve e acompanhe suas reuniões</CardTitle></CardHeader>
+    <CardContent><p className="text-gray-600 mb-4">Entre ou crie uma conta para usar este recurso. Sua transcrição temporária continua disponível nesta aba.</p>
+      <div className="flex gap-4 text-primary-700"><Link to="/login">Entrar</Link><Link to="/signup">Criar conta</Link><Link to="/new-transcription">Transcrever um arquivo</Link></div>
+    </CardContent></Card>
+}
 
 function App() {
   const {
@@ -55,8 +65,6 @@ function App() {
     return <p role="status" className="p-6 text-gray-600">Verificando sessão...</p>
   }
 
-  const requiresLogin = !isAuthenticated
-
   return (
     <Router>
       <Toaster 
@@ -87,26 +95,18 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Login signup />} />
-        <Route path="/guest" element={<Guest />} />
-
-        {requiresLogin ? (
-          <>
-            <Route path="/" element={<Guest />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </>
-        ) : (
+        <Route path="/guest" element={<Navigate to="/" replace />} />
         <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="transcriptions" element={<Transcriptions />} />
-          <Route path="transcriptions/:id" element={<TranscriptionDetail />} />
-          <Route path="meetings" element={<Meetings />} />
-          <Route path="meetings/:id" element={<MeetingDetail />} />
-          <Route path="new-transcription" element={<NewTranscription />} />
-          <Route path="meeting-minutes" element={<MeetingMinutes />} />
-          <Route path="settings" element={<Settings />} />
+          <Route index element={<>{isAuthenticated && <Dashboard />}<Guest /></>} />
+          <Route path="transcriptions" element={<AccountRequired><Transcriptions /></AccountRequired>} />
+          <Route path="transcriptions/:id" element={<AccountRequired><TranscriptionDetail /></AccountRequired>} />
+          <Route path="meetings" element={<AccountRequired><Meetings /></AccountRequired>} />
+          <Route path="meetings/:id" element={<AccountRequired><MeetingDetail /></AccountRequired>} />
+          <Route path="new-transcription" element={isAuthenticated ? <NewTranscription /> : <Guest />} />
+          <Route path="meeting-minutes" element={<AccountRequired><MeetingMinutes /></AccountRequired>} />
+          <Route path="settings" element={<AccountRequired><Settings /></AccountRequired>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
-        )}
       </Routes>
     </Router>
   )

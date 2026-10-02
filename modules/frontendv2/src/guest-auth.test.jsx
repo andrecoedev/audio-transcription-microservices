@@ -14,9 +14,11 @@ vi.mock('./services/guestService', () => ({ guestService: {
   createJob: vi.fn(), claim: vi.fn(), delete: vi.fn(),
 } }))
 vi.mock('./services/authService', () => ({ authService: { signup: vi.fn(), login: vi.fn(), me: vi.fn() } }))
+vi.mock('./pages/Dashboard', () => ({ default: () => <h1>Experiência autenticada</h1> }))
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() }, Toaster: () => null }))
 
-const policy = { max_upload_mb: 10, max_audio_seconds: 60, jobs_per_session: 1, retention_hours: 24 }
+const policy = { max_upload_mb: 100, max_audio_seconds: 600, jobs_per_session: 1, retention_hours: 24,
+  provider: 'assemblyai', diarization: true, can_create_job: false, unavailable_reason: 'Serviço em validação.' }
 beforeEach(() => {
   vi.resetAllMocks()
   localStorage.clear()
@@ -28,12 +30,35 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Guest and account boundaries', () => {
+  it.each([false, true])('immediately enters the authenticated app after signup=%s and preserves pending ownership proof on refresh', async (signup) => {
+    sessionStorage.setItem('usagi-guest-session', JSON.stringify({ guest_token: 'synthetic-proof', resultId: 7 }))
+    guestService.result.mockResolvedValue({ status: 'completed', segments: [] })
+    const response = { access_token: 'synthetic-user-proof', user: { username: 'visitor', registration_source: 'public' } }
+    authService.login.mockResolvedValue(response)
+    authService.signup.mockResolvedValue(response)
+    authService.me.mockResolvedValue({ authenticated: true, user: response.user })
+    window.history.replaceState({}, '', signup ? '/signup?saveGuest=1' : '/login?saveGuest=1')
+    render(<App />)
+    fireEvent.change(await screen.findByLabelText('Usuário'), { target: { value: 'visitor' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'test password long' } })
+    if (signup) fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'visitor@example.test' } })
+    fireEvent.click(screen.getByRole('button', { name: signup ? 'Criar conta' : 'Entrar' }))
+    expect(await screen.findByRole('heading', { name: 'Experiência autenticada' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/')
+    expect(useAuthStore.getState().isAuthenticated).toBe(true)
+    expect(await screen.findByRole('button', { name: 'Salvar na minha conta' })).toBeTruthy()
+    expect(guestService.claim).not.toHaveBeenCalled()
+    cleanup()
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Experiência autenticada' })).toBeTruthy()
+    expect(sessionStorage.getItem('usagi-guest-session')).not.toBeNull()
+  })
   it('shows server upload limits for public accounts without exposing platform providers', async () => {
     useAuthStore.setState({ user: { registration_source: 'public' }, token: 'test-user-proof', isAuthenticated: true })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-    expect(await screen.findByText(/m[aá]x\. 10MB/)).toBeTruthy()
+    expect(await screen.findByText(/m[aá]x\. 100MB/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /AssemblyAI/ })).toBeNull()
-    expect(screen.getByLabelText('Segmentação de Falantes')).toBeTruthy()
+    expect(screen.getByLabelText('Detecção de falantes')).toBeTruthy()
   })
 
   it('does not enable public upload if the server limits are unavailable and supports retry', async () => {
@@ -43,28 +68,32 @@ describe('Guest and account boundaries', () => {
     expect(await screen.findByText('Não foi possível consultar os limites de upload.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
-    expect(await screen.findByText(/m[aá]x\. 10MB/)).toBeTruthy()
+    expect(await screen.findByText(/m[aá]x\. 100MB/)).toBeTruthy()
   })
   it('App root is public without a session or auth bootstrap request', async () => {
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Experimente o USAGI sem conta' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Nova Transcrição' })).toBeTruthy()
+    expect(screen.getByRole('complementary')).toBeTruthy()
     expect(authService.me).not.toHaveBeenCalled()
   })
 
   it('App keeps protected history behind login', async () => {
     window.history.replaceState({}, '', '/meetings')
     render(<App />)
-    expect(await screen.findByLabelText('Usuário')).toBeTruthy()
+    expect(await screen.findByText('Salve e acompanhe suas reuniões')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Reuniões' })).toBeNull()
   })
   it('opens public upload without logging in or creating an identity on page load', async () => {
     render(<MemoryRouter><Guest /></MemoryRouter>)
-    expect(await screen.findByText(/Até 10 MiB e 60s/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Criar conta para salvar' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Faster-Whisper/ })).toBeTruthy()
+    expect(await screen.findByText(/Até 100 MB e 10 minutos/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'criar conta' })).toBeTruthy()
+    expect(screen.getByText('Transcrição com AssemblyAI')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Faster-Whisper/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /AssemblyAI/ })).toBeNull()
-    expect(screen.queryByLabelText('Segmentação de Falantes')).toBeNull()
+    expect(screen.getByLabelText('Detecção de falantes')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
     expect(guestService.createSession).not.toHaveBeenCalled()
+    expect(guestService.createJob).not.toHaveBeenCalled()
   })
 
   it('restores result using the guest proof and transfers it only with explicit authenticated action', async () => {
@@ -107,13 +136,13 @@ describe('Guest and account boundaries', () => {
     authService.signup.mockResolvedValue({ access_token: 'user-proof', user: { username: 'visitor', registration_source: 'public' } })
     render(<MemoryRouter initialEntries={['/signup?saveGuest=1']}><Routes>
       <Route path="/signup" element={<Login signup />} />
-      <Route path="/guest" element={<p>Salvar visitante</p>} />
+      <Route path="/" element={<p>Experiência autenticada</p>} />
     </Routes></MemoryRouter>)
     fireEvent.change(screen.getByLabelText('Usuário'), { target: { value: 'visitor' } })
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'visitor@example.test' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'test password long' } })
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
-    expect(await screen.findByText('Salvar visitante')).toBeTruthy()
+    expect(await screen.findByText('Experiência autenticada')).toBeTruthy()
     expect(authService.signup).toHaveBeenCalledWith('visitor', 'visitor@example.test', 'test password long')
     expect(useAuthStore.getState().user.registration_source).toBe('public')
   })
@@ -122,7 +151,7 @@ describe('Guest and account boundaries', () => {
     useAuthStore.setState({ user: { registration_source: 'public' }, isAuthenticated: true })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
     expect(screen.queryByRole('button', { name: /AssemblyAI/ })).toBeNull()
-    expect(screen.getByLabelText('Segmentação de Falantes')).toBeTruthy()
+    expect(screen.getByLabelText('Detecção de falantes')).toBeTruthy()
   })
 
   it('preserves failed conversion proof so the user can retry', async () => {

@@ -18,7 +18,7 @@ it('requests first generation and displays a sanitized failure', async () => {
   audioService.getMeetingIntelligenceStatus.mockResolvedValue({ configured: true, generation: null, completed_revision: null })
   audioService.requestMeetingIntelligence.mockRejectedValue(new Error('Serviço indisponível'))
   render(<MeetingIntelligencePanel meetingId="42" />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Gerar análise' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Gerar resumo' }))
   expect(await screen.findByRole('alert')).toBeTruthy()
   expect(audioService.requestMeetingIntelligence).toHaveBeenCalledWith('42', false)
 })
@@ -32,11 +32,11 @@ it('shows null assignee/deadline and retains completed result while regenerating
   expect(screen.getByText(/Não identificado/)).toBeTruthy()
   expect(screen.getByText(/Sem prazo explícito/)).toBeTruthy()
   expect(screen.getByRole('link', { name: '0.0s–2.0s' }).getAttribute('href')).toBe('#segment-0')
-  fireEvent.click(screen.getByRole('button', { name: 'Regenerar análise' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Gerar novamente' }))
   await waitFor(() => expect(audioService.requestMeetingIntelligence).toHaveBeenCalledWith('42', true))
   expect(await screen.findByRole('status')).toBeTruthy()
   expect(screen.getByText('Resumo da reunião')).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'Regenerar análise' }).disabled).toBe(true)
+  expect(screen.getByRole('button', { name: 'Gerar novamente' }).disabled).toBe(true)
 })
 
 it('allows explicit retry after failure', async () => {

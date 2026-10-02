@@ -23,8 +23,10 @@ continuam responsabilidades de implantação.
 
 Cadastro público não provisiona admin nem assume ownership legado por username.
 Sessões Guest têm prova/expiração server-side e rotas próprias; rotas privadas
-não foram desprotegidas. Guest e contas públicas compartilham orçamento local
-limitado; nenhuma delas recebe as chaves externas da plataforma. BYOK completo
+não foram desprotegidas. Guest AssemblyAI está bloqueado por P4-04, inclusive no
+Worker; não há fallback local ou uso de chave platform sem orçamento homologado.
+Quotas de Guest/contas públicas não equivalem a orçamento financeiro;
+nenhuma delas recebe as chaves externas da plataforma. BYOK completo
 é próximo trabalho, sem persistência de novas chaves nesta Task. Ver
 [políticas de Guest/contas](guest_and_accounts.md) para limites, cleanup e contexto
 de identidades locais provisionadas explicitamente pelo operador.

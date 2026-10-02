@@ -76,7 +76,7 @@ export default function Sidebar() {
             💡 Dica Rápida
           </h3>
           <p className="text-xs text-primary-700">
-            Use a diarização para identificar diferentes falantes no áudio automaticamente.
+            Use a detecção de falantes para identificar quem está falando no áudio.
           </p>
         </div>
       </div>

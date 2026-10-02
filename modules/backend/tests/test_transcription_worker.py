@@ -58,6 +58,32 @@ def _recording_factory(session_factory, snapshots):
     return lambda: RecordingSession(session_factory(), snapshots)
 
 
+def test_legacy_guest_job_never_loads_local_or_paid_engines(db_context, monkeypatch, tmp_path):
+    from datetime import datetime, timedelta, timezone
+    from uuid import uuid4
+    from src.models import GuestSession, TranscriptionOwnership
+
+    input_path = tmp_path / "legacy-guest.wav"
+    input_path.write_bytes(b"synthetic audio")
+    tid = _seed_worker_job(db_context["session_factory"], input_path)
+    db = db_context["session_factory"]()
+    guest = GuestSession(id=str(uuid4()), expires_at=datetime.now(timezone.utc) + timedelta(hours=1))
+    db.add(guest)
+    db.flush()
+    db.add(TranscriptionOwnership(transcription_id=tid, owner_sub=f"guest:{guest.id}", guest_session_id=guest.id))
+    db.commit()
+    monkeypatch.setattr(transcription_worker, "SessionLocal", db_context["session_factory"])
+    def forbidden_engine_loading():
+        pytest.fail("Guest cannot load any processing engines before P4-04 admission")
+    monkeypatch.setattr(transcription_worker, "get_processing_service", forbidden_engine_loading)
+    with pytest.raises(RuntimeError, match="Transcription processing failed"):
+        transcription_worker.process_transcription_job_sync(tid)
+    db.expire_all()
+    assert db.get(Transcription, tid).job.status == db.get(Transcription, tid).status == "failed"
+    assert not input_path.exists()
+    db.close()
+
+
 def test_worker_persists_queued_processing_completed(
     db_context, monkeypatch, tmp_path
 ):

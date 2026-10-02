@@ -96,7 +96,7 @@ export default function Dashboard() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <ModelStatusCard
-              name="Diarização (Pyannote)"
+              name="Detecção de falantes"
               icon={Users}
               configured={health?.models?.diarization?.configured}
               device={health?.models?.diarization?.device}

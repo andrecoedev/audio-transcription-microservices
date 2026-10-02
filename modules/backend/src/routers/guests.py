@@ -24,7 +24,9 @@ def guest_policy():
             "max_audio_seconds": settings.PUBLIC_MAX_AUDIO_SECONDS,
             "jobs_per_session": settings.GUEST_JOBS_PER_SESSION,
             "retention_hours": settings.GUEST_RETENTION_HOURS,
-            "provider": "whisper", "diarization": False}
+            "provider": "assemblyai", "diarization": True,
+            "can_create_job": False, "blocked_by": "P4-04",
+            "unavailable_reason": "A transcrição para visitantes está temporariamente indisponível enquanto validamos o serviço."}
 
 
 @router.get("/policy")
@@ -51,7 +53,7 @@ def session(guest: GuestSession = Depends(get_guest_session)):
 
 @router.post("/transcriptions/jobs", status_code=202)
 async def create_job(request: Request, file: UploadFile = File(...),
-                     use_diarization: bool = Form(False), transcription_model: str = Form("whisper"),
+                     use_diarization: bool = Form(False), transcription_model: str = Form("assemblyai"),
                      db: Session = Depends(get_db), guest: GuestSession = Depends(get_guest_session)):
     # Atomic reservation also serializes uploads against conversion/cleanup.
     reserved = db.query(GuestSession).filter(
