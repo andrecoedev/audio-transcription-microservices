@@ -68,8 +68,8 @@ The official flow is:
 React or Streamlit
         |
         v
-FastAPI (auth, upload, database, jobs, queries)
-        |
+FastAPI (auth, upload, PostgreSQL, jobs, queries)
+        |--------------------> PostgreSQL
         v
 Redis queue: transcriptions
         |
@@ -77,12 +77,13 @@ Redis queue: transcriptions
 RQ Worker (FFmpeg, Faster-Whisper, Pyannote, AssemblyAI, Gemini)
         |
         v
-Database
+PostgreSQL
 ```
 
 The API process does not import or initialize Torch, Transformers, Whisper,
-Pyannote, librosa, pydub or AssemblyAI. The worker initializes engines once
-before consuming the queue and reuses them between jobs.
+Pyannote, librosa, pydub or AssemblyAI. RQ's supervising parent also stays
+ML-free; engines are initialized after fork in each work-horse child. They
+are reused within that job, not between separate supervised jobs.
 
 Relevant backend layout:
 
@@ -106,8 +107,9 @@ Relevant backend layout:
 │   ├── requirements.txt               # Full worker/test dependencies
 │   ├── Dockerfile.api                 # CPU-only HTTP runtime
 │   ├── Dockerfile.worker              # FFmpeg and ML runtime
+│   ├── alembic/                       # PostgreSQL schema migrations
 │   ├── .env.example                   # Configuration template
-│   └── 📁 database/                   # SQLite database
+│   └── 📁 database/                   # Temporary uploads shared with the worker
 ├── 📁 frontend/
 │   └── app.py                         # Streamlit interface
 └── .env                               # Main configuration
@@ -117,9 +119,12 @@ The four unconsumed synchronous processing endpoints (`/transcribe`,
 `/diarize`, `/whisper/transcribe_segment`, and
 `/assemblyai/transcribe_segment`) were removed. `/system/gpu` remains only as
 a deprecated lightweight compatibility response; GPU details are logged by the
-worker. Updating API keys requires restarting the worker, not FastAPI. See the
-[P1-A architecture audit](modules/backend/P1A_ARCHITECTURE.md) for the complete
-boundary and compatibility notes.
+worker. Provider keys come from the deployment environment; neither API nor
+frontend persists or returns them. Changing a provider key requires restarting
+the worker. See the
+[current operational architecture](modules/backend/USAGI_OPERATIONAL_STABILIZATION.md)
+for the boundary and supervised-worker lifecycle. The original P1-A audit is
+preserved in Git history at commit `c67ec92`, not as a current runtime guide.
 
 See the [final P1-B validation](modules/backend/P1B_FINAL_VALIDATION.md) for the
 PT-BR quality, performance, diarization and engine-removal evidence.
@@ -152,6 +157,7 @@ speaker-count, performance and three-job stability evidence.
 - **Pyannote.audio** - Speaker diarization
 - **AssemblyAI** - Cloud transcription (alternative)
 - **SQLAlchemy** - ORM for persistence
+- **PostgreSQL + Alembic** - Official database and schema migrations
 - **Pydantic** - Validation and configuration
 - **librosa + pydub** - Audio processing
 - **NVIDIA CUDA + cuDNN** - GPU acceleration
@@ -178,7 +184,7 @@ speaker-count, performance and three-job stability evidence.
 │  └──────────────────────────────────────┘  │
 │  • RQ job orchestration                    │
 │  • JWT Authentication                      │
-│  • SQLite Persistence                      │
+│  • PostgreSQL Persistence                  │
 │  • Health Checks                           │
 │  • No Torch/CUDA imports                   │
 └────────────────────┬───────────────────────┘
@@ -194,7 +200,7 @@ speaker-count, performance and three-job stability evidence.
 **Worker Workflow:**
 1. **API startup**: No models or CUDA stack are loaded
 2. **Upload**: Frontend → FastAPI → database and Redis
-3. **Processing**: The separate RQ worker reuses its engines
+3. **Processing**: A supervised RQ child loads engines after fork
 4. **Diarization**: Pyannote identifies speakers on GPU
 5. **Transcription**: Faster-Whisper uses bounded in-memory PCM windows
 6. **Response**: Aggregated results persisted
@@ -206,6 +212,7 @@ speaker-count, performance and three-job stability evidence.
 
 ### Prerequisites
 - **Python 3.10+** (3.11 or 3.12 recommended for local development)
+- **Docker Compose** (recommended for PostgreSQL, Redis, API and worker)
 - **Hugging Face account** (token required for Pyannote)
 - **AssemblyAI account** (optional, for cloud transcription)
 - **FFmpeg** (audio/video conversion)
@@ -272,6 +279,22 @@ SILENCE_THRESHOLD=-100
 
 **4. Run API, worker and frontend:**
 
+The supported reproducible runtime is Docker Compose. It starts PostgreSQL and
+Redis, runs Alembic once in the `migrate` service, and only then starts API and
+worker. PostgreSQL is not published on a host port.
+
+```powershell
+docker compose -f modules/backend/docker-compose.yml up --build
+```
+
+For local processes outside Compose, point `DATABASE_URL` at an existing
+PostgreSQL database and migrate it before starting either process:
+
+```powershell
+cd modules\backend
+alembic upgrade head
+```
+
 Terminal 1 - Backend:
 ```powershell
 cd modules\backend
@@ -283,6 +306,29 @@ Terminal 2 - RQ Worker (loads FFmpeg/Whisper/Pyannote):
 cd modules\backend
 python run_worker.py
 ```
+
+The direct Worker command requires Linux/WSL; on Windows, run the supported
+Linux container through Docker Compose because RQ's supervised Worker forks.
+
+The Worker now uses RQ's supervised, forking `Worker`. Its parent does not load
+Torch, CUDA or models; each work-horse child initializes the stable ML engines
+after fork. This restores periodic heartbeats and supervision, but reloads
+models for every job. The model cache is persistent. Worker names are unique so
+a stale registration cannot prevent immediate process restart.
+
+`TRANSCRIPTION_JOB_TIMEOUT_SECONDS` defaults to 3600 (minimum 60) in both API
+and Worker. RQ's normal maintenance and durable-job reconciliation run every
+60 seconds. After an abrupt kill, a restarted Worker deliberately does **not**
+requeue a job still marked `started`; it waits for RQ to mark that execution
+abandoned, then automatically reconciles it. This prevents an immediate
+duplicate, but recovery may take the configured job timeout plus a maintenance
+interval. Monitor both PostgreSQL and RQ; `failed` must agree in both systems.
+
+The [USAGI operational report](modules/backend/USAGI_OPERATIONAL_STABILIZATION.md)
+records the local crash/timeout tests and the isolated development database.
+The earlier [P2-C.2 diagnosis](modules/backend/P2C2_DIAGNOSTIC.md) describes
+the superseded `SimpleWorker` behavior. The Pyannote 4 candidate was **not**
+promoted; the Compose Worker retains the stable Pyannote 3/Torch 2.2 matrix.
 
 Docker Compose defaults to a CPU/auto worker. To explicitly expose an NVIDIA
 GPU and select CUDA/FP16, apply the GPU overlay:
@@ -296,14 +342,66 @@ These files under `modules/backend/` are the only supported Compose
 configuration. The obsolete root Compose, which started a monolithic backend
 without the Redis/RQ boundary, was removed.
 
-Terminal 3 - Frontend:
+Database schema, SQLite import, PostgreSQL integration tests, pooling and
+backup/restore commands are documented in
+[P2-A database operations](modules/backend/P2A_DATABASE.md).
+
+Persistent users, stable ownership, JWT/CORS controls, audit events, data
+export/erasure, retention, and audio cleanup are documented in
+[P2-B security and privacy operations](modules/backend/P2B_SECURITY_PRIVACY.md).
+
+Rate limits, least-privilege Compose environment, operational maintenance,
+ML/CUDA release gates, and the remaining P2-C blockers are documented in
+[P2-C operational hardening](modules/backend/P2C_OPERATIONAL_HARDENING.md).
+The isolated P2-C.1 candidate, per-advisory Torch triage, restore drill, and
+remaining release gates are in
+[P2-C.1 technical closure](modules/backend/P2C1_TECHNICAL_CLOSURE.md).
+
+P3-A adds a durable meeting view for completed transcriptions. The Worker
+persists the meeting metadata, speaker IDs, ordered segments and completed job
+status in one database transaction; the transcript remains in the existing
+`transcriptions.segments` JSONB and is not copied to RQ or a second table.
+The React frontend has a **Reuniões** list and detail page. Authenticated API
+routes are `GET /meetings`, `GET /meetings/{id}`,
+`GET /meetings/{id}/transcript`, `PATCH /meetings/{id}` (title),
+`PATCH /meetings/{id}/speakers/{speaker_id}` (display name), and
+`DELETE /meetings/{id}`. Deletion also removes the underlying transcription;
+active jobs cannot be deleted. The Compose `migrate` service applies Alembic
+before starting API and Worker. See [P3-A meeting design](modules/backend/P3A_MEETINGS.md)
+for the ownership and migration decisions.
+
+P3-B adds persistent meeting intelligence to the existing Meeting page.
+`POST /meetings/{id}/intelligence` requests generation and returns 202;
+`GET /meetings/{id}/intelligence/status` reports durable revision states,
+`GET /meetings/{id}/intelligence/result` reads the last completed result,
+and `POST /meetings/{id}/intelligence/regenerate` requests a new revision.
+An optional `revision` query parameter retrieves an older completed result.
+The Worker reuses Gemini and validates the v1 JSON contract plus literal
+segment evidence before persisting. Failed attempts and older results remain
+traceable; pending requests are idempotent. Configure the Gemini key locally
+for the Worker and `GEMINI_API_KEY_CONFIGURED=true` for the API; the API never
+receives the key in Compose. See [P3-B design and validation](modules/backend/P3B_MEETING_INTELLIGENCE.md).
+
+The real Gemini evaluation initially exposed an unsupported deadline in fixture
+B. Grounding and abstention were corrected and **P3-B/P3-B.2 passed local
+homologation within the documented criteria**, using unchanged frozen sources,
+B plus one repeat, and A/C regressions. Literal references alone are not proof
+of semantic correctness. See [P3-B.2 evaluation](modules/backend/P3B2_GROUNDING_ABSTENTION.md)
+for negative trials, final evidence, metrics and limitations. Production remains
+**not homologated**; Pyannote 4 remains an unpromoted, isolated candidate.
+
+[Consolidation audit](modules/backend/CONSOLIDATION_AUDIT.md) distinguishes current
+operational guides, historical evaluations and retained diagnostic tools.
+
+Terminal 3 - Official React frontend:
 ```powershell
-cd modules\frontend
-streamlit run app.py
+cd modules\frontendv2
+npm ci
+npm run dev
 ```
 
 **URLs:**
-- **Frontend**: http://localhost:8501
+- **React frontend**: http://localhost:3000
 - **API Docs**: http://localhost:2020/docs
 - **Health Check**: http://localhost:2020/health
 
@@ -386,7 +484,7 @@ curl -X POST "http://localhost:2020/transcriptions/jobs" \
 - [x] **Streamlit interface** - Health checks and progress
 - [x] **Automated scripts** - PowerShell for Windows
 - [x] **FastAPI REST API** - Documented endpoints
-- [x] **SQLite persistence** - Transcription history
+- [x] **PostgreSQL persistence** - Alembic-managed transcription history
 - [x] **.env configuration** - GPU settings, API keys
 - [x] **Detailed logging** - VRAM, timings, device info
 - [x] **Automated boundary tests** - Job lifecycle and API/worker isolation
