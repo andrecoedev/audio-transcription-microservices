@@ -297,10 +297,18 @@ class MeetingActionItem(Base):
     description = Column(String(4000), nullable=False)
     assignee = Column(String(255), nullable=True)
     due_date = Column(Date, nullable=True)
+    source_intelligence_id = Column(Integer, ForeignKey("meeting_intelligence.id", ondelete="RESTRICT"), nullable=True)
+    source_revision = Column(Integer, nullable=True)
+    source_index = Column(Integer, nullable=True)
+    original_description = Column(String(4000), nullable=True)
+    original_assignee = Column(String(255), nullable=True)
+    original_due_date = Column(String(255), nullable=True)
+    evidence = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
     status = Column(String(20), nullable=False, default="open", server_default=text("'open'"))
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     meeting = relationship("Meeting", back_populates="action_items")
+    source_intelligence = relationship("MeetingIntelligence")
 
     def to_dict(self):
         return {
@@ -310,8 +318,36 @@ class MeetingActionItem(Base):
             "status": self.status,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "source": "manual",
+            "source": "ai_reviewed" if self.source_intelligence_id is not None else "manual",
+            "source_revision": self.source_revision,
+            "source_index": self.source_index,
+            "original_description": self.original_description,
+            "original_assignee": self.original_assignee,
+            "original_due_date": self.original_due_date,
+            "evidence": self.evidence,
         }
+
+
+class MeetingActionSuggestionReview(Base):
+    """Persistent per-suggestion review state, including after action deletion."""
+
+    __tablename__ = "meeting_action_suggestion_reviews"
+    __table_args__ = (
+        UniqueConstraint("meeting_id", "source_revision", "source_index", name="uq_meeting_action_suggestion_review_source"),
+        CheckConstraint("status IN ('accepted', 'dismissed', 'deleted')", name="ck_meeting_action_suggestion_review_status"),
+        CheckConstraint("(status = 'accepted' AND action_id IS NOT NULL) OR (status != 'accepted' AND action_id IS NULL)", name="ck_meeting_action_suggestion_review_action"),
+        Index("ix_meeting_action_suggestion_reviews_meeting_id", "meeting_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    meeting_id = Column(Integer, ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False)
+    source_intelligence_id = Column(Integer, ForeignKey("meeting_intelligence.id", ondelete="RESTRICT"), nullable=False)
+    source_revision = Column(Integer, nullable=False)
+    source_index = Column(Integer, nullable=False)
+    status = Column(String(20), nullable=False)
+    action_id = Column(Integer, ForeignKey("meeting_action_items.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class MeetingSpeaker(Base):

@@ -1,6 +1,6 @@
 import pytest
 
-from src.models import AuditEvent, MeetingActionItem, MeetingIntelligence
+from src.models import AuditEvent, MeetingActionItem, MeetingActionSuggestionReview, MeetingIntelligence
 from tests.test_meetings_api import _seed_meeting
 from src.models import User
 from src.services.privacy import erase_user_data, export_user_data
@@ -115,6 +115,115 @@ def test_editing_actions_preserves_completed_ai_revision(db_context, auth_header
         assert db.query(MeetingActionItem).one().description == "Human edit"
     finally:
         db.close()
+
+
+def _seed_intelligence(factory, meeting_id, revision=1, suggestions=None):
+    result = {"schema_version": "1", "summary": "Original", "topics": [], "decisions": [],
+              "action_items": suggestions if suggestions is not None else [
+                  {"description": "Enviar slides", "assignee": "Bruno", "due_date": "na próxima semana",
+                   "evidence": [{"segment_order": 10, "quote": "Enviar slides na próxima semana"}]}
+              ], "open_questions": []}
+    db = factory()
+    try:
+        row = MeetingIntelligence(meeting_id=meeting_id, revision=revision, schema_version="1",
+                                  provider="fixture", model="fixture", status="completed", result=result,
+                                  source_metadata={}, input_fingerprint=str(revision) * 64)
+        db.add(row)
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_ai_suggestion_accept_preserves_provenance_and_is_idempotent(db_context, auth_headers):
+    factory = db_context["session_factory"]
+    meeting_id = _seed_meeting(factory)
+    _seed_intelligence(factory, meeting_id)
+    client, headers = db_context["client"], auth_headers()
+    path = f"/meetings/{meeting_id}/actions/suggestions/1/0"
+    accepted = client.post(path, json={"description": "Enviar slides finais", "due_date": "2026-10-05"}, headers=headers)
+    assert accepted.status_code == 201
+    item = accepted.json()
+    assert item["description"] == "Enviar slides finais" and item["assignee"] == "Bruno"
+    assert item["due_date"] == "2026-10-05"
+    assert item["source"] == "ai_reviewed" and item["source_revision"] == 1 and item["source_index"] == 0
+    assert item["original_description"] == "Enviar slides"
+    assert item["original_due_date"] == "na próxima semana"
+    assert item["evidence"] == [{"segment_order": 10, "quote": "Enviar slides na próxima semana"}]
+    again = client.post(path, json={"description": "different retry"}, headers=headers)
+    assert again.status_code == 200 and again.json()["id"] == item["id"]
+    db = factory()
+    try:
+        assert db.query(MeetingActionItem).count() == 1
+        assert db.query(MeetingActionSuggestionReview).one().status == "accepted"
+        assert db.query(MeetingIntelligence).one().result["action_items"][0]["description"] == "Enviar slides"
+    finally:
+        db.close()
+
+
+def test_suggestion_dismissal_persists_and_cannot_be_reaccepted(db_context, auth_headers):
+    factory = db_context["session_factory"]
+    meeting_id = _seed_meeting(factory)
+    _seed_intelligence(factory, meeting_id)
+    client, headers = db_context["client"], auth_headers()
+    path = f"/meetings/{meeting_id}/actions/suggestions/1/0"
+    dismissed = client.post(path + "/dismiss", headers=headers)
+    assert dismissed.status_code == 200 and dismissed.json()["status"] == "dismissed"
+    assert client.post(path + "/dismiss", headers=headers).json() == dismissed.json()
+    assert client.post(path, headers=headers).status_code == 409
+    listing = client.get(f"/meetings/{meeting_id}/actions", headers=headers).json()
+    assert listing["action_items"] == []
+    assert listing["suggestion_reviews"] == [{"source_revision": 1, "source_index": 0, "status": "dismissed"}]
+
+
+def test_ai_action_delete_is_physical_but_review_tombstone_prevents_duplicate(db_context, auth_headers):
+    factory = db_context["session_factory"]
+    meeting_id = _seed_meeting(factory)
+    _seed_intelligence(factory, meeting_id)
+    client, headers = db_context["client"], auth_headers()
+    suggestion_path = f"/meetings/{meeting_id}/actions/suggestions/1/0"
+    item = client.post(suggestion_path, headers=headers).json()
+    assert client.delete(f"/meetings/{meeting_id}/actions/{item['id']}", headers=headers).status_code == 204
+    assert client.post(suggestion_path, headers=headers).status_code == 409
+    listing = client.get(f"/meetings/{meeting_id}/actions", headers=headers).json()
+    assert listing["action_items"] == []
+    assert listing["suggestion_reviews"][0]["status"] == "deleted"
+    db = factory()
+    try:
+        assert db.query(MeetingActionItem).count() == 0
+    finally:
+        db.close()
+
+
+def test_suggestion_provenance_is_server_derived_and_revision_scoped(db_context, auth_headers):
+    factory = db_context["session_factory"]
+    meeting_id = _seed_meeting(factory)
+    _seed_intelligence(factory, meeting_id, revision=1)
+    _seed_intelligence(factory, meeting_id, revision=2, suggestions=[
+        {"description": "Reformulated", "assignee": None, "due_date": None, "evidence": []}
+    ])
+    client, headers = db_context["client"], auth_headers()
+    path = f"/meetings/{meeting_id}/actions/suggestions"
+    assert client.post(f"{path}/999/0", headers=headers).status_code == 404
+    assert client.post(f"{path}/2/1", headers=headers).status_code == 404
+    assert client.post(f"{path}/2/0", headers=headers, json={"source_revision": 1}).status_code == 422
+    old = client.post(f"{path}/1/0", headers=headers).json()
+    client.post(f"{path}/2/0", headers=headers)
+    listing = client.get(f"/meetings/{meeting_id}/actions", headers=headers).json()
+    by_revision = {item["source_revision"]: item for item in listing["action_items"]}
+    assert by_revision[1]["description"] == "Enviar slides"
+    assert by_revision[1]["original_description"] == "Enviar slides"
+    assert by_revision[2]["description"] == "Reformulated"
+    assert by_revision[1]["id"] == old["id"]
+
+
+def test_other_owner_cannot_accept_or_dismiss_suggestion(db_context, auth_headers):
+    factory, client = db_context["session_factory"], db_context["client"]
+    meeting_id = _seed_meeting(factory)
+    _seed_intelligence(factory, meeting_id)
+    path = f"/meetings/{meeting_id}/actions/suggestions/1/0"
+    assert client.post(path, headers=auth_headers("bob")).status_code == 404
+    assert client.post(path + "/dismiss", headers=auth_headers("bob")).status_code == 404
+    assert client.post(path, headers=auth_headers()).status_code == 201
 
 
 def test_privacy_export_and_erasure_include_owned_actions(db_context, auth_headers):

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..models import AuditEvent, Transcription, TranscriptionOwnership, User
+from ..models import AuditEvent, MeetingActionSuggestionReview, Transcription, TranscriptionOwnership, User
 from .audit import append_audit_event
 from .storage_lifecycle import delete_file_idempotently
 
@@ -86,6 +86,14 @@ def export_user_data(db: Session, user: User) -> dict:
                 "action_items": [
                     action.to_dict()
                     for action in sorted(transcription.meeting.action_items, key=lambda item: item.id)
+                ],
+                "action_suggestion_reviews": [
+                    {"source_revision": review.source_revision, "source_index": review.source_index,
+                     "status": review.status}
+                    for review in db.query(MeetingActionSuggestionReview)
+                    .filter_by(meeting_id=transcription.meeting.id)
+                    .order_by(MeetingActionSuggestionReview.source_revision,
+                              MeetingActionSuggestionReview.source_index).all()
                 ],
             }
             if transcription.meeting else None
