@@ -9,6 +9,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -275,6 +276,42 @@ class Meeting(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    action_items = relationship(
+        "MeetingActionItem", back_populates="meeting",
+        cascade="all, delete-orphan", passive_deletes=True,
+    )
+
+
+class MeetingActionItem(Base):
+    """User-managed actions; editing them never updates an AI revision."""
+
+    __tablename__ = "meeting_action_items"
+    __table_args__ = (
+        CheckConstraint("status IN ('open', 'done', 'dismissed')", name="ck_meeting_action_items_status"),
+        CheckConstraint("length(trim(description)) > 0", name="ck_meeting_action_items_description"),
+        Index("ix_meeting_action_items_meeting_id", "meeting_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    meeting_id = Column(Integer, ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False)
+    description = Column(String(4000), nullable=False)
+    assignee = Column(String(255), nullable=True)
+    due_date = Column(Date, nullable=True)
+    status = Column(String(20), nullable=False, default="open", server_default=text("'open'"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    meeting = relationship("Meeting", back_populates="action_items")
+
+    def to_dict(self):
+        return {
+            "id": self.id, "meeting_id": self.meeting_id,
+            "description": self.description, "assignee": self.assignee,
+            "due_date": self.due_date.isoformat() if self.due_date else None,
+            "status": self.status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "source": "manual",
+        }
 
 
 class MeetingSpeaker(Base):
