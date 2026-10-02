@@ -96,6 +96,16 @@ export const audioService = {
     return data
   },
 
+  async getMeetingMinutes(id) {
+    const { data } = await api.get(`/meetings/${id}/minutes`)
+    return data
+  },
+
+  async getMeetingMinutesMarkdown(id) {
+    const { data } = await api.get(`/meetings/${id}/minutes.md`, { responseType: 'text' })
+    return data
+  },
+
   async updateMeetingTitle(id, title) {
     const { data } = await api.patch(`/meetings/${id}`, { title })
     return data
