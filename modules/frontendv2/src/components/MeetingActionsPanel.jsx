@@ -109,7 +109,7 @@ function Suggestion({ item, revision, references, busy, accept, dismiss }) {
   </li>
 }
 
-export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0 }) {
+export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0, onActionsChanged }) {
   const [items, setItems] = useState([])
   const [suggestionReviews, setSuggestionReviews] = useState([])
   const [suggestionResult, setSuggestionResult] = useState(null)
@@ -152,6 +152,7 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
     try {
       await operation()
       setRefresh(value => value + 1)
+      onActionsChanged?.()
       return true
     } catch {
       setError('Não foi possível salvar a alteração. Tente novamente.')

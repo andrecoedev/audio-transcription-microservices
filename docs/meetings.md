@@ -55,8 +55,19 @@ transcribe e exclusão delete_transcriptions; ownership segue o padrão existent
 (404 para outro owner, acesso administrativo preservado). Exclusão da reunião ou
 transcrição remove as tarefas por cascade. Audit events não guardam seu conteúdo.
 
-Ata revisada e exportação Markdown permanecem fora do escopo deste contrato de
-backend.
+## Ata revisada e exportação
+
+| Endpoint | Contrato |
+|---|---|
+| GET /meetings/{id}/minutes | Projeção determinística: título/contexto, summary/topics/decisions/open_questions da revisão completed mais recente e tarefas operacionais abertas/concluídas |
+| GET /meetings/{id}/minutes.md | Download Markdown da mesma projeção |
+
+Sem intelligence concluída, as seções de IA retornam vazias; summary é string
+vazia e listas são arrays vazios. Tarefas dismissed nunca entram na ata. Tarefas
+AI aceitas usam descrição/responsável/prazo/status operacionais; a projeção
+expõe source e identificadores de provenance. Texto dinâmico é escapado como
+texto inline do Markdown para não criar links, HTML ou seções injetadas. Os
+endpoints exigem read_transcriptions e respeitam ownership.
 
 ## Revisões de intelligence
 
