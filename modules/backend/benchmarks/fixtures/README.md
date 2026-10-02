@@ -23,7 +23,9 @@ and clone `https://github.com/pyannote/AMI-diarization-setup`. Then run
 records reproducible windows for clean two-speaker speech, controlled unequal
 volume, rapid turns, overlap, far-field room audio, and four speakers. Generated
 audio, JSONL (`speaker`, `start`, `end`, `text`, `dbfs`) and RTTM files remain
-ignored; only aggregate, non-sensitive benchmark results are committed.
+ignored. Aggregate baselines and release gates are documented in
+[ML validation](../../../../docs/ml_validation.md); raw benchmark outputs stay local-only in the ignored
+`benchmarks/results/` or `.local-artifacts/` directories.
 
 Run `benchmark_diarization_robustness.py --help` for DER evaluation. Its primary
 score uses a 0.25-second collar and includes overlap; it also stores a secondary

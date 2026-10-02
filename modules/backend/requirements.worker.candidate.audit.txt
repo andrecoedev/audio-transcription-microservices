@@ -1,5 +1,0 @@
-# Normalize CUDA local versions for advisory lookup. This file is not installed.
-# The actual candidate wheels are torch/torchaudio/torchvision +cu128.
-torch==2.10.0
-torchaudio==2.10.0
-torchvision==0.25.0

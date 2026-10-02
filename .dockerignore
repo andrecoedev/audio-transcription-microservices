@@ -26,6 +26,7 @@ logs/
 dist/
 **/dist/
 **/.env
+**/.env.*
 **/.env.local
 **/.env.*.local
 **/benchmarks/fixtures/*
@@ -34,3 +35,9 @@ dist/
 **/*.wav
 **/*.mp3
 **/*.m4a
+.local-artifacts/
+docs/
+**/backups/
+**/*.db-*
+**/*.sqlite*-*
+**/*.sql.gz
