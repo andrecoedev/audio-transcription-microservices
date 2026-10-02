@@ -83,6 +83,10 @@ def export_user_data(db: Session, user: User) -> dict:
                      "source_metadata": row.source_metadata}
                     for row in sorted(transcription.meeting.intelligence_revisions, key=lambda item: item.revision)
                 ],
+                "action_items": [
+                    action.to_dict()
+                    for action in sorted(transcription.meeting.action_items, key=lambda item: item.id)
+                ],
             }
             if transcription.meeting else None
         )

@@ -34,12 +34,45 @@ def _sample_wav() -> bytes:
     return buffer.getvalue()
 
 
+def _smoke_manual_actions(session, base_url, meeting_id):
+    """Exercise only synthetic user state; never invoke the intelligence provider."""
+    path = base_url + f"/meetings/{meeting_id}/actions"
+    created = session.post(path, json={"description": "Tarefa sintética de smoke"}, timeout=20)
+    print(f"action_create_http={created.status_code}", flush=True)
+    created.raise_for_status()
+    item = created.json()
+    assert item["source"] == "manual" and item["status"] == "open"
+    assert item["assignee"] is None and item["due_date"] is None
+    url = path + f"/{item['id']}"
+    edited = session.patch(url, json={"description": "Tarefa sintética revisada", "assignee": "Pessoa de teste", "due_date": "2026-10-05"}, timeout=20)
+    edited.raise_for_status()
+    for status in ("done", "open", "dismissed", "open"):
+        changed = session.patch(url, json={"status": status}, timeout=20)
+        changed.raise_for_status()
+        persisted = session.get(path, timeout=20)
+        persisted.raise_for_status()
+        task = next(action for action in persisted.json()["action_items"] if action["id"] == item["id"])
+        assert task["status"] == status and task["description"] == "Tarefa sintética revisada"
+        assert task["due_date"] == "2026-10-05" and task["assignee"] == "Pessoa de teste"
+    cleared = session.patch(url, json={"assignee": None, "due_date": None}, timeout=20)
+    cleared.raise_for_status()
+    assert cleared.json()["assignee"] is None and cleared.json()["due_date"] is None
+    removed = session.delete(url, timeout=20)
+    removed.raise_for_status()
+    assert removed.status_code == 204
+    print("action_lifecycle_persisted=true", flush=True)
+    # Leave one synthetic action to verify Meeting cascade in the caller's cleanup.
+    remaining = session.post(path, json={"description": "Tarefa sintética para cascade"}, timeout=20)
+    remaining.raise_for_status()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--diarization", action="store_true")
     parser.add_argument("--audio-file", type=Path)
     parser.add_argument("--require-segments", action="store_true")
     parser.add_argument("--meeting", action="store_true")
+    parser.add_argument("--actions", action="store_true")
     parser.add_argument("--drop-rq-job", action="store_true")
     parser.add_argument("--intelligence", action="store_true")
     parser.add_argument("--review-output", type=Path)
@@ -49,6 +82,8 @@ def main() -> None:
         parser.error("--drop-rq-job requires --meeting")
     if args.intelligence and not args.meeting:
         parser.error("--intelligence requires --meeting")
+    if args.actions and not args.meeting:
+        parser.error("--actions requires --meeting")
 
     password = os.environ["USAGI_SMOKE_PASSWORD"]
     base_url = os.environ.get("USAGI_SMOKE_API_URL", "http://api:2020")
@@ -153,6 +188,8 @@ def main() -> None:
                 renamed.raise_for_status()
                 assert renamed.json()["display_name"] == "Falante de teste"
             meeting_ready = True
+            if args.actions:
+                _smoke_manual_actions(session, base_url, job_id)
             availability = session.get(base_url + f"/meetings/{job_id}/intelligence/status", timeout=20)
             availability.raise_for_status()
             if not availability.json()["configured"]:
@@ -219,6 +256,9 @@ def main() -> None:
             )
             print(f"deleted_read_http={missing.status_code}", flush=True)
             assert missing.status_code == 404
+            if args.actions and meeting_ready:
+                assert session.get(base_url + f"/meetings/{job_id}/actions", timeout=20).status_code == 404
+                print("actions_deleted_with_meeting=true", flush=True)
 
 
 if __name__ == "__main__":

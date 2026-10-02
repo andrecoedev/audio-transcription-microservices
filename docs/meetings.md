@@ -20,6 +20,30 @@ Conclusão do Worker cria Meeting/speakers e completed na mesma transação.
 A migration de Meeting faz backfill de resultados completed já existentes.
 Exclusão de transcrição remove Meeting, speakers e intelligence por cascade.
 
+## Ações administradas pelo usuário
+
+MeetingActionItem pertence à Meeting e armazena descrição, responsável opcional,
+data de prazo opcional (YYYY-MM-DD), status e timestamps. Nesta entrega as tarefas
+são criadas manualmente, inclusive sem Intelligence. A tabela é independente das
+revisões produzidas pela IA: editar uma tarefa não altera o resultado original.
+
+| Endpoint | Contrato |
+|---|---|
+| GET /meetings/{id}/actions | Lista tarefas, inclusive descartadas |
+| POST /meetings/{id}/actions | Cria tarefa manual, inicialmente open |
+| PATCH /meetings/{id}/actions/{action_id} | Edita campos fornecidos; null limpa responsável/prazo |
+| DELETE /meetings/{id}/actions/{action_id} | Remove explicitamente a tarefa, retorna 204 |
+
+Status: open, done, dismissed. Concluir/reabrir/descartar usam PATCH. Dismissed
+preserva o registro e pode ser reaberto; delete remove o registro operacional.
+Descrição não pode ser vazia; status/descrição não aceitam null. IDs de tarefas
+devem pertencer à Meeting da URL. Reads usam read_transcriptions, criação/edição
+transcribe e exclusão delete_transcriptions; ownership segue o padrão existente
+(404 para outro owner, acesso administrativo preservado). Exclusão da reunião ou
+transcrição remove as tarefas por cascade. Audit events não guardam seu conteúdo.
+
+Aceite de sugestões da IA/provenance e ata revisada são entregas seguintes.
+
 ## Revisões de intelligence
 
 MeetingIntelligence tem FK para Meeting, revisão monotônica, schema_version,

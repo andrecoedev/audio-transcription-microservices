@@ -113,6 +113,25 @@ export const audioService = {
     return data
   },
 
+  async getMeetingActions(id) {
+    const { data } = await api.get(`/meetings/${id}/actions`)
+    return data
+  },
+
+  async createMeetingAction(id, payload) {
+    const { data } = await api.post(`/meetings/${id}/actions`, payload)
+    return data
+  },
+
+  async updateMeetingAction(id, actionId, payload) {
+    const { data } = await api.patch(`/meetings/${id}/actions/${actionId}`, payload)
+    return data
+  },
+
+  async deleteMeetingAction(id, actionId) {
+    await api.delete(`/meetings/${id}/actions/${actionId}`)
+  },
+
   async requestMeetingIntelligence(id, regenerate = false) {
     const path = `/meetings/${id}/intelligence${regenerate ? '/regenerate' : ''}`
     const { data } = await api.post(path)

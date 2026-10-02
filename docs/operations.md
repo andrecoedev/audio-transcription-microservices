@@ -37,7 +37,7 @@ python run_worker.py
 ## Schema e ownership
 
 Schema nunca é criado no import/startup HTTP. Cadeia aplicada preservada:
-20260909_0001 → 20260920_0002 → 20260930_0003 → 20261001_0004.
+20260909_0001 → 20260920_0002 → 20260930_0003 → 20261001_0004 → 20261002_0005.
 Use `alembic current`, `history`, `upgrade head` e `check`.
 Downgrade é destrutivo e deve ser ensaiado apenas em banco sintético isolado.
 
@@ -117,6 +117,8 @@ parciais. Não existe scheduler de exclusão instalado automaticamente.
 smoke_http_dev.py é sintético/public-only: login, sessão, upload, polling,
 resultado e exclusão dos próprios dados. Opções --meeting, --diarization,
 --intelligence, --require-segments e --drop-rq-job permitem verificar persistência.
+Com --meeting --actions, também cria/edita/conclui/reabre/descarta/remove tarefas
+manuais e verifica sua persistência e exclusão junto à reunião, sem chamar Gemini.
 USAGI_SMOKE_PASSWORD vai apenas no ambiente. Intelligence real é chamada cobrada:
 não ativá-la repetidamente sem necessidade/autorização.
 Outputs de review devem permanecer em diretório local ignorado.
