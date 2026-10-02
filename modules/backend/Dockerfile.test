@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY modules/backend/requirements.api.txt /app/requirements.api.txt
+COPY modules/backend/requirements.test.txt /app/requirements.test.txt
+RUN pip install --no-cache-dir -r /app/requirements.test.txt
+
+COPY . /app
+WORKDIR /app/modules/backend
+
+CMD ["pytest", "-q"]
