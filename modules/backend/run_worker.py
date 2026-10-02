@@ -30,6 +30,7 @@ from src.workers.config import (
     is_redis_available,
 )
 from src.workers.transcription_worker import recover_pending_jobs
+from src.workers.meeting_intelligence_worker import recover_intelligence_jobs
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class RecoveringWorker(Worker):
         super().run_maintenance_tasks()
         for queue in self.queues:
             recover_pending_jobs(queue)
+            recover_intelligence_jobs(queue)
 
 
 def main():
@@ -71,6 +73,7 @@ def main():
         if errors:
             raise RuntimeError("Invalid worker configuration: " + "; ".join(errors))
         recover_pending_jobs(queue)
+        recover_intelligence_jobs(queue)
     except Exception:
         logger.exception("Worker initialization failed")
         sys.exit(1)

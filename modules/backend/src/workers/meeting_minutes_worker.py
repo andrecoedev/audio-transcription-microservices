@@ -3,7 +3,6 @@
 import logging
 
 from .. import engine_registry
-from ..config import settings
 from ..database import SessionLocal
 from ..models import Transcription
 
@@ -18,8 +17,8 @@ def process_meeting_minutes_sync(
     try:
         generator = engine_registry.meeting_minutes_generator
         if generator is None:
-            from ..services.meeting_minutes import MeetingMinutesGenerator
-            engine_registry.meeting_minutes_generator = MeetingMinutesGenerator(settings.GEMINI_API_KEY)
+            from ..services.intelligence_provider import get_provider
+            get_provider()
             generator = engine_registry.meeting_minutes_generator
         transcription = db.get(Transcription, transcription_id)
         if not transcription:

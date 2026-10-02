@@ -30,7 +30,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.database import get_db
 from src.models import Base, User
-from src.routers import meeting_minutes, meetings, transcriptions
+from src.routers import meeting_intelligence, meeting_minutes, meetings, transcriptions
 from src.security import create_access_token
 
 
@@ -100,6 +100,7 @@ def db_context(tmp_path, monkeypatch):
     app = FastAPI()
     app.include_router(transcriptions.router)
     app.include_router(meetings.router)
+    app.include_router(meeting_intelligence.router)
     app.include_router(meeting_minutes.router)
 
     def override_get_db():
@@ -112,6 +113,7 @@ def db_context(tmp_path, monkeypatch):
     app.dependency_overrides[get_db] = override_get_db
     queue = FakeQueue()
     monkeypatch.setattr(transcriptions, "get_transcription_queue", lambda: queue)
+    monkeypatch.setattr(meeting_intelligence, "get_transcription_queue", lambda: queue)
     monkeypatch.setattr(transcriptions, "_UPLOAD_DIRECTORY", tmp_path / "uploads")
 
     with TestClient(app) as client:

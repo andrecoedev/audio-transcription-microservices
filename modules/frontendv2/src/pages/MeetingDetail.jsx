@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import Button from '../components/Button'
 import { audioService } from '../services/audioService'
+import MeetingIntelligencePanel from '../components/MeetingIntelligencePanel'
 
 export default function MeetingDetail() {
   const { id } = useParams()
@@ -73,6 +74,7 @@ export default function MeetingDetail() {
         <input id={`speaker-${speaker.id}`} aria-label={`Nome de ${speaker.id}`} required maxLength={100} value={speakerNames[speaker.id] || ''} onChange={event => setSpeakerNames({ ...speakerNames, [speaker.id]: event.target.value })} className="flex-1 px-3 py-2 border rounded-lg" />
         <Button type="submit" size="sm">Renomear</Button>
       </form>)}</div></CardContent></Card>
+    <MeetingIntelligencePanel meetingId={id} />
     <Card><CardHeader><CardTitle>Transcrição</CardTitle></CardHeader><CardContent><div className="space-y-4">
       {transcript.segments.map(segment => <div id={`segment-${segment.order}`} key={segment.order} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
         <div className="flex justify-between text-sm text-gray-600"><span>{segment.speaker_display_name || segment.speaker || 'Falante'}</span><span>{segment.start?.toFixed(1)}s – {segment.end?.toFixed(1)}s</span></div>

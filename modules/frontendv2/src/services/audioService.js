@@ -113,6 +113,22 @@ export const audioService = {
     return data
   },
 
+  async requestMeetingIntelligence(id, regenerate = false) {
+    const path = `/meetings/${id}/intelligence${regenerate ? '/regenerate' : ''}`
+    const { data } = await api.post(path)
+    return data
+  },
+
+  async getMeetingIntelligenceStatus(id) {
+    const { data } = await api.get(`/meetings/${id}/intelligence/status`)
+    return data
+  },
+
+  async getMeetingIntelligenceResult(id) {
+    const { data } = await api.get(`/meetings/${id}/intelligence/result`)
+    return data
+  },
+
   async getSystemGpu() {
     const { data } = await api.get('/system/gpu')
     return data

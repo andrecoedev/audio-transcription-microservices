@@ -3,8 +3,10 @@ Serviço de geração de atas de reunião usando IA (Gemini).
 """
 
 import logging
+import time
 import google.generativeai as genai
 from typing import Dict, List, Optional
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +28,31 @@ class MeetingMinutesGenerator:
         """Configura o cliente Gemini."""
         try:
             genai.configure(api_key=self.api_key)
-            # Usar gemini-1.5-flash que é o modelo disponível atualmente
-            self.model = genai.GenerativeModel('gemini-2.5-flash')
+            # Use the deployment's configured model for both supported flows.
+            self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
             logger.info("✅ Gemini configurado para geração de atas")
         except Exception as e:
-            logger.error(f"❌ Erro ao configurar Gemini: {e}")
+            logger.error("Unable to configure Gemini (%s)", type(e).__name__)
             raise
+
+    def generate_intelligence(self, prompt: str) -> str:
+        """Reuse the Gemini client; domain validation occurs in the Worker."""
+        started = time.monotonic()
+        response = self.model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json", "temperature": 0.1, "max_output_tokens": 16384},
+            request_options={"timeout": min(settings.MEETING_MINUTES_TIMEOUT_SECONDS, 300), "retry": None},
+        )
+        usage = getattr(response, "usage_metadata", None)
+        logger.info(
+            "Gemini intelligence metrics model=%s latency_seconds=%.3f input_tokens=%s output_tokens=%s total_tokens=%s retries=0",
+            settings.GEMINI_MODEL, time.monotonic() - started,
+            getattr(usage, "prompt_token_count", None), getattr(usage, "candidates_token_count", None),
+            getattr(usage, "total_token_count", None),
+        )
+        if not response.text:
+            raise ValueError("Empty Gemini response")
+        return response.text
     
     def generate_minutes(
         self,
@@ -148,7 +169,7 @@ Por favor, analise a transcrição acima e gere uma ata de reunião completa e e
             }
         
         except Exception as e:
-            logger.error(f"❌ Erro ao gerar ata: {e}")
+            logger.error("Unable to generate meeting minutes (%s)", type(e).__name__)
             raise
     
     def _extract_section(self, text: str, section_title: str) -> str:
@@ -287,5 +308,5 @@ Por favor, analise a transcrição acima e gere uma ata de reunião completa e e
         """Retorna status da configuração."""
         return {
             "configured": bool(self.api_key),
-            "model": "gemini-2.5-flash"
+            "model": settings.GEMINI_MODEL
         }
