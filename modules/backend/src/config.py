@@ -19,9 +19,12 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = Field(
-        default="sqlite:///./database/transcriptions.db",
-        description="Database connection URL"
+        description="SQLAlchemy URL; PostgreSQL+psycopg is the official runtime"
     )
+    DB_POOL_SIZE: int = Field(default=5, description="Persistent connections per process")
+    DB_MAX_OVERFLOW: int = Field(default=5, description="Temporary overflow connections")
+    DB_POOL_TIMEOUT_SECONDS: int = Field(default=30, description="Pool checkout timeout")
+    DB_POOL_RECYCLE_SECONDS: int = Field(default=1800, description="Connection recycle age")
     
     # Redis & Job Queue
     REDIS_URL: str = Field(
@@ -180,6 +183,23 @@ class Settings(BaseSettings):
 
         if not self.DATABASE_URL or not self.DATABASE_URL.strip():
             errors.append("DATABASE_URL is required")
+
+        if self.is_production and not self.DATABASE_URL.startswith(
+            "postgresql+psycopg://"
+        ):
+            errors.append(
+                "DATABASE_URL must use PostgreSQL with the psycopg driver "
+                "when APP_ENV=prod"
+            )
+
+        if self.DB_POOL_SIZE <= 0:
+            errors.append("DB_POOL_SIZE must be greater than zero")
+        if self.DB_MAX_OVERFLOW < 0:
+            errors.append("DB_MAX_OVERFLOW cannot be negative")
+        if self.DB_POOL_TIMEOUT_SECONDS <= 0:
+            errors.append("DB_POOL_TIMEOUT_SECONDS must be greater than zero")
+        if self.DB_POOL_RECYCLE_SECONDS <= 0:
+            errors.append("DB_POOL_RECYCLE_SECONDS must be greater than zero")
 
         if self.DEFAULT_TRANSCRIPTION_MODEL not in {"whisper", "assemblyai"}:
             errors.append("DEFAULT_TRANSCRIPTION_MODEL must be 'whisper' or 'assemblyai'")
