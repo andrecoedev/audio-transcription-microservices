@@ -160,6 +160,22 @@ services:
       start_period: 5m
     restart: unless-stopped
 
+  frontend:
+    build:
+      context: ../frontendv2
+      dockerfile: Dockerfile.web
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
   test:
     profiles: ["test"]
     build:

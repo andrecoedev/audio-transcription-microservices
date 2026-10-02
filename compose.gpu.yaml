@@ -1,0 +1,4 @@
+include:
+  - path:
+      - modules/backend/docker-compose.yml
+      - modules/backend/docker-compose.gpu.yml

@@ -21,20 +21,24 @@ Não publique .env, valores/fragmentos/hashes de chaves ou saída expandida de C
 
 Da raiz:
 ```powershell
-docker compose -p usagidev --env-file modules/backend/.env -f modules/backend/docker-compose.yml up --build -d
+docker compose -p usagidev --env-file modules/backend/.env up --build -d
 ```
 
 GPU opcional, mantendo a mesma matriz estável:
 ```powershell
-docker compose -p usagidev --env-file modules/backend/.env -f modules/backend/docker-compose.yml -f modules/backend/docker-compose.gpu.yml up --build -d
+docker compose -p usagidev --env-file modules/backend/.env -f compose.gpu.yaml up --build -d
 ```
 
-Compose inicia PostgreSQL, Redis, Alembic, API e Worker separadamente.
+O Compose da raiz inicia frontend React, PostgreSQL, Redis, Alembic, API e Worker
+em containers separados do mesmo projeto. `-p usagidev` mantém os volumes de
+desenvolvimento já identificados; não troque o nome do projeto sem verificar
+qual banco/volume será usado. O frontend abre em http://localhost:3000 e envia
+requisições ao backend pelo proxy `/api`, sem receber segredos.
 Não use volume/banco desconhecido. Windows roda Worker no container Linux/WSL.
 Não atualizar Torch isoladamente nem instalar uma matriz CUDA alternativa para
 contornar um erro sem validação conjunta.
 
-Frontend:
+Para desenvolver o frontend fora do Docker, opcionalmente:
 ```powershell
 cd modules/frontendv2
 npm ci
