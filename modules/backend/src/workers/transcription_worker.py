@@ -9,7 +9,7 @@ from rq.job import Job
 
 from ..config import settings
 from ..database import SessionLocal
-from ..models import Meeting, MeetingSpeaker, Transcription, TranscriptionJob
+from ..models import Meeting, MeetingSpeaker, Transcription, TranscriptionJob, TranscriptionOwnership
 from ..services.processing_engines import initialize_processing_engines
 from ..services.audit import append_audit_event
 from ..services.meeting_projection import ordered_segments, speaker_ids
@@ -17,6 +17,7 @@ from ..services.storage_lifecycle import delete_file_idempotently
 from ..services.transcription_processing_service import (
     TranscriptionProcessingService,
     PublicAudioDurationError,
+    TranscriptionProcessingError,
 )
 
 logger = logging.getLogger(__name__)
@@ -177,6 +178,10 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
             "use_diarization": job.use_diarization,
             "transcription_model": job.transcription_model,
             "max_duration_seconds": job.max_duration_seconds,
+            "guest_context": db.query(TranscriptionOwnership.id).filter(
+                TranscriptionOwnership.transcription_id == transcription_id,
+                TranscriptionOwnership.guest_session_id.isnot(None),
+            ).first() is not None,
         }
     except Exception:
         db.rollback()
@@ -301,6 +306,10 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
 
         claimed = True
         input_path = claim["input_path"]
+        if claim["guest_context"]:
+            # Also protect previously queued/recovered Guest jobs. P4-04 must
+            # validate provider admission and budget before any engine loading.
+            raise TranscriptionProcessingError("Visitor AssemblyAI processing is not validated")
         logger.info("Transcription job %s started", transcription_id)
         started_at = time.monotonic()
 

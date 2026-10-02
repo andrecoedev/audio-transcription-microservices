@@ -10,6 +10,43 @@ from src.services import rate_limit
 from .conftest import FakeRedisConnection
 
 
+@pytest.fixture(autouse=True)
+def simulated_guest_provider_admission(monkeypatch):
+    # These ownership/upload regressions use a fake queue, never paid calls.
+    # P4-04 admission is simulated only here; production remains fail-closed.
+    from src.routers import transcriptions
+    monkeypatch.setattr(transcriptions, "require_guest_processing", lambda: None)
+
+
+def test_guest_processing_blocked_by_provider_recovery_without_local_fallback(db_context, monkeypatch, wav_bytes):
+    from src.routers import transcriptions
+    from src.services.provider_policy import require_guest_processing
+    monkeypatch.setattr(transcriptions, "require_guest_processing", require_guest_processing)
+    client = db_context["client"]
+    policy = client.get("/guest/policy").json()
+    assert policy["provider"] == "assemblyai" and policy["diarization"] is True
+    assert policy["can_create_job"] is False and policy["blocked_by"] == "P4-04"
+    assert policy["max_upload_mb"] == settings.PUBLIC_MAX_UPLOAD_MB
+    assert policy["max_audio_seconds"] == settings.PUBLIC_MAX_AUDIO_SECONDS
+    guest = guest_headers(client)
+    response = client.post("/guest/transcriptions/jobs", headers=guest,
+        files={"file": ("synthetic.wav", wav_bytes)}, data={"use_diarization": "true"})
+    assert response.status_code == 503
+    assert db_context["queue"].enqueued == []
+    assert client.get("/guest/session", headers=guest).json()["jobs_created"] == 0
+
+
+def test_simulated_guest_assemblyai_admission_preserves_speaker_option(db_context, wav_bytes):
+    client = db_context["client"]
+    response = client.post("/guest/transcriptions/jobs", headers=guest_headers(client),
+        files={"file": ("synthetic.wav", wav_bytes)}, data={"use_diarization": "true"})
+    assert response.status_code == 202
+    db = db_context["session_factory"]()
+    job = db.get(Transcription, response.json()["id"]).job
+    assert job.transcription_model == "assemblyai" and job.use_diarization is True
+    db.close()
+
+
 def guest_headers(client):
     response = client.post("/guest/sessions")
     assert response.status_code == 201
@@ -140,7 +177,7 @@ def test_guest_expiry_and_job_budget_are_server_side(db_context, wav_bytes):
     db.close()
 
 
-@pytest.mark.parametrize("options", [{"transcription_model": "assemblyai"}, {"use_diarization": "true"}])
+@pytest.mark.parametrize("options", [{"transcription_model": "whisper"}])
 def test_guest_cannot_enable_expensive_providers(db_context, wav_bytes, options):
     client = db_context["client"]
     headers = guest_headers(client)

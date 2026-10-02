@@ -9,6 +9,12 @@ from fastapi import HTTPException
 from ..security import TokenData
 
 
+def require_guest_processing() -> None:
+    # No runtime opt-in until P4-04 validates native speakers, failures and
+    # atomic platform budget reservation. Availability is not permission.
+    raise HTTPException(503, "Visitor transcription is unavailable while AssemblyAI is being validated")
+
+
 def require_provider_credential(user: TokenData, provider: str, *, credential_source: str = "platform") -> None:
     if provider == "whisper":
         return

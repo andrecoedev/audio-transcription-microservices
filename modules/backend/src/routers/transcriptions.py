@@ -15,7 +15,7 @@ from ..security import TokenData, require_scope_when
 from ..services.audit import append_audit_event
 from ..services.transcription_deletion import ActiveTranscriptionError, delete_transcription_data
 from ..services.rate_limit import enforce_rate_limit
-from ..services.provider_policy import require_provider_credential
+from ..services.provider_policy import require_provider_credential, require_guest_processing
 from ..services.storage_lifecycle import delete_file_idempotently, upload_directory
 from ..utils.uploads import UploadValidationError, save_validated_upload
 from ..utils.http_limits import BodyLimitedRoute
@@ -35,6 +35,7 @@ class UploadLimitedRoute(BodyLimitedRoute):
                 enforce_rate_limit(request, "upload-ip")
                 if request.url.path.startswith("/guest/"):
                     enforce_rate_limit(request, "public-job")
+                    require_guest_processing()  # Fail before parsing/spooling while P4-04 is blocked.
             return await original(request)
 
         return limited
@@ -175,8 +176,9 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
         await file.close()
         raise HTTPException(status_code=400, detail="Invalid transcription model")
     if guest_session is not None:
-        if transcription_model != "whisper" or use_diarization:
-            raise HTTPException(403, "Guest processing supports only local transcription without diarization")
+        if transcription_model != "assemblyai":
+            raise HTTPException(403, "Visitor processing supports only AssemblyAI; no local fallback")
+        require_guest_processing()
     else:
         require_provider_credential(current_user, transcription_model)
 
