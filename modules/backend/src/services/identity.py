@@ -39,7 +39,8 @@ def authenticate_local_user(db: Session, username: str, password: str) -> User |
     if user is not None:
         if not user.is_active or not verify_password(password, user.hashed_password):
             return None
-        _resolve_exact_legacy_ownership(db, user)
+        if user.registration_source == "local":
+            _resolve_exact_legacy_ownership(db, user)
         return user
 
     if normalized_username == settings.AUTH_ADMIN_USERNAME:
@@ -82,6 +83,33 @@ def principal_for_user(user: User) -> dict:
         "sub": str(user.id),
         "username": user.username,
         "email": user.email,
+        # Restrictive transport hint only; permissions still use the database.
+        "registration_source": user.registration_source,
         "roles": ["admin"] if user.is_superuser else ["user"],
         "scopes": ADMIN_SCOPES if user.is_superuser else USER_SCOPES,
     }
+
+
+def register_public_user(db: Session, username: str, email: str, password: str) -> User:
+    """Public registration cannot provision an admin or claim a legacy identity."""
+    username = username.strip()
+    email = email.strip().lower()
+    if (
+        not _USERNAME_RE.fullmatch(username)
+        or username.casefold() == settings.AUTH_ADMIN_USERNAME.casefold()
+        or email == settings.AUTH_ADMIN_EMAIL.strip().lower()
+        or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email)
+        or not 12 <= len(password.encode("utf-8")) <= 72
+    ):
+        raise ValueError("Unable to create account with these details")
+    legacy = db.query(TranscriptionOwnership.id).filter(
+        TranscriptionOwnership.user_id.is_(None),
+        TranscriptionOwnership.owner_sub == username,
+    ).first()
+    if legacy:
+        raise ValueError("Unable to create account with these details")
+    user = User(username=username, email=email, hashed_password=get_password_hash(password),
+                is_active=True, is_superuser=False, registration_source="public")
+    db.add(user)
+    db.flush()
+    return user

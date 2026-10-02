@@ -16,6 +16,7 @@ from ..database import get_db
 from ..models import Transcription
 from ..schemas import MeetingMinutesRequest
 from ..security import TokenData, require_scope_when
+from ..services.provider_policy import require_provider_credential
 from ..workers.config import get_transcription_queue, is_redis_available
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,7 @@ async def generate_meeting_minutes(
     ),
 ):
     """Preserva o contrato síncrono, mas executa Gemini no processo worker."""
+    require_provider_credential(current_user, "gemini")
     if not (settings.GEMINI_API_KEY_CONFIGURED or settings.GEMINI_API_KEY):
         raise HTTPException(
             status_code=503,
@@ -132,7 +134,7 @@ async def get_meeting_minutes_status(
             logger.warning("Unable to inspect meeting minutes worker")
 
     return {
-        "available": configured and worker_available,
+        "available": configured and worker_available and current_user.registration_source == "local",
         "configured": configured,
         "worker_available": worker_available,
         "config": {"provider": "gemini", "execution": "rq-worker"},

@@ -149,3 +149,21 @@ def test_diarization_overlap_preserves_both_tracks_and_transcribes_both(
         "SPEAKER_00",
         "SPEAKER_01",
     ]
+
+
+def test_public_duration_limit_rejects_before_inference_and_cleans(monkeypatch, tmp_path):
+    from src.services.transcription_processing_service import PublicAudioDurationError
+    engine = RecordingWhisper()
+    calls = []
+    def conversion(source, destination, **kwargs):
+        calls.append(kwargs)
+        Path(destination).write_bytes(b"wav")
+        return destination, 61.0
+    monkeypatch.setattr(engine_registry, "whisper_engine", engine)
+    monkeypatch.setattr(processing_module, "_TEMP_DIRECTORY", tmp_path)
+    monkeypatch.setattr(processing_module, "convert_to_wav", conversion)
+    with pytest.raises(PublicAudioDurationError):
+        TranscriptionProcessingService().process_transcription("input.wav", False, "whisper", max_duration_seconds=60)
+    assert calls == [{"max_duration_seconds": 60}]
+    assert engine.calls == []
+    assert list(tmp_path.iterdir()) == []

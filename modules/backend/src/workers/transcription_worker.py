@@ -16,6 +16,7 @@ from ..services.meeting_projection import ordered_segments, speaker_ids
 from ..services.storage_lifecycle import delete_file_idempotently
 from ..services.transcription_processing_service import (
     TranscriptionProcessingService,
+    PublicAudioDurationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -105,6 +106,7 @@ def recover_pending_jobs(queue) -> int:
                 process_transcription_job_sync,
                 db_job.transcription_id,
                 job_id=rq_job_id,
+                **({"job_timeout": db_job.timeout_seconds} if db_job.timeout_seconds else {}),
             )
             recovered += 1
 
@@ -174,6 +176,7 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
             "input_path": job.input_path,
             "use_diarization": job.use_diarization,
             "transcription_model": job.transcription_model,
+            "max_duration_seconds": job.max_duration_seconds,
         }
     except Exception:
         db.rollback()
@@ -305,6 +308,7 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             file_path=input_path,
             use_diarization=claim["use_diarization"],
             transcription_model=claim["transcription_model"],
+            **({"max_duration_seconds": claim["max_duration_seconds"]} if claim["max_duration_seconds"] else {}),
         )
         processing_time = time.monotonic() - started_at
         _persist_completed_job(transcription_id, result, processing_time)
@@ -337,7 +341,7 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             "word_count": result.word_count,
         }
     except Exception as exc:
-        public_error = "Transcription processing failed"
+        public_error = "Audio exceeds the public duration limit" if isinstance(exc, PublicAudioDurationError) else "Transcription processing failed"
         if claimed:
             try:
                 _persist_failed_job(transcription_id, public_error)

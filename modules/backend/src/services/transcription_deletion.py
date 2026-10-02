@@ -53,5 +53,5 @@ def delete_transcription_data(
         db.rollback()
         raise
 
-    if input_path and not delete_file_idempotently(input_path):
+    if input_path and not delete_file_idempotently(input_path) and input_path.exists():
         logger.warning("Input cleanup incomplete for transcription %s", transcription.id)

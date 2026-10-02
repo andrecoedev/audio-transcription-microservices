@@ -2,10 +2,9 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..authorization import enforce_transcription_access, is_admin
+from ..authorization import enforce_transcription_access, is_admin, ownership_filter
 from ..database import get_db
 from ..models import Meeting, MeetingSpeaker, TranscriptionOwnership
 from ..security import TokenData, require_scope
@@ -73,13 +72,7 @@ def list_meetings(
             TranscriptionOwnership,
             TranscriptionOwnership.transcription_id == Meeting.id,
         ).filter(
-            or_(
-                TranscriptionOwnership.user_id == user.user_id,
-                (
-                    TranscriptionOwnership.user_id.is_(None)
-                    & (TranscriptionOwnership.owner_sub == user.username)
-                ),
-            )
+            ownership_filter(user.user_id, user.username, user.registration_source)
         )
     total = query.count()
     meetings = (
