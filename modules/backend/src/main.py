@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import sanitize_settings_snapshot, settings
 from .logging_config import configure_logging
-from .routers import api_keys, auth, health, meeting_actions, meeting_intelligence, meeting_minutes, meetings, transcriptions
+from .routers import api_keys, auth, health, meeting_actions, meeting_intelligence, meeting_minutes, meetings, reviewed_meeting_minutes, transcriptions
 
 
 configure_logging()
@@ -54,6 +54,7 @@ app.include_router(meeting_actions.router)
 app.include_router(meeting_intelligence.router)
 app.include_router(api_keys.router)
 app.include_router(meeting_minutes.router)
+app.include_router(reviewed_meeting_minutes.router)
 
 
 @app.middleware("http")
