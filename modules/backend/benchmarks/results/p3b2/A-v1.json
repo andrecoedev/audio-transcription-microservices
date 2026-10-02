@@ -1,0 +1,175 @@
+{
+  "fixture": "A",
+  "meeting_id": 18,
+  "generation": {
+    "id": 9,
+    "meeting_id": 18,
+    "revision": 1,
+    "schema_version": "1",
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "status": "pending",
+    "error_message": null,
+    "created_at": "2026-10-02T11:11:08.424478+00:00",
+    "updated_at": "2026-10-02T11:11:08.424478+00:00",
+    "started_at": null,
+    "completed_at": null,
+    "input_fingerprint": "14f148f9d951cedb4fd6214f0bffe2dfaf2e2e95410ae251ee47f0e618b98967"
+  },
+  "attempted_calls": 1,
+  "source_unchanged": true,
+  "previous_revision": null,
+  "status": "completed",
+  "polling_latency_seconds": 10.083865818999925,
+  "result": {
+    "id": 9,
+    "meeting_id": 18,
+    "revision": 1,
+    "schema_version": "1",
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "status": "completed",
+    "error_message": null,
+    "created_at": "2026-10-02T11:11:08.424478+00:00",
+    "updated_at": "2026-10-02T11:11:17.296718+00:00",
+    "started_at": "2026-10-02T11:11:08.483488+00:00",
+    "completed_at": "2026-10-02T11:11:17.297626+00:00",
+    "input_fingerprint": "14f148f9d951cedb4fd6214f0bffe2dfaf2e2e95410ae251ee47f0e618b98967",
+    "content": {
+      "topics": [
+        {
+          "evidence": [
+            {
+              "quote": "Hoje estamos a discutir o livro.",
+              "segment_order": 2
+            }
+          ],
+          "description": "Discussão sobre o livro."
+        },
+        {
+          "evidence": [
+            {
+              "quote": "A sala tem mesas quietas e uma área separada para conversa.",
+              "segment_order": 3
+            },
+            {
+              "quote": "The conversation area helps people exchange ideas without disturbing the leaders.",
+              "segment_order": 7
+            },
+            {
+              "quote": "Nós descrevemos as duas áreas.",
+              "segment_order": 13
+            }
+          ],
+          "description": "Descrição do ambiente da sala, incluindo mesas quietas e uma área separada para conversa."
+        },
+        {
+          "evidence": [
+            {
+              "quote": "Os principais tópicos são leitura e conversa quieta.",
+              "segment_order": 10
+            }
+          ],
+          "description": "Leitura e conversa quieta foram identificados como os principais tópicos da discussão."
+        }
+      ],
+      "summary": "A reunião ficcional, conduzida por Alice e Bruno, focou na discussão de um livro e na descrição de um ambiente com mesas quietas e uma área de conversa. Os principais tópicos abordados foram leitura e conversa quieta. Foi explicitamente declarado que a reunião era apenas uma discussão, não uma sessão de planejamento, e que não havia tarefas para atribuir nem decisões a serem tomadas.",
+      "decisions": [],
+      "action_items": [],
+      "open_questions": [],
+      "schema_version": "1"
+    },
+    "references": [
+      {
+        "segment_order": 0,
+        "start": 0.03096875,
+        "end": 1.56659375
+      },
+      {
+        "segment_order": 1,
+        "start": 2.3934687500000003,
+        "end": 3.40596875
+      },
+      {
+        "segment_order": 2,
+        "start": 4.11471875,
+        "end": 6.46034375
+      },
+      {
+        "segment_order": 3,
+        "start": 7.287218750000001,
+        "end": 11.03346875
+      },
+      {
+        "segment_order": 4,
+        "start": 11.89409375,
+        "end": 15.52221875
+      },
+      {
+        "segment_order": 5,
+        "start": 16.39971875,
+        "end": 17.53034375
+      },
+      {
+        "segment_order": 6,
+        "start": 18.57659375,
+        "end": 21.88409375
+      },
+      {
+        "segment_order": 7,
+        "start": 22.91346875,
+        "end": 29.86596875
+      },
+      {
+        "segment_order": 8,
+        "start": 30.844718750000002,
+        "end": 33.03846875
+      },
+      {
+        "segment_order": 9,
+        "start": 33.03846875,
+        "end": 35.19846875
+      },
+      {
+        "segment_order": 10,
+        "start": 36.27846875,
+        "end": 39.23159375
+      },
+      {
+        "segment_order": 11,
+        "start": 40.09221875,
+        "end": 43.66971875
+      },
+      {
+        "segment_order": 12,
+        "start": 44.53034375,
+        "end": 45.188468750000006
+      },
+      {
+        "segment_order": 13,
+        "start": 46.09971875,
+        "end": 48.64784375
+      },
+      {
+        "segment_order": 14,
+        "start": 49.643468750000004,
+        "end": 52.883468750000006
+      }
+    ],
+    "source": {
+      "title": "A.wav",
+      "language": "pt",
+      "speakers": [
+        {
+          "id": "SPEAKER_00",
+          "display_name": null
+        },
+        {
+          "id": "SPEAKER_01",
+          "display_name": null
+        }
+      ]
+    }
+  },
+  "survived_rq_deletion": true
+}

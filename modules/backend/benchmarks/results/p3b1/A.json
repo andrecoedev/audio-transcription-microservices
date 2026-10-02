@@ -1,0 +1,296 @@
+{
+  "fixture": "A",
+  "attempted_real_calls": 1,
+  "retries": 0,
+  "meeting_id": 13,
+  "segments": [
+    {
+      "end": 1.56659375,
+      "text": "Este é um encontro ficcional.",
+      "order": 0,
+      "start": 0.03096875,
+      "speaker": "SPEAKER_00"
+    },
+    {
+      "end": 3.40596875,
+      "text": "Eu sou Alice.",
+      "order": 1,
+      "start": 2.3934687500000003,
+      "speaker": "SPEAKER_00"
+    },
+    {
+      "end": 6.46034375,
+      "text": "Hoje estamos a discutir o livro.",
+      "order": 2,
+      "start": 4.11471875,
+      "speaker": "SPEAKER_00"
+    },
+    {
+      "end": 11.03346875,
+      "text": "A sala tem mesas quietas e uma área separada para conversa.",
+      "order": 3,
+      "start": 7.287218750000001,
+      "speaker": "SPEAKER_00"
+    },
+    {
+      "end": 15.52221875,
+      "text": "Esta reunião é apenas uma discussão, não uma sessão de planejamento.",
+      "order": 4,
+      "start": 11.89409375,
+      "speaker": "SPEAKER_00"
+    },
+    {
+      "end": 17.53034375,
+      "text": "E aí, Bruno?",
+      "order": 5,
+      "start": 16.39971875,
+      "speaker": "SPEAKER_01"
+    },
+    {
+      "end": 21.88409375,
+      "text": "The Quiet Table Usarius Fall for Reading",
+      "order": 6,
+      "start": 18.57659375,
+      "speaker": "SPEAKER_01"
+    },
+    {
+      "end": 29.86596875,
+      "text": "The conversation area helps people exchange ideas without disturbing the leaders.",
+      "order": 7,
+      "start": 22.91346875,
+      "speaker": "SPEAKER_01"
+    },
+    {
+      "end": 33.03846875,
+      "text": "We are describing the current.",
+      "order": 8,
+      "start": 30.844718750000002,
+      "speaker": "SPEAKER_01"
+    },
+    {
+      "end": 35.19846875,
+      "text": "not assign where",
+      "order": 9,
+      "start": 33.03846875,
+      "speaker": "SPEAKER_00"
+    },
+    {
+      "end": 39.23159375,
+      "text": "Os principais tópicos são leitura e conversa quieta.",
+      "order": 10,
+      "start": 36.27846875,
+      "speaker": "SPEAKER_00"
+    },
+    {
+      "end": 43.66971875,
+      "text": "Nós não temos tarefas para assinar e não decisões para fazer hoje.",
+      "order": 11,
+      "start": 40.09221875,
+      "speaker": "SPEAKER_00"
+    },
+    {
+      "end": 45.188468750000006,
+      "text": "Agrid.",
+      "order": 12,
+      "start": 44.53034375,
+      "speaker": "SPEAKER_01"
+    },
+    {
+      "end": 48.64784375,
+      "text": "Nós descrevemos as duas áreas.",
+      "order": 13,
+      "start": 46.09971875,
+      "speaker": "SPEAKER_01"
+    },
+    {
+      "end": 52.883468750000006,
+      "text": "Existem itens de ação no evento.",
+      "order": 14,
+      "start": 49.643468750000004,
+      "speaker": "SPEAKER_01"
+    }
+  ],
+  "duration_seconds": 53.861188,
+  "transcript_characters": 566,
+  "meeting": {
+    "id": 13,
+    "transcription_id": 13,
+    "owner_user_id": 1,
+    "title": "A.wav",
+    "created_at": "2026-10-02T09:39:26.599371+00:00",
+    "updated_at": "2026-10-02T09:39:26.599371+00:00",
+    "duration_seconds": 53.861188,
+    "language": "pt",
+    "status": "completed",
+    "speaker_count": 2,
+    "speakers": [
+      {
+        "id": "SPEAKER_00",
+        "display_name": null
+      },
+      {
+        "id": "SPEAKER_01",
+        "display_name": null
+      }
+    ],
+    "processing_metadata": {
+      "model": "whisper",
+      "use_diarization": true,
+      "processing_time_seconds": 39.018301756,
+      "word_count": 97,
+      "job_completed_at": "2026-10-02T09:39:26.611815+00:00"
+    }
+  },
+  "polling_latency_seconds": 12.077966096000011,
+  "result": {
+    "id": 1,
+    "meeting_id": 13,
+    "revision": 1,
+    "schema_version": "1",
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "status": "completed",
+    "error_message": null,
+    "created_at": "2026-10-02T09:39:27.821512+00:00",
+    "updated_at": "2026-10-02T09:39:38.937762+00:00",
+    "started_at": "2026-10-02T09:39:27.853682+00:00",
+    "completed_at": "2026-10-02T09:39:38.938599+00:00",
+    "input_fingerprint": "14f148f9d951cedb4fd6214f0bffe2dfaf2e2e95410ae251ee47f0e618b98967",
+    "content": {
+      "topics": [
+        {
+          "evidence": [
+            {
+              "quote": "Hoje estamos a discutir o livro.",
+              "segment_order": 2
+            },
+            {
+              "quote": "The Quiet Table Usarius Fall for Reading",
+              "segment_order": 6
+            },
+            {
+              "quote": "Os principais tópicos são leitura e conversa quieta.",
+              "segment_order": 10
+            }
+          ],
+          "description": "Discussão sobre um livro e o conceito de \"The Quiet Table Usarius Fall for Reading\", com foco em leitura e conversa quieta."
+        },
+        {
+          "evidence": [
+            {
+              "quote": "A sala tem mesas quietas e uma área separada para conversa.",
+              "segment_order": 3
+            },
+            {
+              "quote": "The conversation area helps people exchange ideas without disturbing the leaders.",
+              "segment_order": 7
+            },
+            {
+              "quote": "Nós descrevemos as duas áreas.",
+              "segment_order": 13
+            }
+          ],
+          "description": "A descrição de mesas quietas e uma área separada para conversa, que ajuda as pessoas a trocar ideias sem perturbar."
+        }
+      ],
+      "summary": "A reunião ficcional discutiu um livro e os conceitos de mesas quietas para leitura e áreas separadas para conversação. Foi explicitamente declarado que a reunião era apenas uma discussão, sem tarefas a serem atribuídas ou decisões a serem tomadas.",
+      "decisions": [],
+      "action_items": [],
+      "open_questions": [],
+      "schema_version": "1"
+    },
+    "references": [
+      {
+        "segment_order": 0,
+        "start": 0.03096875,
+        "end": 1.56659375
+      },
+      {
+        "segment_order": 1,
+        "start": 2.3934687500000003,
+        "end": 3.40596875
+      },
+      {
+        "segment_order": 2,
+        "start": 4.11471875,
+        "end": 6.46034375
+      },
+      {
+        "segment_order": 3,
+        "start": 7.287218750000001,
+        "end": 11.03346875
+      },
+      {
+        "segment_order": 4,
+        "start": 11.89409375,
+        "end": 15.52221875
+      },
+      {
+        "segment_order": 5,
+        "start": 16.39971875,
+        "end": 17.53034375
+      },
+      {
+        "segment_order": 6,
+        "start": 18.57659375,
+        "end": 21.88409375
+      },
+      {
+        "segment_order": 7,
+        "start": 22.91346875,
+        "end": 29.86596875
+      },
+      {
+        "segment_order": 8,
+        "start": 30.844718750000002,
+        "end": 33.03846875
+      },
+      {
+        "segment_order": 9,
+        "start": 33.03846875,
+        "end": 35.19846875
+      },
+      {
+        "segment_order": 10,
+        "start": 36.27846875,
+        "end": 39.23159375
+      },
+      {
+        "segment_order": 11,
+        "start": 40.09221875,
+        "end": 43.66971875
+      },
+      {
+        "segment_order": 12,
+        "start": 44.53034375,
+        "end": 45.188468750000006
+      },
+      {
+        "segment_order": 13,
+        "start": 46.09971875,
+        "end": 48.64784375
+      },
+      {
+        "segment_order": 14,
+        "start": 49.643468750000004,
+        "end": 52.883468750000006
+      }
+    ],
+    "source": {
+      "title": "A.wav",
+      "language": "pt",
+      "speakers": [
+        {
+          "id": "SPEAKER_00",
+          "display_name": null
+        },
+        {
+          "id": "SPEAKER_01",
+          "display_name": null
+        }
+      ]
+    }
+  },
+  "survived_rq_deletion": true,
+  "execution_status": "completed"
+}

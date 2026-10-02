@@ -1,0 +1,8 @@
+{
+  "fixture": "B",
+  "attempted_real_calls": 0,
+  "retries": 0,
+  "meeting_id": 14,
+  "execution_status": "failed",
+  "error_type": "RuntimeError"
+}
