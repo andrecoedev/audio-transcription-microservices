@@ -6,14 +6,12 @@ import {
   Clock, 
   CheckCircle2, 
   XCircle,
-  TrendingUp,
   Users,
   Zap
 } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import Button from '../components/Button'
 import { audioService } from '../services/audioService'
-import { useTranscriptionStore } from '../stores/transcriptionStore'
 import toast from 'react-hot-toast'
 
 export default function Dashboard() {
@@ -92,19 +90,19 @@ export default function Dashboard() {
             <ModelStatusCard
               name="Diarização (Pyannote)"
               icon={Users}
-              loaded={health?.models?.diarization?.loaded}
+              configured={health?.models?.diarization?.configured}
               device={health?.models?.diarization?.device}
             />
             <ModelStatusCard
               name="Whisper (Local)"
               icon={Zap}
-              loaded={health?.models?.whisper?.loaded}
+              configured={health?.models?.whisper?.configured}
               device={health?.models?.whisper?.device}
             />
             <ModelStatusCard
               name="AssemblyAI (Cloud)"
               icon={Activity}
-              loaded={health?.models?.assemblyai?.loaded}
+              configured={health?.models?.assemblyai?.configured}
               device={health?.models?.assemblyai?.device}
             />
           </div>
@@ -227,19 +225,19 @@ function StatCard({ icon: Icon, label, value, color }) {
   )
 }
 
-function ModelStatusCard({ name, icon: Icon, loaded, device }) {
+function ModelStatusCard({ name, icon: Icon, configured, device }) {
   return (
     <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
-      <div className={`p-2 rounded-lg ${loaded ? 'bg-green-100' : 'bg-red-100'}`}>
-        <Icon className={`w-5 h-5 ${loaded ? 'text-green-600' : 'text-red-600'}`} />
+      <div className={`p-2 rounded-lg ${configured ? 'bg-green-100' : 'bg-red-100'}`}>
+        <Icon className={`w-5 h-5 ${configured ? 'text-green-600' : 'text-red-600'}`} />
       </div>
       <div className="flex-1">
         <p className="font-medium text-gray-900 text-sm">{name}</p>
         <p className="text-xs text-gray-500">
-          {loaded ? device || 'Ativo' : 'Não carregado'}
+          {configured ? device || 'Configurado' : 'Não configurado'}
         </p>
       </div>
-      <div className={`w-2 h-2 rounded-full ${loaded ? 'bg-green-500' : 'bg-red-500'}`} />
+      <div className={`w-2 h-2 rounded-full ${configured ? 'bg-green-500' : 'bg-red-500'}`} />
     </div>
   )
 }

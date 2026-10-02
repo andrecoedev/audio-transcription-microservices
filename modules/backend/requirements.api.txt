@@ -1,0 +1,20 @@
+# Runtime HTTP da API (sem stack de ML/audio)
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.34.2
+python-dotenv==1.2.2
+
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.9
+
+PyJWT==2.14.0
+bcrypt==4.0.1
+python-multipart==0.0.31
+
+pydantic==2.10.6
+pydantic-settings==2.7.1
+aiofiles==24.1.0
+
+rq==1.16.2
+redis==5.0.1

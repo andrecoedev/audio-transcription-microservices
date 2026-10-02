@@ -1,0 +1,54 @@
+import { beforeEach, expect, it, vi } from 'vitest'
+import api from './api'
+import { audioService } from './audioService'
+
+vi.mock('./api', () => ({
+  default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
+}))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+it('uses durable meeting endpoints for metadata, transcript and edits', async () => {
+  api.get.mockResolvedValue({ data: { id: 42 } })
+  api.patch.mockResolvedValue({ data: { id: 42 } })
+  api.delete.mockResolvedValue({ data: {} })
+  await audioService.listMeetings()
+  await audioService.getMeeting(42)
+  await audioService.getMeetingTranscript(42)
+  await audioService.updateMeetingTitle(42, 'Título')
+  await audioService.renameMeetingSpeaker(42, 'SPEAKER_00', 'Maria')
+  await audioService.deleteMeeting(42)
+  expect(api.get.mock.calls.map(([path]) => path)).toEqual([
+    '/meetings', '/meetings/42', '/meetings/42/transcript',
+  ])
+  expect(api.patch).toHaveBeenCalledWith('/meetings/42', { title: 'Título' })
+  expect(api.patch).toHaveBeenCalledWith('/meetings/42/speakers/SPEAKER_00', { display_name: 'Maria' })
+  expect(api.delete).toHaveBeenCalledWith('/meetings/42')
+})
+
+it('uses only the official upload, status and result contract', async () => {
+  api.post.mockResolvedValue({ data: { id: 42 } })
+  api.get.mockResolvedValue({ data: { status: 'completed' } })
+  const progress = vi.fn()
+  const result = await audioService.createTranscriptionJob(
+    new File(['RIFFdataWAVE'], 'meeting.wav', { type: 'audio/wav' }),
+    { transcriptionModel: 'whisper', useDiarization: true, onUploadProgress: progress }
+  )
+  expect(result.id).toBe(42)
+  expect(api.post.mock.calls[0][0]).toBe('/transcriptions/jobs')
+  const form = api.post.mock.calls[0][1]
+  expect(form.get('transcription_model')).toBe('whisper')
+  expect(form.get('use_diarization')).toBe('true')
+  expect(api.post.mock.calls[0][2].onUploadProgress).toBe(progress)
+  await audioService.getTranscriptionJobStatus(42)
+  await audioService.getTranscription(42)
+  expect(api.get.mock.calls.map(([path]) => path)).toEqual([
+    '/transcriptions/jobs/42/status',
+    '/transcriptions/42',
+  ])
+  api.delete.mockResolvedValue({ data: {} })
+  await audioService.deleteTranscription(42)
+  expect(api.delete).toHaveBeenCalledWith('/transcriptions/42')
+})

@@ -1,0 +1,81 @@
+# Reuniões e Meeting Intelligence
+
+## Reunião persistente
+
+Meeting compartilha PK com Transcription. Título/idioma/data e speakers editáveis
+são próprios da reunião; owner, métricas e transcript JSONB permanecem na
+Transcription. Não há segunda cópia do transcript nem dependência do resultado RQ.
+Segments recebem ordem determinística por start/end/posição original.
+Conclusão do Worker cria Meeting/speakers e completed na mesma transação.
+
+| Endpoint | Contrato |
+|---|---|
+| GET /meetings | Lista metadados acessíveis ao owner/admin |
+| GET /meetings/{id} | Metadados, speakers e métricas |
+| GET /meetings/{id}/transcript | Segmentos persistidos com order |
+| PATCH /meetings/{id} | Edita título |
+| PATCH /meetings/{id}/speakers/{speaker_id} | Edita display name |
+| DELETE /meetings/{id} | Remove reunião/transcrição; 409 se job ativo |
+
+A migration de Meeting faz backfill de resultados completed já existentes.
+Exclusão de transcrição remove Meeting, speakers e intelligence por cascade.
+
+## Revisões de intelligence
+
+MeetingIntelligence tem FK para Meeting, revisão monotônica, schema_version,
+provider/model, status, fingerprint/metadados do source, result JSONB e timestamps.
+O transcript não é duplicado. Contexto e speakers são capturados no request.
+Lock na Meeting e índice único parcial garantem uma revisão ativa por reunião.
+
+| Endpoint | Contrato |
+|---|---|
+| POST /meetings/{id}/intelligence | 202 pending/processing; 200 se já completed; failed permite retry |
+| POST /meetings/{id}/intelligence/regenerate | Nova revisão terminal; reutiliza geração ativa |
+| GET /meetings/{id}/intelligence/status | Estados/revisões duráveis e configuração pública |
+| GET /meetings/{id}/intelligence/result?revision=N | Resultado completed; sem N, último completed |
+
+Resultado anterior continua disponível durante geração/falha nova.
+RQ recebe apenas ID; excluir seu estado efêmero não remove resultado PostgreSQL.
+Ownership é verificado em todas as rotas; writes exigem scope meeting_minutes,
+reads read_transcriptions. Erros públicos são sanitizados.
+Redis indisponível antes do commit retorna 503 sem revisão. Enqueue incerto após
+commit preserva pending; recovery examina job determinístico antes de republicar.
+Abandono de inferência vira failed, sem retry automático de chamada cobrada.
+Conclusão tardia após exclusão não recria a reunião.
+
+## Contrato e grounding
+
+Schema v1: summary, topics, decisions, action_items, open_questions.
+Evidence contém segment_order zero-based e quote literal; timestamps são
+resolvidos no servidor. Tasks têm assignee/due_date nullable. Prazo é expressão
+explícita do transcript, não data de calendário inferida.
+
+Pydantic rejeita campos extras/tipos/estruturas inválidas; grounding verifica
+segmentos/quotes e presença literal de atributos. **Isso não prova interpretação
+correta**, relação tarefa-responsável-prazo ou ausência de hallucination.
+Prompt trata transcript como dados não confiáveis, pede leitura global,
+abstinência em ruído/conflito e impede que o resumo reintroduza fatos descartados.
+Responsável/prazo ausentes permanecem null. Sugestões não são decisões finais.
+Revisão humana continua necessária; não existe um validador semântico perfeito.
+
+## Provider e limites
+
+Gemini reutiliza o cliente legado MeetingMinutesGenerator no Worker; SDK
+google.generativeai, não migrado nesta limpeza. Modelo padrão gemini-2.5-flash,
+schema_version 1, temperatura 0.1, JSON MIME, máximo 16384 tokens de saída.
+Input limitado a 200000 caracteres por padrão. Job timeout padrão 600s;
+chamada SDK no máximo 300s, retries de transporte desabilitados.
+Sem chunking, loop de reparo ou troca silenciosa de provider.
+
+GEMINI_API_KEY é Worker-only; API recebe GEMINI_API_KEY_CONFIGURED.
+Modelo/runtime devem corresponder à revisão. Alterar versão/prompt exige nova
+avaliação, não presumir compatibilidade.
+
+## Compatibilidade e limites
+
+/meeting-minutes segue ativo na navegação e conserva Markdown/espera HTTP/RQ.
+Não tem persistência/revisões/provenance de intelligence; removê-lo exigiria
+decisão de contrato/UX. O cliente Gemini e generate_minutes continuam necessários.
+
+Ver [avaliação factual local](intelligence_validation.md). P3-A e P3-B/P3-B.2
+foram validadas localmente; produção não homologada. Sem P3-C nesta limpeza.

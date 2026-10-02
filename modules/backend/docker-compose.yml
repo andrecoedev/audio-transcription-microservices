@@ -1,39 +1,215 @@
-version: '3.8'
+x-database-environment: &database-environment
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-transcription}:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/${POSTGRES_DB:-transcription_db}
 
 services:
-  app:
-    build:
-      context: ..
-      dockerfile: modules/backend/Dockerfile
-    container_name: transcription-app
-    ports:
-      - "2020:2020"
-      - "8000:8000"
-      - "8001:8001"
-      - "8002:8002"
-    env_file:
-      - .env
-    volumes:
-      - ./database:/app/database
-      - ../diarization_service:/app/diarization_service:ro
-      - ../transcription_service:/app/transcription_service:ro
-      - ../frontend:/app/frontend:ro
-    depends_on:
-      - db
-    restart: unless-stopped
-
-  db:
-    image: postgres:15-alpine
-    container_name: transcription-db
+  postgres:
+    image: postgres:16-alpine
     environment:
-      POSTGRES_DB: transcription_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-transcription_db}
+      POSTGRES_USER: ${POSTGRES_USER:-transcription}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: modules/backend/Dockerfile.api
+    command: ["alembic", "upgrade", "head"]
+    working_dir: /app/modules/backend
+    environment:
+      <<: *database-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: ../..
+      dockerfile: modules/backend/Dockerfile.api
+    ports:
+      - "2020:2020"
+    environment:
+      <<: *database-environment
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-dev}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-30}
+      DB_POOL_RECYCLE_SECONDS: ${DB_POOL_RECYCLE_SECONDS:-1800}
+      SECRET_KEY: ${SECRET_KEY:-}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      JWT_ISSUER: ${JWT_ISSUER:-usagi-api}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-usagi-web}
+      AUTH_ADMIN_USERNAME: ${AUTH_ADMIN_USERNAME:-admin}
+      AUTH_ADMIN_EMAIL: ${AUTH_ADMIN_EMAIL:-admin@local.invalid}
+      AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD:-}
+      AUTH_ADMIN_PASSWORD_HASH: ${AUTH_ADMIN_PASSWORD_HASH:-}
+      AUTH_ALLOW_DEMO_LOGIN: ${AUTH_ALLOW_DEMO_LOGIN:-false}
+      AUTH_MODE: ${AUTH_MODE:-strict}
+      AUTH_PROTECT_API_KEYS: ${AUTH_PROTECT_API_KEYS:-true}
+      AUTH_PROTECT_PROCESSING: ${AUTH_PROTECT_PROCESSING:-true}
+      AUTH_PROTECT_READS: ${AUTH_PROTECT_READS:-true}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173}
+      CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-false}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-5120}
+      ALLOWED_EXTENSIONS: ${ALLOWED_EXTENSIONS:-mp3,wav,mp4,mpeg,m4a,flac,ogg,opus}
+      AUDIO_UPLOAD_DIRECTORY: ${AUDIO_UPLOAD_DIRECTORY:-database/uploads}
+      DEFAULT_TRANSCRIPTION_MODEL: ${DEFAULT_TRANSCRIPTION_MODEL:-whisper}
+      TRANSCRIPTION_JOB_TIMEOUT_SECONDS: ${TRANSCRIPTION_JOB_TIMEOUT_SECONDS:-3600}
+      MEETING_MINUTES_TIMEOUT_SECONDS: ${MEETING_MINUTES_TIMEOUT_SECONDS:-600}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      INTELLIGENCE_MAX_INPUT_CHARACTERS: ${INTELLIGENCE_MAX_INPUT_CHARACTERS:-200000}
+      HF_TOKEN_CONFIGURED: ${HF_TOKEN_CONFIGURED:-false}
+      AAI_API_KEY_CONFIGURED: ${AAI_API_KEY_CONFIGURED:-false}
+      GEMINI_API_KEY_CONFIGURED: ${GEMINI_API_KEY_CONFIGURED:-false}
+      LOGIN_RATE_LIMIT_PER_IP: ${LOGIN_RATE_LIMIT_PER_IP:-30}
+      LOGIN_RATE_LIMIT_PER_ACCOUNT: ${LOGIN_RATE_LIMIT_PER_ACCOUNT:-10}
+      UPLOAD_RATE_LIMIT_PER_IP: ${UPLOAD_RATE_LIMIT_PER_IP:-300}
+      JOB_RATE_LIMIT_PER_USER: ${JOB_RATE_LIMIT_PER_USER:-30}
+    volumes:
+      - processing_data:/app/modules/backend/database
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:2020/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: modules/backend/Dockerfile.worker
+    command: ["python", "run_worker.py"]
+    working_dir: /app/modules/backend
+    environment:
+      <<: *database-environment
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-dev}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-30}
+      DB_POOL_RECYCLE_SECONDS: ${DB_POOL_RECYCLE_SECONDS:-1800}
+      HF_TOKEN: ${HF_TOKEN:-}
+      AAI_API_KEY: ${AAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      MEETING_MINUTES_TIMEOUT_SECONDS: ${MEETING_MINUTES_TIMEOUT_SECONDS:-600}
+      AUDIO_UPLOAD_DIRECTORY: ${AUDIO_UPLOAD_DIRECTORY:-database/uploads}
+      WHISPER_MODEL: ${WHISPER_MODEL:-large-v3}
+      TRANSCRIPTION_JOB_TIMEOUT_SECONDS: ${TRANSCRIPTION_JOB_TIMEOUT_SECONDS:-3600}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-auto}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-auto}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-pt}
+      WHISPER_BEAM_SIZE: ${WHISPER_BEAM_SIZE:-1}
+      WHISPER_MAX_DECODE_CHUNK_SECONDS: ${WHISPER_MAX_DECODE_CHUNK_SECONDS:-300}
+      WHISPER_CPU_THREADS: ${WHISPER_CPU_THREADS:-0}
+      FORCE_CPU: ${FORCE_CPU:-false}
+      GPU_MEMORY_FRACTION: ${GPU_MEMORY_FRACTION:-0.8}
+      MIN_SEGMENT_DURATION: ${MIN_SEGMENT_DURATION:-0}
+      SILENCE_THRESHOLD: ${SILENCE_THRESHOLD:--100}
+    volumes:
+      - processing_data:/app/modules/backend/database
+      - model_cache:/root/.cache/huggingface
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from rq import Worker; from src.workers.config import get_redis_connection; c=get_redis_connection(); assert any(w.name.startswith('transcription-worker-') for w in Worker.all(connection=c))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5m
+    restart: unless-stopped
+
+  test:
+    profiles: ["test"]
+    build:
+      context: ../..
+      dockerfile: modules/backend/Dockerfile.test
+    command:
+      [
+        "pytest",
+        "-q",
+        "tests/test_database_architecture.py",
+        "tests/test_health_database.py",
+        "tests/test_transcriptions_api.py",
+        "tests/integration",
+      ]
+    working_dir: /app/modules/backend
+    environment:
+      <<: *database-environment
+      APP_ENV: test
+      P2A_TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-transcription}:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/${POSTGRES_DB:-transcription_db}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    volumes:
+      - processing_data:/app/modules/backend/database
+
+  maintenance:
+    profiles: ["maintenance"]
+    build:
+      context: ../..
+      dockerfile: modules/backend/Dockerfile.api
+    command: ["python", "-m", "scripts.reconcile_audio_files"]
+    working_dir: /app/modules/backend
+    environment:
+      <<: *database-environment
+      APP_ENV: ${APP_ENV:-dev}
+      AUDIO_UPLOAD_DIRECTORY: ${AUDIO_UPLOAD_DIRECTORY:-database/uploads}
+      AUDIO_ORPHAN_RETENTION_HOURS: ${AUDIO_ORPHAN_RETENTION_HOURS:-24}
+      TRANSCRIPTION_RETENTION_DAYS: ${TRANSCRIPTION_RETENTION_DAYS:-0}
+      AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-0}
+    volumes:
+      - processing_data:/app/modules/backend/database
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:
+  redis_data:
+  processing_data:
+  model_cache:

@@ -470,15 +470,40 @@ else:
                     "segments": []
                 }
 
-                # Enviar para o backend unificado (/transcribe)
-                backend_url = "http://localhost:2020/transcribe"
+                # Enfileirar no fluxo assíncrono oficial e aguardar o resultado.
+                backend_url = "http://localhost:2020"
                 try:
                     with open(audio_path, "rb") as f:
                         files = {"file": (uploaded_file.name, f, "audio/mpeg")}
                         data = {"use_diarization": str(use_diarization).lower()}
-                        resp = requests.post(backend_url, files=files, data=data, timeout=600)
+                        resp = requests.post(
+                            f"{backend_url}/transcriptions/jobs",
+                            files=files,
+                            data=data,
+                            timeout=60,
+                        )
                         resp.raise_for_status()
-                        result = resp.json()
+                        job = resp.json()
+
+                    deadline = time.time() + 600
+                    while time.time() < deadline:
+                        status_response = requests.get(
+                            f"{backend_url}{job['status_url']}", timeout=15
+                        )
+                        status_response.raise_for_status()
+                        job_status = status_response.json().get("job_status")
+                        if job_status == "completed":
+                            result_response = requests.get(
+                                f"{backend_url}{job['result_url']}", timeout=30
+                            )
+                            result_response.raise_for_status()
+                            result = result_response.json()
+                            break
+                        if job_status == "failed":
+                            raise RuntimeError("O worker não conseguiu processar o áudio")
+                        time.sleep(2)
+                    else:
+                        raise TimeoutError("Tempo limite aguardando o worker")
 
                     # Preencher transcription_data com o resultado
                     transcription_data["segments"] = result.get("segments", [])
@@ -500,6 +525,8 @@ else:
 
                 except requests.exceptions.RequestException as e:
                     st.error(f"Erro ao chamar backend TranscriberCore: {e}")
+                except (RuntimeError, TimeoutError) as e:
+                    st.error(str(e))
 
                 # Salvar no histórico
                 save_transcription_history(uploaded_file.name, transcription_data)

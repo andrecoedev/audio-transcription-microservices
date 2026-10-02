@@ -1,21 +1,37 @@
-"""Configuração centralizada do Redis para fila de jobs."""
+"""Configuração centralizada do Redis e da fila RQ."""
 
-import os
-from typing import Optional
+import logging
+
+from redis import Redis
+from rq import Queue
+
+from ..config import settings
+
+logger = logging.getLogger(__name__)
+
+TRANSCRIPTION_QUEUE_NAME = "transcriptions"
 
 
 def get_redis_url() -> str:
-    """Obtém URL do Redis da variável de ambiente ou usa local."""
-    return os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    return settings.REDIS_URL
 
 
-def is_redis_available() -> bool:
-    """Verifica se Redis está disponível."""
+def get_redis_connection() -> Redis:
+    return Redis.from_url(get_redis_url(), decode_responses=False)
+
+
+def get_transcription_queue(connection: Redis | None = None) -> Queue:
+    return Queue(
+        TRANSCRIPTION_QUEUE_NAME,
+        connection=connection or get_redis_connection(),
+        default_timeout=settings.TRANSCRIPTION_JOB_TIMEOUT_SECONDS,
+    )
+
+
+def is_redis_available(connection: Redis | None = None) -> bool:
     try:
-        import redis
-        r = redis.Redis.from_url(get_redis_url(), decode_responses=False)
-        r.ping()
+        (connection or get_redis_connection()).ping()
         return True
-    except Exception as e:
-        print(f"⚠️  Redis não disponível: {e}")
+    except Exception:
+        logger.warning("Redis unavailable")
         return False

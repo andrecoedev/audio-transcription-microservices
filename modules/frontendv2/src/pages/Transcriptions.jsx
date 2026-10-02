@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { 
   Search, 
@@ -20,13 +20,9 @@ export default function Transcriptions() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [pagination, setPagination] = useState({ skip: 0, limit: 10 })
+  const [pagination] = useState({ skip: 0, limit: 10 })
 
-  useEffect(() => {
-    loadTranscriptions()
-  }, [pagination, statusFilter])
-
-  const loadTranscriptions = async () => {
+  const loadTranscriptions = useCallback(async () => {
     try {
       setLoading(true)
       const params = { 
@@ -41,7 +37,11 @@ export default function Transcriptions() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [pagination, statusFilter])
+
+  useEffect(() => {
+    loadTranscriptions()
+  }, [loadTranscriptions])
 
   const handleDelete = async (id) => {
     if (!confirm('Tem certeza que deseja excluir esta transcrição?')) return
@@ -196,6 +196,7 @@ export default function Transcriptions() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Excluir ${transcription.filename}`}
                           onClick={() => handleDelete(transcription.id)}
                           className="text-red-600 hover:bg-red-50"
                         >

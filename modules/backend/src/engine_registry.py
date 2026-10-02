@@ -4,10 +4,8 @@ Registro centralizado dos engines de ML.
 Responsabilidades
 -----------------
 * Guardar as instâncias singleton dos engines (Pyannote, Whisper, AssemblyAI, Gemini).
-* Expor um asyncio.Lock (`mutation_lock`) que protege qualquer operação de escrita
-  nos engines – startup e POST /api-keys devem adquirir o lock antes de reatribuir.
-* Definir os Protocols (contratos mínimos) que cada engine precisa satisfazer, evitando
-  que `main.py` e os routers dependam de classes concretas.
+* Definir os Protocols mínimos dos engines usados pelo processamento.
+* Guardar instâncias reutilizadas exclusivamente pelo processo RQ worker.
 
 Regra de uso
 ------------
@@ -19,7 +17,6 @@ NUNCA use `from .engine_registry import whisper_engine` – isso cria uma cópia
 do valor None que não é atualizada quando o engine é carregado no startup.
 """
 
-import asyncio
 from typing import Optional, runtime_checkable, Protocol
 
 
@@ -50,12 +47,9 @@ class DiarizationEngineProtocol(Protocol):
     def diarize(
         self,
         audio_path: str,
-        min_duration: float = 0.7,
-        silence_threshold: int = -30,
+        min_duration: Optional[float] = None,
+        silence_threshold: Optional[float] = None,
     ) -> dict:
-        ...
-
-    def convert_to_wav(self, input_path: str, output_path: str = "temp_converted.wav") -> str:
         ...
 
     def get_device(self) -> str:
@@ -73,9 +67,6 @@ class MeetingMinutesGeneratorProtocol(Protocol):
     ) -> dict:
         ...
 
-    def get_config_status(self) -> dict:
-        ...
-
 
 # ---------------------------------------------------------------------------
 # Singletons dos engines (inicialmente None)
@@ -85,12 +76,3 @@ diarization_engine: Optional[DiarizationEngineProtocol] = None
 whisper_engine: Optional[TranscriptionEngineProtocol] = None
 assemblyai_engine: Optional[TranscriptionEngineProtocol] = None
 meeting_minutes_generator: Optional[MeetingMinutesGeneratorProtocol] = None
-
-# ---------------------------------------------------------------------------
-# Lock de mutação
-#
-# Use `async with engine_registry.mutation_lock:` sempre que for reatribuir
-# qualquer um dos engines acima.  Leituras (is not None, .get_device()) não
-# precisam do lock – são operações atômicas no nível do GIL.
-# ---------------------------------------------------------------------------
-mutation_lock: asyncio.Lock = asyncio.Lock()

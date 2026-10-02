@@ -1,0 +1,6 @@
+services:
+  worker:
+    gpus: all
+    environment:
+      WHISPER_DEVICE: cuda
+      WHISPER_COMPUTE_TYPE: float16

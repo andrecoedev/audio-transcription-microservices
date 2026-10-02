@@ -7,26 +7,6 @@ export const audioService = {
     return data
   },
 
-  // Upload e transcrição de áudio
-  async transcribeAudio(file, options = {}) {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('use_diarization', options.useDiarization || false)
-    
-    if (options.transcriptionModel) {
-      formData.append('transcription_model', options.transcriptionModel)
-    }
-
-    const { data } = await api.post('/transcribe', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: options.onUploadProgress,
-    })
-    
-    return data
-  },
-
   // Upload e criação de job assíncrono local
   async createTranscriptionJob(file, options = {}) {
     const formData = new FormData()
@@ -77,35 +57,9 @@ export const audioService = {
     return data
   },
 
-  // Diarização direta
-  async diarizeAudio(file, options = {}) {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('min_duration', options.minDuration || 0.7)
-    formData.append('silence_threshold', options.silenceThreshold || -30)
-
-    const { data } = await api.post('/diarize', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-    
-    return data
-  },
-
   // Obter status das API Keys (sem expor valores completos)
   async getApiKeysStatus() {
     const { data } = await api.get('/api-keys')
-    return data
-  },
-
-  // Atualizar API Keys
-  async updateApiKeys(keys) {
-    const { data } = await api.post('/api-keys', {
-      hf_token: keys.hfToken || null,
-      aai_api_key: keys.aaiApiKey || null,
-      gemini_api_key: keys.geminiApiKey || null,
-    })
     return data
   },
 
@@ -126,4 +80,58 @@ export const audioService = {
     const { data } = await api.get('/meeting-minutes/status')
     return data
   },
+
+  async listMeetings(params = {}) {
+    const { data } = await api.get('/meetings', { params })
+    return data
+  },
+
+  async getMeeting(id) {
+    const { data } = await api.get(`/meetings/${id}`)
+    return data
+  },
+
+  async getMeetingTranscript(id) {
+    const { data } = await api.get(`/meetings/${id}/transcript`)
+    return data
+  },
+
+  async updateMeetingTitle(id, title) {
+    const { data } = await api.patch(`/meetings/${id}`, { title })
+    return data
+  },
+
+  async renameMeetingSpeaker(id, speakerId, displayName) {
+    const { data } = await api.patch(`/meetings/${id}/speakers/${encodeURIComponent(speakerId)}`, {
+      display_name: displayName,
+    })
+    return data
+  },
+
+  async deleteMeeting(id) {
+    const { data } = await api.delete(`/meetings/${id}`)
+    return data
+  },
+
+  async requestMeetingIntelligence(id, regenerate = false) {
+    const path = `/meetings/${id}/intelligence${regenerate ? '/regenerate' : ''}`
+    const { data } = await api.post(path)
+    return data
+  },
+
+  async getMeetingIntelligenceStatus(id) {
+    const { data } = await api.get(`/meetings/${id}/intelligence/status`)
+    return data
+  },
+
+  async getMeetingIntelligenceResult(id) {
+    const { data } = await api.get(`/meetings/${id}/intelligence/result`)
+    return data
+  },
+
+  async getSystemGpu() {
+    const { data } = await api.get('/system/gpu')
+    return data
+  },
+
 }
