@@ -60,18 +60,18 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange }) 
   const state = status?.generation?.status
   const busy = ['pending', 'processing'].includes(state)
   const content = result?.content
-  return <Card><CardHeader><CardTitle>Inteligência da reunião</CardTitle></CardHeader><CardContent>
+  return <Card><CardHeader><CardTitle>Resumo inteligente</CardTitle></CardHeader><CardContent>
     <div className="space-y-4">
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {error && <Button variant="outline" onClick={() => setRefresh(value => value + 1)}>Consultar novamente</Button>}
       {!status && !error && <p>Consultando análise...</p>}
       {status && !status.generation && <p>Ainda não gerada.</p>}
       {status && !status.configured && <p>Geração indisponível neste ambiente.</p>}
-      {busy && <p role="status">{result ? 'Regenerando análise; a versão anterior continua disponível.' : 'Gerando análise...'}</p>}
+      {busy && <p role="status">{result ? 'Gerando novamente; a versão anterior continua disponível.' : 'Gerando resumo...'}</p>}
       {state === 'failed' && <p role="alert" className="text-red-700">A geração falhou. Você pode tentar novamente.</p>}
-      {publicAccount && <p>Para gerar Intelligence externo será necessário conectar sua própria credencial. BYOK ainda não está disponível; sua conta não utiliza credenciais USAGI.</p>}
+      {publicAccount && <p>Para gerar um resumo com serviços externos, será necessário conectar sua própria credencial. Esse recurso estará disponível em breve.</p>}
       {status && !publicAccount && <Button onClick={generate} disabled={submitting || busy || !status.configured}>
-        {submitting ? 'Solicitando...' : result ? 'Regenerar análise' : state === 'failed' ? 'Tentar novamente' : 'Gerar análise'}
+        {submitting ? 'Solicitando...' : result ? 'Gerar novamente' : state === 'failed' ? 'Tentar novamente' : 'Gerar resumo'}
       </Button>}
       {content && <div className="space-y-5">
         <p className="text-sm text-gray-500">Versão {result.revision} · {result.provider} · {result.model}. Revise os itens com as evidências do transcript.</p>

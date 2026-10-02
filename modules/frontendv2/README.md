@@ -62,7 +62,8 @@ concluído com segmentos. JSON pode exportar os metadados de qualquer estado.
 
 ## Limitações de produto
 
-A entrada não exige login: Guest usa transcrição local limitada com resultado
+A entrada usa a mesma interface sem exigir login: Guest terá AssemblyAI limitado
+(indisponível até recuperação/homologação P4-04, sem fallback local), com resultado
 temporário isolado. Signup/login permitem salvar mediante prova Guest validada
 pelo servidor. Contas públicas não recebem credenciais externas USAGI; BYOK
 completo ficará nas próximas Tasks. Veja [Guest e contas](../../docs/guest_and_accounts.md).

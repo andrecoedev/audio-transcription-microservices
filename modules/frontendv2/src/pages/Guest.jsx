@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import Navbar from '../components/Navbar'
 import Button from '../components/Button'
+import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import NewTranscription from './NewTranscription'
 import { guestService } from '../services/guestService'
 import { useAuthStore } from '../stores/authStore'
@@ -35,11 +35,12 @@ export default function Guest() {
   }
 
   useEffect(() => {
+    if (authenticated) return
     let active = true
     guestService.policy().then((value) => { if (active) { setPolicy(value); setError('') } })
       .catch(() => { if (active) setError('Não foi possível carregar os limites. Tente novamente.') })
     return () => { active = false }
-  }, [retry])
+  }, [retry, authenticated])
 
   useEffect(() => {
     if (!session?.guest_token) return
@@ -69,6 +70,7 @@ export default function Guest() {
   }, [session, retry])
 
   async function createJob(file, options) {
+    if (!policy?.can_create_job) throw new Error(policy?.unavailable_reason || 'Transcrição temporariamente indisponível')
     let current = session
     if (!current) {
       current = await guestService.createSession()
@@ -108,26 +110,14 @@ export default function Guest() {
     }
   }
 
-  return <>
-    <Navbar />
-    <main className="max-w-5xl mx-auto p-6 space-y-6">
-      <h1 className="text-3xl font-bold">Experimente o USAGI sem conta</h1>
-      <p>Transcrição local temporária. Entre ou crie uma conta para salvar o resultado e acessar suas reuniões.</p>
-      <div className="flex gap-4 text-primary-700">
-        {authenticated ? <Link to="/">Minha conta</Link> : <>
-          <Link to="/login?saveGuest=1">Entrar para salvar</Link>
-          <Link to="/signup?saveGuest=1">Criar conta para salvar</Link>
-        </>}
-      </div>
-      {policy && <p className="text-sm text-gray-600">
-        Até {policy.max_upload_mb} MiB e {policy.max_audio_seconds}s; {policy.jobs_per_session} job(s) por sessão.
-        Retenção temporária: {policy.retention_hours}h desde a criação da sessão. Sem diarização nem APIs externas.
-        A sessão fica nesta aba; fechar a aba pode impedir a recuperação do resultado.
-      </p>}
-      {error && <div role="alert">{error}<Button variant="outline" onClick={() => setRetry((n) => n + 1)}>Tentar novamente</Button></div>}
-      {!policy && !error && <p role="status">Carregando limites...</p>}
-      {session?.resultId ? <section className="space-y-4">
-        <h2 className="text-xl font-semibold">Resultado temporário</h2>
+  if (authenticated && !session?.resultId && !error) return null
+
+  return <div className="max-w-4xl mx-auto space-y-6">
+      {error && <Card><CardContent><div role="alert">{error}<Button variant="outline" onClick={() => setRetry((n) => n + 1)}>Tentar novamente</Button></div></CardContent></Card>}
+      {!authenticated && !policy && !error && <p role="status">Carregando limites...</p>}
+      {session?.resultId ? <Card>
+        <CardHeader><CardTitle>{authenticated ? 'Salve sua transcrição anterior' : 'Resultado da transcrição'}</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
         {!result ? <p role="status">Carregando resultado...</p> : <>
           <p>Status: {result.status}</p>
           {result.status === 'failed' && <p role="alert">{result.error_message || 'Processamento falhou'}</p>}
@@ -139,8 +129,11 @@ export default function Guest() {
             <Button variant="outline" onClick={remove} disabled={busy || ['queued', 'processing'].includes(result.status)}>Excluir resultado temporário</Button>
           </div>
         </>}
-      </section> : policy && !session?.spent && <NewTranscription guestPolicy={policy} onCreate={createJob} onCreated={() => {}} />}
+      </CardContent></Card> : !authenticated && policy && !session?.spent && <NewTranscription guestPolicy={policy} onCreate={createJob} onCreated={() => {}} />}
+      {!authenticated && policy && <div className="text-sm text-gray-500 space-y-2">
+        <p>Até {policy.max_upload_mb} MB e {Math.floor(policy.max_audio_seconds / 60)} minutos. {policy.jobs_per_session} transcrição por sessão; resultado temporário por {policy.retention_hours}h nesta aba.</p>
+        <p><Link className="text-primary-700" to="/login?saveGuest=1">Entrar</Link> ou <Link className="text-primary-700" to="/signup?saveGuest=1">criar conta</Link> para salvar suas reuniões.</p>
+      </div>}
       {session?.spent && <p>Resultado excluído. Crie uma conta para continuar; excluir não reinicia a cota de visitante.</p>}
-    </main>
-  </>
+  </div>
 }

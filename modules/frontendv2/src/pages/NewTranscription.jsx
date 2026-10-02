@@ -28,6 +28,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   }, [publicAccount, policyAttempt])
   const limits = guestPolicy || (publicAccount ? publicLimits : null)
   const policyReady = !publicAccount || Boolean(publicLimits)
+  const processingAllowed = !guestPolicy || guestPolicy.can_create_job === true
   const maxFileSize = limits ? limits.max_upload_mb * 1024 * 1024 : MAX_FILE_SIZE
   const canUsePlatform = !guestPolicy && !publicAccount
   const [file, setFile] = useState(null)
@@ -61,11 +62,11 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
     },
     maxFiles: 1,
     multiple: false,
-    disabled: !policyReady
+    disabled: !policyReady || !processingAllowed
   })
 
   const handleSubmit = async () => {
-    if (!file || !policyReady) {
+    if (!file || !policyReady || !processingAllowed) {
       toast.error('Selecione um arquivo primeiro')
       return
     }
@@ -76,6 +77,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
 
       const result = await (onCreate || audioService.createTranscriptionJob)(file, {
         ...options,
+        transcriptionModel: guestPolicy ? 'assemblyai' : options.transcriptionModel,
         onUploadProgress: (progressEvent) => {
           const percentCompleted = progressEvent.total
             ? Math.min(100, Math.round((progressEvent.loaded * 100) / progressEvent.total)) : 0
@@ -105,6 +107,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Nova Transcrição</h1>
         <p className="text-gray-600 mt-1">Faça upload de um arquivo de áudio ou vídeo para transcrever</p>
+        {guestPolicy && !processingAllowed && <p role="status" className="text-sm text-gray-600 mt-2">{guestPolicy.unavailable_reason}</p>}
       </div>
 
       {/* Upload Area */}
@@ -186,7 +189,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Modelo de Transcrição */}
-          <div>
+          {guestPolicy ? <p className="text-sm text-gray-600">Transcrição com AssemblyAI</p> : <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Modelo de Transcrição
             </label>
@@ -231,21 +234,21 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                 </div>
               </button>}
             </div>
-          </div>
+          </div>}
 
           {/* Diarização */}
-          {!guestPolicy && <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
             <div className="flex items-center gap-3">
               <Users className="w-5 h-5 text-gray-600" />
               <div>
-                <p className="font-medium text-gray-900">Segmentação de Falantes</p>
+                <p className="font-medium text-gray-900">Detecção de falantes</p>
                 <p className="text-sm text-gray-500">Identifica diferentes falantes no áudio</p>
               </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
-                aria-label="Segmentação de Falantes"
+                aria-label="Detecção de falantes"
                 checked={options.useDiarization}
                 onChange={(e) => setOptions({ ...options, useDiarization: e.target.checked })}
                 disabled={uploading}
@@ -253,8 +256,8 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>
-          </div>}
-          {!canUsePlatform && <p className="text-sm text-gray-600">Somente Faster-Whisper local. Providers externos não usam credenciais USAGI nesta conta; BYOK será disponibilizado em uma próxima etapa.</p>}
+          </div>
+          {!guestPolicy && !canUsePlatform && <p className="text-sm text-gray-600">Para usar serviços externos nesta conta, será necessário conectar sua própria credencial. Esse recurso estará disponível em breve.</p>}
         </CardContent>
       </Card>
 
@@ -269,7 +272,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={!file || uploading || !policyReady}
+          disabled={!file || uploading || !policyReady || !processingAllowed}
           loading={uploading}
         >
           Iniciar Transcrição

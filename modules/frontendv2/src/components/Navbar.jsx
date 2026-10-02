@@ -21,12 +21,15 @@ export default function Navbar() {
       {/* Informações do Usuário */}
       <div className="flex items-center gap-3">
         {!token && (
+          <div className="flex items-center gap-3">
           <Link
             to="/login"
             className="px-3 py-1.5 text-xs font-medium rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
           >
             Entrar
           </Link>
+          <Link to="/signup" className="text-xs font-medium text-primary-700">Criar conta</Link>
+          </div>
         )}
         {token && <button
           type="button"
@@ -49,7 +52,7 @@ export default function Navbar() {
           />
         ) : (
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-semibold ring-2 ring-primary-100">
-            {user?.initials || 'U'}
+            {user?.initials || 'V'}
           </div>
         )}
       </div>

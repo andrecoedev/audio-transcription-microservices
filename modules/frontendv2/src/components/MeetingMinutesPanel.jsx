@@ -104,7 +104,7 @@ export default function MeetingMinutesPanel({ meetingId, version = 0 }) {
       <Section title="Resumo"><p className="whitespace-pre-wrap text-gray-700">{minutes.summary || 'Nenhum resumo disponível.'}</p></Section>
       <Section title="Tópicos"><TextList values={minutes.topics} empty="Nenhum tópico registrado." /></Section>
       <Section title="Decisões"><TextList values={minutes.decisions} empty="Nenhuma decisão registrada." /></Section>
-      <Section title="Action Items">
+      <Section title="Tarefas">
         {minutes.action_items?.length ? <ul className="space-y-2">{minutes.action_items.map(action => <li key={action.id} className="rounded border border-gray-200 p-3">
           <p className={action.status === 'done' ? 'text-gray-500 line-through' : 'text-gray-800'}>{action.description}</p>
           <p className="mt-1 text-sm text-gray-600">{action.status === 'done' ? 'Concluída' : 'Aberta'} · {action.source === 'manual' ? 'Criada manualmente' : 'IA → revisada'}{action.assignee ? ` · ${action.assignee}` : ''}{action.due_date ? ` · ${action.due_date}` : ''}</p>
