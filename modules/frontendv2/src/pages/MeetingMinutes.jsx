@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { FileText, Calendar, Users, Sparkles, Download, Loader2 } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import Button from '../components/Button'
@@ -12,7 +13,6 @@ export default function MeetingMinutes() {
     title: '',
     date: new Date().toISOString().split('T')[0],
     participants: '',
-    context: '',
   })
   const [generatedMinutes, setGeneratedMinutes] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -30,7 +30,7 @@ export default function MeetingMinutes() {
       setGeminiAvailable(status.available)
       if (!status.available) {
         toast.error(
-          'Gemini não está configurado. Configure a API Key nas Configurações.',
+          'Gemini indisponível. Solicite ao administrador a configuração do worker.',
           { duration: 6000 }
         )
       }
@@ -44,7 +44,7 @@ export default function MeetingMinutes() {
     try {
       setLoadingTranscriptions(true)
       const data = await audioService.listTranscriptions()
-      setTranscriptions(data.transcriptions || [])
+      setTranscriptions((data.transcriptions || []).filter(item => item.status === 'completed'))
     } catch (error) {
       console.error('Erro ao carregar transcrições:', error)
       toast.error('Erro ao carregar transcrições')
@@ -65,7 +65,7 @@ export default function MeetingMinutes() {
     }
 
     if (!geminiAvailable) {
-      toast.error('Configure a API Key do Gemini nas Configurações')
+      toast.error('Solicite ao administrador a configuração do Gemini no worker')
       return
     }
 
@@ -79,7 +79,6 @@ export default function MeetingMinutes() {
           title: meetingData.title,
           date: meetingData.date,
           participants: meetingData.participants.split(',').map(p => p.trim()).filter(Boolean),
-          context: meetingData.context,
         }
       )
 
@@ -91,7 +90,7 @@ export default function MeetingMinutes() {
       
       if (errorMsg.includes('API_KEY_INVALID') || errorMsg.includes('401')) {
         toast.error(
-          'API Key do Gemini inválida. Verifique nas Configurações.',
+          'Gemini indisponível. Solicite ao administrador a verificação do worker.',
           { duration: 6000 }
         )
       } else if (errorMsg.includes('SAFETY')) {
@@ -148,8 +147,9 @@ export default function MeetingMinutes() {
           Geração de Atas de Reunião
         </h1>
         <p className="text-gray-600 mt-1">
-          Transforme transcrições em atas estruturadas com IA
+          Gerador legado: o resultado é temporário e não utiliza a revisão de tarefas.
         </p>
+        <Link to="/meetings" className="text-primary-700 underline">Use Reuniões para análise persistente, tarefas revisadas e ata consolidada.</Link>
       </div>
 
       {/* Status do Gemini */}
@@ -160,10 +160,10 @@ export default function MeetingMinutes() {
               <div className="text-yellow-600 mt-1">⚠️</div>
               <div className="flex-1">
                 <h3 className="font-semibold text-yellow-900 mb-1">
-                  Gemini não configurado
+                  Gemini indisponível
                 </h3>
                 <p className="text-sm text-yellow-800">
-                  Configure a API Key do Google Gemini na página de Configurações para usar este recurso.
+                  Solicite ao administrador a configuração do Gemini no worker para usar este recurso.
                 </p>
                 <a
                   href="/settings"
@@ -256,19 +256,6 @@ export default function MeetingMinutes() {
                 onChange={(e) => setMeetingData({ ...meetingData, participants: e.target.value })}
                 className="input min-h-[80px]"
                 placeholder="João Silva, Maria Santos, Pedro Costa"
-              />
-            </div>
-
-            {/* Contexto Adicional */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Contexto Adicional (opcional)
-              </label>
-              <textarea
-                value={meetingData.context}
-                onChange={(e) => setMeetingData({ ...meetingData, context: e.target.value })}
-                className="input min-h-[100px]"
-                placeholder="Informações adicionais sobre a reunião, objetivos específicos, departamento, etc."
               />
             </div>
 

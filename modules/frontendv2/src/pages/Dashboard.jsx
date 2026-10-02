@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [recentTranscriptions, setRecentTranscriptions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     loadDashboardData()
@@ -27,6 +28,7 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
+      setError(false)
       
       // Carregar dados em paralelo
       const [healthData, statsData, transcriptionsData] = await Promise.all([
@@ -38,9 +40,9 @@ export default function Dashboard() {
       setHealth(healthData)
       setStats(statsData)
       setRecentTranscriptions(transcriptionsData.transcriptions || [])
-    } catch (error) {
+    } catch {
+      setError(true)
       toast.error('Erro ao carregar dados do dashboard')
-      console.error(error)
     } finally {
       setLoading(false)
     }
@@ -48,6 +50,7 @@ export default function Dashboard() {
 
   const getStatusBadge = (status) => {
     const badges = {
+      queued: { text: 'Na fila', class: 'badge-warning' },
       completed: { text: 'Concluída', class: 'badge-success' },
       processing: { text: 'Processando', class: 'badge-warning' },
       failed: { text: 'Falhou', class: 'badge-error' },
@@ -67,6 +70,11 @@ export default function Dashboard() {
     )
   }
 
+  if (error) return <div className="space-y-3">
+    <p role="alert">Não foi possível carregar o dashboard.</p>
+    <Button onClick={loadDashboardData}>Tentar novamente</Button>
+  </div>
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -83,7 +91,7 @@ export default function Dashboard() {
       {/* Status dos Modelos */}
       <Card>
         <CardHeader>
-          <CardTitle>🧠 Status dos Modelos</CardTitle>
+          <CardTitle>🧠 Configuração dos Providers</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -94,7 +102,7 @@ export default function Dashboard() {
               device={health?.models?.diarization?.device}
             />
             <ModelStatusCard
-              name="Whisper (Local)"
+              name="Faster-Whisper (Local)"
               icon={Zap}
               configured={health?.models?.whisper?.configured}
               device={health?.models?.whisper?.device}
@@ -106,6 +114,7 @@ export default function Dashboard() {
               device={health?.models?.assemblyai?.device}
             />
           </div>
+          <p className="mt-3 text-xs text-gray-500">Configuração não comprova carregamento dos modelos ou disponibilidade das APIs externas.</p>
         </CardContent>
       </Card>
 

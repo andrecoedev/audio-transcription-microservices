@@ -25,6 +25,24 @@ local por padrão. `/api` aponta para o serviço
 API instala requirements.api.txt; Worker instala requirements.txt.
 Windows executa o Worker no container Linux/WSL, pois o supervisor faz fork.
 
+### PostgreSQL unhealthy por incompatibilidade de major
+
+Se o log disser `database files are incompatible with server`, confira **somente**
+imagem, volume montado e versão indicada no erro antes de qualquer operação.
+Um volume inicializado em PostgreSQL 15 não pode ser aberto diretamente pela
+imagem PostgreSQL 16 deste Compose. `up`, restart ou Alembic não migram o formato
+físico de PostgreSQL. Não use `down -v`, não apague o volume e não troque a imagem
+para contornar o problema sem identificar a origem dos dados.
+
+Foi identificado esse conflito no volume
+`audio-transcription-microservices_postgres_data`: PG15 contra `postgres:16-alpine`.
+Ele foi preservado, sem consultar seu conteúdo. Recuperação requer decisão
+explícita, cópia íntegra do volume e procedimento isolado compatível com PG15;
+depois, backup lógico/restauração validada em destino PG16 identificado. Nunca
+consultar ou importar automaticamente bancos de terceiros que possam existir
+no volume. A configuração documentada usa o projeto explícito `usagidev`; não
+assuma que mudar o nome do projeto migra ou recupera dados de outro volume.
+
 Para processos locais, migre PostgreSQL antes de iniciar:
 ```powershell
 cd modules/backend

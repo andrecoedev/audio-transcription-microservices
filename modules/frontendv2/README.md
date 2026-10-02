@@ -47,11 +47,42 @@ sem consumidores foram removidos, sem mudar UX.
 Rotas: login, dashboard, transcriptions e detalhe, meetings e detalhe,
 new-transcription, meeting-minutes e settings. O fluxo antigo meeting-minutes
 ainda está ativo na Sidebar; não foi removido sem decisão de compatibilidade.
-Settings consulta flags de configuração, nunca recebe/persiste chaves.
+Settings consulta `/health` (banco, Redis, presença do Worker e flags públicas),
+nunca recebe/persiste chaves. Configurado não significa modelo carregado nem
+provider externo operacional. O diagnóstico CUDA pertence aos logs do Worker.
+
+O link Informações → Status do Sistema abre Settings; não existem páginas
+globais de Modelos Ativos ou Falantes. Os falantes são editados na própria
+reunião. Não apresentar botões sem destino para essas páginas inexistentes.
+
+Históricos usam `skip/limit/total` da API. A busca por filename é **nesta página**,
+não busca global. Falha de consulta é diferente de lista vazia e oferece retry.
+Uploads rejeitados têm feedback; copiar/TXT/SRT só são habilitados para resultado
+concluído com segmentos. JSON pode exportar os metadados de qualquer estado.
+
+## Limitações de produto
+
+A entrada ainda exige login e não há cadastro público/Guest Mode. O perfil em
+Settings é apenas local e pode ser substituído pela identidade retornada em
+`/auth/me`; não é preferência persistente de conta nem muda a identidade no
+servidor. A escolha de transcrição/diarização é por job, não uma preferência
+de conta. Automatic ainda não existe na UI. AssemblyAI possui adapter e caminho
+no Worker, mas ainda precisa de validação de erros/capabilities antes de
+homologar suporte completo. Não restaurar inputs de secrets antigos de Settings.
+
+Atas legadas mantêm URL/contrato para compatibilidade, mas são temporárias,
+não passam pela revisão humana de tarefas e não possuem a persistência/proveniência
+de Meeting Intelligence. A experiência recomendada é Reuniões → análise →
+ações revisadas → ata consolidada. O antigo campo Contexto adicional não era
+repassado pelo backend e não é mais apresentado como funcional.
 
 flow.test.jsx protege login, rotas, upload/polling/resultado/exclusão e erros.
 MeetingIntelligencePanel.test.jsx protege falha/retry e revisão anterior durante
 regeneração. audioService.test.js protege URLs/contratos.
+functional-audit.test.jsx protege navegação/status, falhas/retry/paginação,
+upload rejeitado, export sem resultado, labels de login e atualização da ata
+quando uma revisão Intelligence conclui. Esses testes DOM usam serviços
+simulados; não substituem walkthrough visual ou homologação de providers reais.
 
 Guias duplicados com demo user, CORS wildcard, Vite 5 e arquivos inexistentes
 foram substituídos por esta documentação. Sem redesign ou nova funcionalidade.

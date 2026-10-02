@@ -52,7 +52,8 @@ Recarga de modelos por job é custo aceito para supervisão/CUDA segura.
 
 - Removidos os HTTP síncronos sem consumidores: /transcribe, /diarize,
   /whisper/transcribe_segment, /assemblyai/transcribe_segment.
-- /system/gpu é resposta leve depreciada; Settings ainda a consulta.
+- /system/gpu é resposta leve depreciada; Settings usa apenas /health e não
+  apresenta o aviso dessa rota como diagnóstico real de GPU.
 - GET /api-keys retorna booleans administrativos; POST retorna 410.
 - /meeting-minutes continua ativo na Sidebar/React e mantém contrato legado
   de espera HTTP/resultado RQ. Não é substituído automaticamente por intelligence.

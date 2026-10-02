@@ -127,4 +127,8 @@ Não tem persistência/revisões/provenance de intelligence; removê-lo exigiria
 decisão de contrato/UX. O cliente Gemini e generate_minutes continuam necessários.
 
 Ver [avaliação factual local](intelligence_validation.md). P3-A e P3-B/P3-B.2
-foram validadas localmente; produção não homologada. Sem P3-C nesta limpeza.
+foram validadas localmente; produção não homologada. Review/aceitação operacional
+das sugestões, edição humana e ata Markdown também estão implementadas. A ata
+na Meeting é atualizada após mudanças nas ações e após uma nova revisão
+Intelligence concluída; não substitui tarefas humanas por sugestões.
+Model/provider upgrades exigem homologação própria; Pyannote 4 não foi promovido.

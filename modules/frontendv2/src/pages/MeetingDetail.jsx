@@ -82,7 +82,7 @@ export default function MeetingDetail() {
       </form>)}</div></CardContent></Card>
     <MeetingIntelligencePanel meetingId={id} onResultChange={refreshActions} />
     <MeetingActionsPanel key={id} meetingId={id} intelligenceVersion={intelligenceVersion} onActionsChanged={refreshMinutes} />
-    <MeetingMinutesPanel key={`minutes-${id}`} meetingId={id} version={minutesVersion} />
+    <MeetingMinutesPanel key={`minutes-${id}`} meetingId={id} version={minutesVersion + intelligenceVersion} />
     <Card><CardHeader><CardTitle>Transcrição</CardTitle></CardHeader><CardContent><div className="space-y-4">
       {transcript.segments.map(segment => <div id={`segment-${segment.order}`} key={segment.order} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
         <div className="flex justify-between text-sm text-gray-600"><span>{segment.speaker_display_name || segment.speaker || 'Falante'}</span><span>{segment.start?.toFixed(1)}s – {segment.end?.toFixed(1)}s</span></div>
