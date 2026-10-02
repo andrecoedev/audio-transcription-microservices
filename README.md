@@ -53,6 +53,10 @@ Worker; API recebe flags públicas *_CONFIGURED. Configure
 GEMINI_API_KEY_CONFIGURED separadamente da chave. Troca de credencial exige
 recriar apenas o serviço que a recebe.
 
+A entrada pública permite experimentação Guest limitada e cadastro. Criar conta
+não concede acesso às credenciais externas USAGI; BYOK completo permanece nas
+próximas Tasks. Veja [Guest, contas, limites e BYOK](docs/guest_and_accounts.md).
+
 ## Fluxos oficiais
 
 - POST /transcriptions/jobs → status → GET /transcriptions/{id}.
