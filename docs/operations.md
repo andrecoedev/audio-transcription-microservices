@@ -37,9 +37,13 @@ python run_worker.py
 ## Schema e ownership
 
 Schema nunca é criado no import/startup HTTP. Cadeia aplicada preservada:
-20260909_0001 → 20260920_0002 → 20260930_0003 → 20261001_0004 → 20261002_0005.
+20260909_0001 → 20260920_0002 → 20260930_0003 → 20261001_0004 → 20261002_0005 → 20261002_0006.
 Use `alembic current`, `history`, `upgrade head` e `check`.
 Downgrade é destrutivo e deve ser ensaiado apenas em banco sintético isolado.
+Antes de aplicar migration no PostgreSQL local persistente, faça e confira um
+backup conforme a seção Backup e restore. A migration `20261002_0006` adiciona
+proveniência das sugestões de IA e o ledger de decisões de revisão; não a aplique
+em `usagidev` sem backup confirmado e validação do destino.
 
 Pooling PostgreSQL padrão por processo: 5 conexões + 5 overflow, checkout 30s,
 recycle 1800s e pre_ping. Timestamps são UTC com timezone; JSONB preserva

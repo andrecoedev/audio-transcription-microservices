@@ -23,16 +23,29 @@ Exclusão de transcrição remove Meeting, speakers e intelligence por cascade.
 ## Ações administradas pelo usuário
 
 MeetingActionItem pertence à Meeting e armazena descrição, responsável opcional,
-data de prazo opcional (YYYY-MM-DD), status e timestamps. Nesta entrega as tarefas
-são criadas manualmente, inclusive sem Intelligence. A tabela é independente das
-revisões produzidas pela IA: editar uma tarefa não altera o resultado original.
+data operacional de prazo opcional (YYYY-MM-DD), status e timestamps. Tarefas
+manuais não exigem Intelligence. Sugestões aceitas preservam a revisão, índice,
+evidence e os campos originais; editar a tarefa nunca altera o resultado da IA.
+O `due_date` da IA é uma expressão literal do transcript e fica em
+`original_due_date`; só um prazo ISO explicitamente informado pelo usuário vira
+`due_date` operacional. A tabela de review mantém a decisão por sugestão mesmo
+depois de dismiss ou remoção explícita da ação, tornando retries idempotentes.
 
 | Endpoint | Contrato |
 |---|---|
 | GET /meetings/{id}/actions | Lista tarefas, inclusive descartadas |
 | POST /meetings/{id}/actions | Cria tarefa manual, inicialmente open |
+| POST /meetings/{id}/actions/suggestions/{revision}/{source_index} | Aceita sugestão concluída; corpo opcional edita description/assignee/due_date |
+| POST /meetings/{id}/actions/suggestions/{revision}/{source_index}/dismiss | Descarta sugestão sem criar tarefa operacional |
 | PATCH /meetings/{id}/actions/{action_id} | Edita campos fornecidos; null limpa responsável/prazo |
 | DELETE /meetings/{id}/actions/{action_id} | Remove explicitamente a tarefa, retorna 204 |
+
+GET actions também retorna `suggestion_reviews` (accepted/dismissed/deleted),
+para a interface suprimir sugestões já revisadas mesmo após reload. Aceite
+repetido retorna a tarefa existente; sugestões já descartadas ou removidas
+retornam 409 se aceitas novamente. Exclusão operacional é física; o ledger de
+review permanece até a exclusão da reunião. Identificadores de revisão/índice
+são resolvidos no servidor e somente revisões completed podem originar ações.
 
 Status: open, done, dismissed. Concluir/reabrir/descartar usam PATCH. Dismissed
 preserva o registro e pode ser reaberto; delete remove o registro operacional.
@@ -42,7 +55,8 @@ transcribe e exclusão delete_transcriptions; ownership segue o padrão existent
 (404 para outro owner, acesso administrativo preservado). Exclusão da reunião ou
 transcrição remove as tarefas por cascade. Audit events não guardam seu conteúdo.
 
-Aceite de sugestões da IA/provenance e ata revisada são entregas seguintes.
+Ata revisada e exportação Markdown permanecem fora do escopo deste contrato de
+backend.
 
 ## Revisões de intelligence
 

@@ -24,6 +24,7 @@ ALLOWED_EVENTS = {
     "meeting_action.created",
     "meeting_action.updated",
     "meeting_action.deleted",
+    "meeting_action.suggestion_dismissed",
     "intelligence.requested",
     "intelligence.completed",
     "intelligence.failed",
