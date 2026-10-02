@@ -13,6 +13,8 @@ from ..models import AuditEvent
 
 ALLOWED_EVENTS = {
     "user.login",
+    "user.registered",
+    "guest.claimed",
     "transcription.created",
     "transcription.completed",
     "transcription.failed",

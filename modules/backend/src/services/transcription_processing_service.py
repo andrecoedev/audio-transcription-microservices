@@ -17,6 +17,10 @@ class TranscriptionProcessingError(RuntimeError):
     pass
 
 
+class PublicAudioDurationError(TranscriptionProcessingError):
+    pass
+
+
 @dataclass(frozen=True)
 class ProcessingResult:
     segments: list[dict]
@@ -39,6 +43,7 @@ class TranscriptionProcessingService:
         file_path: str,
         use_diarization: bool,
         transcription_model: str,
+        max_duration_seconds: int | None = None,
     ) -> ProcessingResult:
         _TEMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
         wav_path = _TEMP_DIRECTORY / f"wav_{uuid.uuid4()}.wav"
@@ -46,7 +51,10 @@ class TranscriptionProcessingService:
 
         try:
             conversion_started = time.perf_counter()
-            converted_path, duration = convert_to_wav(file_path, str(wav_path))
+            converted_path, duration = convert_to_wav(file_path, str(wav_path),
+                **({"max_duration_seconds": max_duration_seconds} if max_duration_seconds else {}))
+            if max_duration_seconds and duration > max_duration_seconds:
+                raise PublicAudioDurationError("Audio exceeds the public duration limit")
             conversion_seconds = time.perf_counter() - conversion_started
             temporary_bytes = wav_path.stat().st_size
 

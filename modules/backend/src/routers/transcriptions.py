@@ -4,35 +4,37 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.routing import APIRoute
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..authorization import enforce_transcription_access, is_admin
+from ..authorization import enforce_transcription_access, is_admin, ownership_filter
 from ..config import settings
 from ..database import get_db
-from ..models import Transcription, TranscriptionJob, TranscriptionOwnership
+from ..models import GuestSession, Transcription, TranscriptionJob, TranscriptionOwnership
 from ..schemas import JobResponse, JobStatusResponse
 from ..security import TokenData, require_scope_when
 from ..services.audit import append_audit_event
 from ..services.transcription_deletion import ActiveTranscriptionError, delete_transcription_data
 from ..services.rate_limit import enforce_rate_limit
+from ..services.provider_policy import require_provider_credential
 from ..services.storage_lifecycle import delete_file_idempotently, upload_directory
 from ..utils.uploads import UploadValidationError, save_validated_upload
+from ..utils.http_limits import BodyLimitedRoute
 from ..workers.config import get_transcription_queue, is_redis_available
 
 logger = logging.getLogger(__name__)
 
 
-class UploadLimitedRoute(APIRoute):
+class UploadLimitedRoute(BodyLimitedRoute):
     """Enforce the IP upload budget before FastAPI parses multipart bodies."""
 
     def get_route_handler(self):
         original = super().get_route_handler()
 
         async def limited(request: Request):
-            if request.method == "POST" and request.url.path == "/transcriptions/jobs":
+            if request.method == "POST" and request.url.path in {"/transcriptions/jobs", "/guest/transcriptions/jobs"}:
                 enforce_rate_limit(request, "upload-ip")
+                if request.url.path.startswith("/guest/"):
+                    enforce_rate_limit(request, "public-job")
             return await original(request)
 
         return limited
@@ -62,13 +64,7 @@ async def list_transcriptions(
             TranscriptionOwnership.transcription_id == Transcription.id,
         )
         query = query.filter(
-            or_(
-                TranscriptionOwnership.user_id == current_user.user_id,
-                (
-                    TranscriptionOwnership.user_id.is_(None)
-                    & (TranscriptionOwnership.owner_sub == current_user.username)
-                ),
-            )
+            ownership_filter(current_user.user_id, current_user.username, current_user.registration_source)
         )
 
     if status:
@@ -139,13 +135,7 @@ async def get_statistics(
     query = db.query(Transcription)
     if current_user and not is_admin(current_user):
         query = query.join(TranscriptionOwnership).filter(
-            or_(
-                TranscriptionOwnership.user_id == current_user.user_id,
-                (
-                    TranscriptionOwnership.user_id.is_(None)
-                    & (TranscriptionOwnership.owner_sub == current_user.username)
-                ),
-            )
+            ownership_filter(current_user.user_id, current_user.username, current_user.registration_source)
         )
     total = query.count()
     completed = query.filter(Transcription.status == "completed").count()
@@ -171,10 +161,24 @@ async def create_transcription_job(
     ),
 ):
     """Valida o upload, persiste o job e o enfileira no RQ."""
+    return await enqueue_transcription(request, file, use_diarization, transcription_model, db, current_user)
+
+
+async def enqueue_transcription(request, file, use_diarization, transcription_model, db, current_user,
+                                *, guest_session: GuestSession | None = None):
+    """One durable upload/queue path, with ownership supplied by verified context."""
+    public = guest_session is not None or current_user.registration_source == "public"
     enforce_rate_limit(request, "job-user", str(current_user.user_id if current_user else "anonymous"))
+    if public and guest_session is None:
+        enforce_rate_limit(request, "public-job")
     if transcription_model not in {"whisper", "assemblyai"}:
         await file.close()
         raise HTTPException(status_code=400, detail="Invalid transcription model")
+    if guest_session is not None:
+        if transcription_model != "whisper" or use_diarization:
+            raise HTTPException(403, "Guest processing supports only local transcription without diarization")
+    else:
+        require_provider_credential(current_user, transcription_model)
 
     try:
         queue = get_transcription_queue()
@@ -199,7 +203,7 @@ async def create_transcription_job(
             file,
             destination=_UPLOAD_DIRECTORY,
             allowed_extensions=settings.allowed_extensions_list,
-            max_size_bytes=settings.max_upload_size_bytes,
+            max_size_bytes=min(settings.max_upload_size_bytes, settings.PUBLIC_MAX_UPLOAD_MB * 1024 * 1024) if public else settings.max_upload_size_bytes,
         )
 
         transcription = Transcription(
@@ -223,24 +227,30 @@ async def create_transcription_job(
             status="queued",
         )
         db.add(job)
-        if not current_user or current_user.user_id is None or not current_user.username:
+        if public:
+            job.max_duration_seconds = settings.PUBLIC_MAX_AUDIO_SECONDS
+            job.timeout_seconds = settings.PUBLIC_JOB_TIMEOUT_SECONDS
+        if guest_session is not None:
+            db.add(TranscriptionOwnership(transcription_id=transcription.id,
+                   owner_sub=f"guest:{guest_session.id}", guest_session_id=guest_session.id))
+        elif not current_user or current_user.user_id is None or not current_user.username:
             raise RuntimeError("Persistent authenticated identity is required")
-        db.add(
-            TranscriptionOwnership(
+        else:
+            db.add(TranscriptionOwnership(
                 transcription_id=transcription.id,
                 owner_sub=current_user.username,
                 user_id=current_user.user_id,
-            )
-        )
+            ))
         append_audit_event(
             db,
             event="transcription.created",
-            actor_user_id=current_user.user_id,
+            actor_user_id=current_user.user_id if current_user else None,
             resource_type="transcription",
             resource_id=transcription.id,
             metadata={
                 "provider": transcription_model,
                 "diarization": use_diarization,
+                "context": "guest" if guest_session else ("public" if public else "local"),
             },
         )
         db.commit()
@@ -250,6 +260,7 @@ async def create_transcription_job(
                 "src.workers.transcription_worker.process_transcription_job_sync",
                 transcription.id,
                 job_id=f"transcription_{transcription.id}",
+                **({"job_timeout": job.timeout_seconds} if job.timeout_seconds else {}),
             )
         except Exception as exc:
             logger.error(

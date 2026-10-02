@@ -2,10 +2,10 @@
 
 from dataclasses import dataclass
 
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..models import AuditEvent, MeetingActionSuggestionReview, Transcription, TranscriptionOwnership, User
+from ..authorization import ownership_filter
 from .audit import append_audit_event
 from .storage_lifecycle import delete_file_idempotently
 
@@ -23,13 +23,7 @@ def _owned_transcriptions_query(db: Session, user: User):
         db.query(Transcription)
         .join(TranscriptionOwnership)
         .filter(
-            or_(
-                TranscriptionOwnership.user_id == user.id,
-                (
-                    TranscriptionOwnership.user_id.is_(None)
-                    & (TranscriptionOwnership.owner_sub == user.username)
-                ),
-            )
+            ownership_filter(user.id, user.username, user.registration_source)
         )
     )
 

@@ -28,14 +28,14 @@ export default function Navbar() {
             Entrar
           </Link>
         )}
-        <button
+        {token && <button
           type="button"
           onClick={logout}
           className="p-2 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
           title="Sair"
         >
           <LogOut className="w-4 h-4" />
-        </button>
+        </button>}
         <div className="text-right">
           <p className="text-sm font-medium text-gray-900">{user?.name}</p>
           <p className="text-xs text-gray-500">{user?.email}</p>

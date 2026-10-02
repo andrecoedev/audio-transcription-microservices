@@ -33,6 +33,7 @@ class TokenData(BaseModel):
     roles: list[str] = Field(default_factory=list)
     scopes: list[str] = Field(default_factory=list)
     legacy_subject: bool = False
+    registration_source: str = "local"
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -72,17 +73,23 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(claims, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
+def decode_verified_claims(token: str) -> dict | None:
+    try:
+        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+                          issuer=settings.JWT_ISSUER, audience=settings.JWT_AUDIENCE,
+                          options={"require": ["exp", "iat", "sub"]})
+    except (jwt.PyJWTError, TypeError, ValueError):
+        return None
+
+
 def decode_access_token(token: str) -> Optional[TokenData]:
     try:
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[settings.ALGORITHM],
-            issuer=settings.JWT_ISSUER,
-            audience=settings.JWT_AUDIENCE,
-            options={"require": ["exp", "iat", "sub"]},
-        )
+        payload = decode_verified_claims(token)
+        if payload is None:
+            return None
         subject = payload.get("sub")
+        if payload.get("purpose", "user") != "user":
+            return None
         if not isinstance(subject, str) or not subject:
             return None
         try:
@@ -133,6 +140,7 @@ async def get_optional_user(
     token_data.user_id = user.id
     token_data.username = user.username
     token_data.email = user.email
+    token_data.registration_source = user.registration_source
     token_data.roles = ["admin"] if user.is_superuser else ["user"]
     return token_data
 

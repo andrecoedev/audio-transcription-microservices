@@ -50,7 +50,7 @@ def probe_audio_duration(input_path: str) -> float:
     return duration
 
 
-def convert_to_wav(input_path: str, output_path: str) -> tuple[str, float]:
+def convert_to_wav(input_path: str, output_path: str, *, max_duration_seconds: int | None = None) -> tuple[str, float]:
     """Stream-decode media to one mono 16 kHz WAV used by the worker."""
     destination = Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -73,6 +73,10 @@ def convert_to_wav(input_path: str, output_path: str) -> tuple[str, float]:
         "pcm_s16le",
         str(destination),
     ]
+    if max_duration_seconds is not None:
+        # Decode only enough to reject overlong public uploads, even if their
+        # compressed size is tiny or their duration metadata is misleading.
+        command[-1:-1] = ["-t", str(max_duration_seconds + 1)]
     try:
         subprocess.run(command, check=True, capture_output=True)
         duration = probe_audio_duration(str(destination))

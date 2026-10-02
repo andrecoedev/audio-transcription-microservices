@@ -23,6 +23,7 @@ export const useAuthStore = create(
             avatar: null,
             roles: user?.roles || [],
             scopes: user?.scopes || [],
+            registration_source: user?.registration_source || 'local',
           },
           isAuthenticated: true,
         })

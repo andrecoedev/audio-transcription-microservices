@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Card, { CardContent, CardHeader, CardTitle } from './Card'
 import Button from './Button'
 import { audioService } from '../services/audioService'
+import { useAuthStore } from '../stores/authStore'
 
 function EvidenceLinks({ evidence, references }) {
   return <div className="text-sm text-gray-500 mt-1">{evidence.map((item, index) => {
@@ -13,6 +14,7 @@ function EvidenceLinks({ evidence, references }) {
 }
 
 export default function MeetingIntelligencePanel({ meetingId, onResultChange }) {
+  const publicAccount = useAuthStore((state) => state.user?.registration_source === 'public')
   const [status, setStatus] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
@@ -67,7 +69,8 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange }) 
       {status && !status.configured && <p>Geração indisponível neste ambiente.</p>}
       {busy && <p role="status">{result ? 'Regenerando análise; a versão anterior continua disponível.' : 'Gerando análise...'}</p>}
       {state === 'failed' && <p role="alert" className="text-red-700">A geração falhou. Você pode tentar novamente.</p>}
-      {status && <Button onClick={generate} disabled={submitting || busy || !status.configured}>
+      {publicAccount && <p>Para gerar Intelligence externo será necessário conectar sua própria credencial. BYOK ainda não está disponível; sua conta não utiliza credenciais USAGI.</p>}
+      {status && !publicAccount && <Button onClick={generate} disabled={submitting || busy || !status.configured}>
         {submitting ? 'Solicitando...' : result ? 'Regenerar análise' : state === 'failed' ? 'Tentar novamente' : 'Gerar análise'}
       </Button>}
       {content && <div className="space-y-5">

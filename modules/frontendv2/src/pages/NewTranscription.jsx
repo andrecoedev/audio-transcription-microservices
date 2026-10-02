@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import { Upload, FileAudio, X, Zap, Users } from 'lucide-react'
@@ -7,9 +7,29 @@ import Button from '../components/Button'
 import { audioService } from '../services/audioService'
 import { MAX_FILE_SIZE } from '../utils/constants'
 import toast from 'react-hot-toast'
+import { useAuthStore } from '../stores/authStore'
+import { guestService } from '../services/guestService'
 
-export default function NewTranscription() {
+export default function NewTranscription({ guestPolicy = null, onCreate = null, onCreated = null }) {
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const publicAccount = !guestPolicy && user?.registration_source === 'public'
+  const [publicLimits, setPublicLimits] = useState(null)
+  const [policyError, setPolicyError] = useState(false)
+  const [policyAttempt, setPolicyAttempt] = useState(0)
+  useEffect(() => {
+    if (!publicAccount) return
+    let active = true
+    setPolicyError(false)
+    guestService.policy().then((policy) => {
+      if (active) setPublicLimits(policy)
+    }).catch(() => { if (active) setPolicyError(true) })
+    return () => { active = false }
+  }, [publicAccount, policyAttempt])
+  const limits = guestPolicy || (publicAccount ? publicLimits : null)
+  const policyReady = !publicAccount || Boolean(publicLimits)
+  const maxFileSize = limits ? limits.max_upload_mb * 1024 * 1024 : MAX_FILE_SIZE
+  const canUsePlatform = !guestPolicy && !publicAccount
   const [file, setFile] = useState(null)
   const [options, setOptions] = useState({
     useDiarization: false,
@@ -22,15 +42,15 @@ export default function NewTranscription() {
     if (acceptedFiles.length > 0) {
       const selectedFile = acceptedFiles[0]
       
-      if (selectedFile.size > MAX_FILE_SIZE) {
-        toast.error(`Arquivo muito grande! Máximo: ${(MAX_FILE_SIZE / (1024 * 1024)).toFixed(0)}MB`)
+      if (selectedFile.size > maxFileSize) {
+        toast.error(`Arquivo muito grande! Máximo: ${(maxFileSize / (1024 * 1024)).toFixed(0)}MB`)
         return
       }
       
       setFile(selectedFile)
       toast.success('Arquivo carregado com sucesso!')
     }
-  }, [])
+  }, [maxFileSize])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -40,11 +60,12 @@ export default function NewTranscription() {
       'video/*': ['.mp4']
     },
     maxFiles: 1,
-    multiple: false
+    multiple: false,
+    disabled: !policyReady
   })
 
   const handleSubmit = async () => {
-    if (!file) {
+    if (!file || !policyReady) {
       toast.error('Selecione um arquivo primeiro')
       return
     }
@@ -53,7 +74,7 @@ export default function NewTranscription() {
       setUploading(true)
       setProgress(0)
 
-      const result = await audioService.createTranscriptionJob(file, {
+      const result = await (onCreate || audioService.createTranscriptionJob)(file, {
         ...options,
         onUploadProgress: (progressEvent) => {
           const percentCompleted = progressEvent.total
@@ -63,7 +84,8 @@ export default function NewTranscription() {
       })
 
       toast.success('Arquivo enviado. Job de transcrição enfileirado!')
-      navigate(`/transcriptions/${result.id}`)
+      if (onCreated) onCreated(result)
+      else navigate(`/transcriptions/${result.id}`)
     } catch (error) {
       toast.error(error.message || 'Erro ao processar arquivo')
     } finally {
@@ -91,7 +113,11 @@ export default function NewTranscription() {
           <CardTitle>📁 Upload de Arquivo</CardTitle>
         </CardHeader>
         <CardContent>
-          {!file ? (
+          {!policyReady ? (
+            <div role="status">
+              {policyError ? <><p>Não foi possível consultar os limites de upload.</p><Button onClick={() => setPolicyAttempt((value) => value + 1)}>Tentar novamente</Button></> : <p>Consultando limites de upload...</p>}
+            </div>
+          ) : !file ? (
             <div
               {...getRootProps()}
               className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
@@ -106,7 +132,7 @@ export default function NewTranscription() {
                 {isDragActive ? 'Solte o arquivo aqui' : 'Arraste um arquivo ou clique para selecionar'}
               </p>
               <p className="text-sm text-gray-500">
-                Formatos suportados: MP3, WAV, MP4, M4A, FLAC, OGG, OPUS (máx. {(MAX_FILE_SIZE / (1024 * 1024)).toFixed(0)}MB)
+                Formatos suportados: MP3, WAV, MP4, M4A, FLAC, OGG, OPUS (máx. {(maxFileSize / (1024 * 1024)).toFixed(0)}MB)
               </p>
             </div>
           ) : (
@@ -185,7 +211,7 @@ export default function NewTranscription() {
                 </div>
               </button>
 
-              <button
+              {canUsePlatform && <button
                 onClick={() => setOptions({ ...options, transcriptionModel: 'assemblyai' })}
                 disabled={uploading}
                 className={`p-4 border-2 rounded-lg transition-all ${
@@ -203,12 +229,12 @@ export default function NewTranscription() {
                     <p className="text-xs text-gray-500">Cloud, requer configuração do servidor</p>
                   </div>
                 </div>
-              </button>
+              </button>}
             </div>
           </div>
 
           {/* Diarização */}
-          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+          {!guestPolicy && <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
             <div className="flex items-center gap-3">
               <Users className="w-5 h-5 text-gray-600" />
               <div>
@@ -227,7 +253,8 @@ export default function NewTranscription() {
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>
-          </div>
+          </div>}
+          {!canUsePlatform && <p className="text-sm text-gray-600">Somente Faster-Whisper local. Providers externos não usam credenciais USAGI nesta conta; BYOK será disponibilizado em uma próxima etapa.</p>}
         </CardContent>
       </Card>
 
@@ -235,14 +262,14 @@ export default function NewTranscription() {
       <div className="flex items-center justify-between">
         <Button
           variant="outline"
-          onClick={() => navigate('/transcriptions')}
+          onClick={() => navigate(guestPolicy ? '/' : '/transcriptions')}
           disabled={uploading}
         >
           Cancelar
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={!file || uploading}
+          disabled={!file || uploading || !policyReady}
           loading={uploading}
         >
           Iniciar Transcrição

@@ -5,10 +5,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from .config import sanitize_settings_snapshot, settings
 from .logging_config import configure_logging
-from .routers import api_keys, auth, health, meeting_actions, meeting_intelligence, meeting_minutes, meetings, reviewed_meeting_minutes, transcriptions
+from .routers import api_keys, auth, guests, health, meeting_actions, meeting_intelligence, meeting_minutes, meetings, reviewed_meeting_minutes, transcriptions
 
 
 configure_logging()
@@ -48,6 +50,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(guests.router)
 app.include_router(transcriptions.router)
 app.include_router(meetings.router)
 app.include_router(meeting_actions.router)
@@ -57,6 +60,15 @@ app.include_router(meeting_minutes.router)
 app.include_router(reviewed_meeting_minutes.router)
 
 
+@app.exception_handler(RequestValidationError)
+async def safe_validation_error(_request, exc):
+    # FastAPI's default includes rejected input, potentially a password/token.
+    return JSONResponse(status_code=422, content={"detail": [
+        {"loc": error["loc"], "msg": error["msg"], "type": error["type"]}
+        for error in exc.errors()
+    ]})
+
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -64,7 +76,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    if request.url.path.startswith(("/auth", "/transcriptions", "/meetings", "/meeting-minutes")):
+    if request.url.path.startswith(("/auth", "/guest", "/transcriptions", "/meetings", "/meeting-minutes")):
         response.headers["Cache-Control"] = "no-store"
     return response
 

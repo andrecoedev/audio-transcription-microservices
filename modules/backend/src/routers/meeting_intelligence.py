@@ -13,6 +13,7 @@ from ..security import TokenData, require_scope
 from ..services.audit import append_audit_event
 from ..services.meeting_intelligence import fingerprint, latest_revision, metadata_view, snapshot
 from ..services.rate_limit import enforce_rate_limit
+from ..services.provider_policy import require_provider_credential
 from ..workers.config import get_transcription_queue, is_redis_available
 
 router = APIRouter(prefix="/meetings", tags=["meeting intelligence"])
@@ -37,6 +38,7 @@ def request_generation(meeting_id, request, response, db, user, *, regenerate):
         response.status_code = 200 if current.status == "completed" else 202
         return metadata_view(current)
     source, segments = snapshot(meeting)
+    require_provider_credential(user, "gemini")
     if meeting.transcription.status != "completed" or not any(item.get("text", "").strip() for item in segments):
         raise HTTPException(422, "A completed meeting with transcript is required")
     if sum(len(item.get("text", "")) for item in segments) > settings.INTELLIGENCE_MAX_INPUT_CHARACTERS:

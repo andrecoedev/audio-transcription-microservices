@@ -8,7 +8,7 @@ Admin pode ser provisionado no primeiro login configurado. Senhas maiores que
 
 JWT HMAC SHA-2 exige sub, exp, iat, issuer, audience e jti; sub novo é users.id.
 Username-sub legado exige correspondência exata a usuário persistente ativo.
-Ownership novo usa user_id; owner_sub permanece apenas como ponte inequívoca.
+Ownership de contas usa user_id; Guest usa guest_session_id e prova assinada temporária. owner_sub permanece apenas como ponte inequívoca para dados legados.
 Acesso cruzado/não resolvido retorna 404. Flags legadas não tornam rotas privadas
 anônimas. Production rejeita placeholders/chave curta, demo e CORS wildcard.
 
@@ -20,6 +20,14 @@ TLS/HSTS/proxy confiável, limite de request no perímetro e rotação de logs
 continuam responsabilidades de implantação.
 
 ## Rate limiting Redis e secrets
+
+Cadastro público não provisiona admin nem assume ownership legado por username.
+Sessões Guest têm prova/expiração server-side e rotas próprias; rotas privadas
+não foram desprotegidas. Guest e contas públicas compartilham orçamento local
+limitado; nenhuma delas recebe as chaves externas da plataforma. BYOK completo
+é próximo trabalho, sem persistência de novas chaves nesta Task. Ver
+[políticas de Guest/contas](guest_and_accounts.md) para limites, cleanup e contexto
+de identidades locais provisionadas explicitamente pelo operador.
 
 Buckets atômicos de janela fixa: login IP 30 e conta 10 por 5 min; upload IP 300
 e criação de job por usuário 30 por hora. Configuráveis. IP compartilhado precisa
@@ -79,7 +87,8 @@ means it provided none. All findings are on the Worker, not the ML-free API.
 
 Mitigation codes used in each row:
 
-- **A:** Worker isolated from HTTP; uploads require authentication; clients
+- **A:** Worker isolated from HTTP; uploads require a user or signed Guest identity;
+  public local processing has shared quotas, size, duration and timeout limits; clients
   cannot submit checkpoint files or model graphs through the official API.
   Models come from configured gated repositories, but revisions are not pinned
   to immutable commits. Compromise of those artifacts remains possible.

@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from .models import TranscriptionOwnership
 from .security import TokenData
@@ -9,6 +10,16 @@ from .security import TokenData
 
 def is_admin(user: Optional[TokenData]) -> bool:
     return bool(user and "admin" in user.roles)
+
+
+def ownership_filter(user_id, username, registration_source):
+    """Stable ownership; public signup never inherits legacy username data."""
+    stable = TranscriptionOwnership.user_id == user_id
+    if registration_source != "local":
+        return stable
+    return or_(stable, TranscriptionOwnership.user_id.is_(None)
+               & TranscriptionOwnership.guest_session_id.is_(None)
+               & (TranscriptionOwnership.owner_sub == username))
 
 
 def enforce_transcription_access(
@@ -39,7 +50,9 @@ def enforce_transcription_access(
         current_user.user_id is not None and owner.user_id == current_user.user_id
     )
     exact_legacy_match = bool(
-        owner.user_id is None
+        current_user.registration_source == "local"
+        and owner.guest_session_id is None
+        and owner.user_id is None
         and current_user.username
         and owner.owner_sub == current_user.username
     )

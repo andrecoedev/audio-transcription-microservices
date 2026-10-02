@@ -136,12 +136,14 @@ class User(Base):
     __table_args__ = (
         UniqueConstraint("username", name="uq_users_username"),
         UniqueConstraint("email", name="uq_users_email"),
+        CheckConstraint("registration_source IN ('local', 'public')", name="ck_users_registration_source"),
     )
 
     id = Column(Integer, primary_key=True)
     username = Column(String(50), nullable=False)
     email = Column(String(255), nullable=False)
     hashed_password = Column(String(255), nullable=False)
+    registration_source = Column(String(16), nullable=False, default="local", server_default=text("'local'"))
     is_active = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     is_superuser = Column(
         Boolean, nullable=False, default=False, server_default=text("false")
@@ -163,11 +165,24 @@ class User(Base):
         return f"<User(id={self.id}, username={self.username})>"
 
 
-class TranscriptionOwnership(Base):
-    """One persistent user owns one transcription.
+class GuestSession(Base):
+    """Expiring server-side identity, not an account or a provider credential."""
+    __tablename__ = "guest_sessions"
+    __table_args__ = (CheckConstraint("jobs_created >= 0", name="ck_guest_sessions_jobs_created"),)
 
-    ``owner_sub`` is retained as an explicit legacy bridge. New records always
-    populate ``user_id``; unresolved historical rows remain visible for a safe,
+    id = Column(String(36), primary_key=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    jobs_created = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    claimed_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class TranscriptionOwnership(Base):
+    """One persistent user or temporary guest owns one transcription.
+
+    ``owner_sub`` is retained as an explicit legacy bridge. New account records
+    populate ``user_id``; Guest records use ``guest_session_id`` instead.
+    Unresolved historical rows remain visible for a safe,
     exact username reconciliation instead of being assigned by fallback.
     """
 
@@ -176,6 +191,7 @@ class TranscriptionOwnership(Base):
         UniqueConstraint("transcription_id", name="uq_transcription_owners_transcription_id"),
         Index("ix_transcription_owners_owner_sub", "owner_sub"),
         Index("ix_transcription_owners_user_id", "user_id"),
+        CheckConstraint("guest_session_id IS NULL OR user_id IS NULL", name="ck_transcription_owners_single_context"),
     )
 
     id = Column(Integer, primary_key=True)
@@ -190,6 +206,7 @@ class TranscriptionOwnership(Base):
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
     )
+    guest_session_id = Column(String(36), ForeignKey("guest_sessions.id", ondelete="RESTRICT"), nullable=True, index=True)
     created_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -223,6 +240,8 @@ class TranscriptionJob(Base):
         nullable=False,
     )
     input_path = Column(String(500), nullable=False)
+    max_duration_seconds = Column(Integer, nullable=True)
+    timeout_seconds = Column(Integer, nullable=True)
     use_diarization = Column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )

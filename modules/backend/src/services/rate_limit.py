@@ -41,6 +41,15 @@ def enforce_rate_limit(request: Request, category: str, identity: str | None = N
         rules = [("upload-ip", ip, settings.UPLOAD_RATE_LIMIT_PER_IP, 3600)]
     elif category == "job-user":
         rules = [("job-user", identity or "", settings.JOB_RATE_LIMIT_PER_USER, 3600)]
+    elif category == "signup":
+        rules = [("signup-ip", ip, settings.SIGNUP_RATE_LIMIT_PER_IP, 3600)]
+    elif category == "guest-session":
+        rules = [("guest-session-ip", ip, settings.GUEST_SESSION_RATE_LIMIT_PER_IP, 3600)]
+    elif category == "public-job":
+        rules = [
+            ("public-job-ip", ip, settings.PUBLIC_JOB_RATE_LIMIT_PER_IP, 3600),
+            ("public-job-global", "all", settings.PUBLIC_JOB_RATE_LIMIT_GLOBAL, 3600),
+        ]
     else:
         raise ValueError("Unsupported rate limit category")
 

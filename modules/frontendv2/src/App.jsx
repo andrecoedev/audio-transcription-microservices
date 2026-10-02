@@ -11,6 +11,7 @@ import NewTranscription from './pages/NewTranscription'
 import MeetingMinutes from './pages/MeetingMinutes'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
+import Guest from './pages/Guest'
 import { authService } from './services/authService'
 import { useAuthStore } from './stores/authStore'
 
@@ -26,8 +27,6 @@ function App() {
     const bootstrap = async () => {
       let verified = false
       try {
-        await authService.getConfig()
-
         const token = localStorage.getItem('token')
         if (token) {
           const me = await authService.me()
@@ -87,9 +86,14 @@ function App() {
       
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Login signup />} />
+        <Route path="/guest" element={<Guest />} />
 
         {requiresLogin ? (
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <>
+            <Route path="/" element={<Guest />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </>
         ) : (
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />

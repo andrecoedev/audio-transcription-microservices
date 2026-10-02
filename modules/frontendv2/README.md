@@ -44,7 +44,7 @@ audioService.js mantém contratos de upload/jobs/polling/resultados/reuniões/
 intelligence. Pages usam serviços e estado React; hooks/store de transcrição
 sem consumidores foram removidos, sem mudar UX.
 
-Rotas: login, dashboard, transcriptions e detalhe, meetings e detalhe,
+Rotas: entrada pública/guest, signup, login, dashboard, transcriptions e detalhe, meetings e detalhe,
 new-transcription, meeting-minutes e settings. O fluxo antigo meeting-minutes
 ainda está ativo na Sidebar; não foi removido sem decisão de compatibilidade.
 Settings consulta `/health` (banco, Redis, presença do Worker e flags públicas),
@@ -62,8 +62,11 @@ concluído com segmentos. JSON pode exportar os metadados de qualquer estado.
 
 ## Limitações de produto
 
-A entrada ainda exige login e não há cadastro público/Guest Mode. O perfil em
-Settings é apenas local e pode ser substituído pela identidade retornada em
+A entrada não exige login: Guest usa transcrição local limitada com resultado
+temporário isolado. Signup/login permitem salvar mediante prova Guest validada
+pelo servidor. Contas públicas não recebem credenciais externas USAGI; BYOK
+completo ficará nas próximas Tasks. Veja [Guest e contas](../../docs/guest_and_accounts.md).
+O perfil em Settings é apenas local e pode ser substituído pela identidade retornada em
 `/auth/me`; não é preferência persistente de conta nem muda a identidade no
 servidor. A escolha de transcrição/diarização é por job, não uma preferência
 de conta. Automatic ainda não existe na UI. AssemblyAI possui adapter e caminho
@@ -83,6 +86,8 @@ functional-audit.test.jsx protege navegação/status, falhas/retry/paginação,
 upload rejeitado, export sem resultado, labels de login e atualização da ata
 quando uma revisão Intelligence conclui. Esses testes DOM usam serviços
 simulados; não substituem walkthrough visual ou homologação de providers reais.
+guest-auth.test.jsx protege entrada pública, cadastro, expiração, claim explícito
+e a ausência de providers pagos para contas públicas.
 
 Guias duplicados com demo user, CORS wildcard, Vite 5 e arquivos inexistentes
 foram substituídos por esta documentação. Sem redesign ou nova funcionalidade.
