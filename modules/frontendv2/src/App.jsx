@@ -5,6 +5,8 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Transcriptions from './pages/Transcriptions'
 import TranscriptionDetail from './pages/TranscriptionDetail'
+import Meetings from './pages/Meetings'
+import MeetingDetail from './pages/MeetingDetail'
 import NewTranscription from './pages/NewTranscription'
 import MeetingMinutes from './pages/MeetingMinutes'
 import Settings from './pages/Settings'
@@ -15,48 +17,46 @@ import { useAuthStore } from './stores/authStore'
 function App() {
   const {
     isAuthenticated,
-    authMode,
-    setAuthMode,
     setSession,
-    enableDemoSession,
+    logout,
   } = useAuthStore()
   const [bootstrapped, setBootstrapped] = useState(false)
 
   useEffect(() => {
     const bootstrap = async () => {
+      let verified = false
       try {
-        const config = await authService.getConfig()
-        setAuthMode(config.mode)
+        await authService.getConfig()
 
         const token = localStorage.getItem('token')
         if (token) {
           const me = await authService.me()
           if (me.authenticated) {
             setSession(me.user, token)
+            verified = true
             setBootstrapped(true)
             return
           }
         }
 
-        if (config.mode === 'permissive') {
-          enableDemoSession()
-        }
       } catch {
-        // Se backend indisponível, mantém experiência anterior em modo demo.
-        enableDemoSession()
+        // Fail closed: API unavailability never creates an anonymous session.
       } finally {
+        if (!verified) {
+          logout()
+        }
         setBootstrapped(true)
       }
     }
 
     bootstrap()
-  }, [setAuthMode, setSession, enableDemoSession])
+  }, [setSession, logout])
 
   if (!bootstrapped) {
     return null
   }
 
-  const requiresLogin = authMode === 'strict' && !isAuthenticated
+  const requiresLogin = !isAuthenticated
 
   return (
     <Router>
@@ -95,6 +95,8 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="transcriptions" element={<Transcriptions />} />
           <Route path="transcriptions/:id" element={<TranscriptionDetail />} />
+          <Route path="meetings" element={<Meetings />} />
+          <Route path="meetings/:id" element={<MeetingDetail />} />
           <Route path="new-transcription" element={<NewTranscription />} />
           <Route path="meeting-minutes" element={<MeetingMinutes />} />
           <Route path="settings" element={<Settings />} />

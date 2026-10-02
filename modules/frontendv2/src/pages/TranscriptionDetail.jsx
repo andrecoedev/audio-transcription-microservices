@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { 
   ArrowLeft, 
@@ -22,16 +22,28 @@ export default function TranscriptionDetail() {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
+  const loadTranscription = useCallback(async ({ silent = false } = {}) => {
+    try {
+      if (!silent) setLoading(true)
+      const data = await audioService.getTranscription(id)
+      setTranscription(data)
+    } catch (error) {
+      if (!silent) {
+        toast.error('Erro ao carregar transcrição')
+        navigate('/transcriptions')
+      }
+      console.error(error)
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [id, navigate])
+
   useEffect(() => {
     loadTranscription()
-  }, [id])
+  }, [loadTranscription])
 
   useEffect(() => {
-    if (!transcription) {
-      return
-    }
-
-    if (!['queued', 'processing'].includes(transcription.status)) {
+    if (!['queued', 'processing'].includes(transcription?.status)) {
       return
     }
 
@@ -40,25 +52,7 @@ export default function TranscriptionDetail() {
     }, 3000)
 
     return () => clearInterval(timer)
-  }, [transcription?.status])
-
-  const loadTranscription = async ({ silent = false } = {}) => {
-    try {
-      setLoading(true)
-      const data = await audioService.getTranscription(id)
-      setTranscription(data)
-    } catch (error) {
-      if (!silent) {
-        toast.error('Erro ao carregar transcrição')
-      }
-      console.error(error)
-      if (!silent) {
-        navigate('/transcriptions')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [transcription?.status, loadTranscription])
 
   const copyToClipboard = async () => {
     const text = transcription.segments
@@ -168,6 +162,11 @@ export default function TranscriptionDetail() {
               <p className="text-sm text-amber-700 mt-2">
                 Status: {transcription.status === 'queued' ? 'na fila' : 'processando'}
               </p>
+            )}
+            {transcription.status === 'completed' && (
+              <Link className="text-primary-700 hover:underline" to={`/meetings/${transcription.id}`}>
+                Ver reunião estruturada
+              </Link>
             )}
           </div>
         </div>

@@ -6,14 +6,12 @@ import {
   Clock, 
   CheckCircle2, 
   XCircle,
-  TrendingUp,
   Users,
   Zap
 } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import Button from '../components/Button'
 import { audioService } from '../services/audioService'
-import { useTranscriptionStore } from '../stores/transcriptionStore'
 import toast from 'react-hot-toast'
 
 export default function Dashboard() {

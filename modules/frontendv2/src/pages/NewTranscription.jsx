@@ -8,8 +8,6 @@ import { audioService } from '../services/audioService'
 import { MAX_FILE_SIZE } from '../utils/constants'
 import toast from 'react-hot-toast'
 
-const ALLOWED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/x-m4a', 'audio/flac', 'audio/ogg', 'audio/opus', 'video/mp4']
-
 export default function NewTranscription() {
   const navigate = useNavigate()
   const [file, setFile] = useState(null)

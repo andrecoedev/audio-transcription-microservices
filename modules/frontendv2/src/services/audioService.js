@@ -63,16 +63,6 @@ export const audioService = {
     return data
   },
 
-  // Atualizar API Keys
-  async updateApiKeys(keys) {
-    const { data } = await api.post('/api-keys', {
-      hf_token: keys.hfToken || null,
-      aai_api_key: keys.aaiApiKey || null,
-      gemini_api_key: keys.geminiApiKey || null,
-    })
-    return data
-  },
-
   // Gerar ata de reunião
   async generateMeetingMinutes(transcriptionId, meetingData) {
     const { data } = await api.post('/meeting-minutes/generate', {
@@ -88,6 +78,38 @@ export const audioService = {
   // Verificar status do gerador de atas
   async getMeetingMinutesStatus() {
     const { data } = await api.get('/meeting-minutes/status')
+    return data
+  },
+
+  async listMeetings(params = {}) {
+    const { data } = await api.get('/meetings', { params })
+    return data
+  },
+
+  async getMeeting(id) {
+    const { data } = await api.get(`/meetings/${id}`)
+    return data
+  },
+
+  async getMeetingTranscript(id) {
+    const { data } = await api.get(`/meetings/${id}/transcript`)
+    return data
+  },
+
+  async updateMeetingTitle(id, title) {
+    const { data } = await api.patch(`/meetings/${id}`, { title })
+    return data
+  },
+
+  async renameMeetingSpeaker(id, speakerId, displayName) {
+    const { data } = await api.patch(`/meetings/${id}/speakers/${encodeURIComponent(speakerId)}`, {
+      display_name: displayName,
+    })
+    return data
+  },
+
+  async deleteMeeting(id) {
+    const { data } = await api.delete(`/meetings/${id}`)
     return data
   },
 

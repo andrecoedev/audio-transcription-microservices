@@ -14,6 +14,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Nova Transcrição', href: '/new-transcription', icon: PlusCircle },
   { name: 'Transcrições', href: '/transcriptions', icon: FileAudio },
+  { name: 'Reuniões', href: '/meetings', icon: Users },
   { name: 'Atas de Reunião', href: '/meeting-minutes', icon: Sparkles },
   { name: 'Configurações', href: '/settings', icon: Settings },
 ]

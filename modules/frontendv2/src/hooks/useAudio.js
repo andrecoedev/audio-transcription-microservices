@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { audioService } from '../services/audioService'
 import toast from 'react-hot-toast'
 
@@ -11,11 +11,7 @@ export function useTranscriptions(options = {}) {
     limit: options.limit || 10,
   })
 
-  useEffect(() => {
-    loadTranscriptions()
-  }, [pagination])
-
-  const loadTranscriptions = async () => {
+  const loadTranscriptions = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -28,7 +24,11 @@ export function useTranscriptions(options = {}) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [pagination])
+
+  useEffect(() => {
+    loadTranscriptions()
+  }, [loadTranscriptions])
 
   const deleteTranscription = async (id) => {
     try {
@@ -59,13 +59,7 @@ export function useTranscription(id) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    if (id) {
-      loadTranscription()
-    }
-  }, [id])
-
-  const loadTranscription = async () => {
+  const loadTranscription = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -78,7 +72,13 @@ export function useTranscription(id) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (id) {
+      loadTranscription()
+    }
+  }, [id, loadTranscription])
 
   const refresh = () => loadTranscription()
 

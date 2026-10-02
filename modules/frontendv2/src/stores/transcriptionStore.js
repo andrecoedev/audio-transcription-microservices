@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export const useTranscriptionStore = create((set, get) => ({
+export const useTranscriptionStore = create((set) => ({
   transcriptions: [],
   currentTranscription: null,
   isLoading: false,

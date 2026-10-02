@@ -6,7 +6,7 @@ export const useAuthStore = create(
     (set) => ({
       user: null,
       token: null,
-      authMode: 'permissive',
+      authMode: 'strict',
       isAuthenticated: false,
       
       setAuthMode: (authMode) => set({ authMode }),
@@ -16,9 +16,9 @@ export const useAuthStore = create(
         set({
           token,
           user: {
-            id: 1,
+            id: user?.id,
             name: user?.username || 'Usuário',
-            email: `${user?.username || 'user'}@transcricao.ai`,
+            email: user?.email || '',
             initials: (user?.username || 'U').slice(0, 2).toUpperCase(),
             avatar: null,
             roles: user?.roles || [],
@@ -27,18 +27,6 @@ export const useAuthStore = create(
           isAuthenticated: true,
         })
       },
-      enableDemoSession: () => set({
-        user: {
-          id: 1,
-          name: 'Usuário Demo',
-          email: 'demo@transcricao.ai',
-          initials: 'UD',
-          avatar: null,
-          roles: ['user'],
-          scopes: ['transcribe', 'meeting_minutes', 'read_transcriptions'],
-        },
-        isAuthenticated: true,
-      }),
       logout: () => {
         localStorage.removeItem('token')
         set({ user: null, token: null, isAuthenticated: false })
