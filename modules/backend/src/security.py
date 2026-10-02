@@ -178,7 +178,3 @@ def require_admin(
     if "admin" not in current_user.roles:
         raise HTTPException(status_code=403, detail="Admin role required")
     return current_user
-
-
-def require_admin_when(_enabled: bool):
-    return require_admin

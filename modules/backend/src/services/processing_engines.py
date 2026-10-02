@@ -35,7 +35,7 @@ def initialize_processing_engines(
     gemini_api_key: str | None,
     factories: dict[str, Callable[..., Any]] | None = None,
 ) -> dict[str, bool]:
-    """Initialize each configured engine once and reuse it across worker jobs."""
+    """Initialize once per work-horse process; supervised jobs use separate children."""
     factories = factories or _default_factories()
 
     if hf_token and engine_registry.diarization_engine is None:

@@ -1,13 +1,10 @@
 """Worker-only audio I/O built around bounded FFmpeg subprocesses."""
 
-import asyncio
 import json
 import logging
-import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -128,24 +125,3 @@ def decode_audio_segment(
     if not pcm16.size:
         return np.empty(0, dtype=np.float32)
     return pcm16.astype(np.float32) / 32768.0
-
-
-async def remove_temp_file_with_retry(
-    path: Optional[str], attempts: int = 5, delay: float = 0.2
-) -> None:
-    """Remove a temporary file with retries for transient Windows locks."""
-    if not path or not os.path.exists(path):
-        return
-
-    for attempt in range(1, attempts + 1):
-        try:
-            os.remove(path)
-            return
-        except PermissionError:
-            if attempt == attempts:
-                logger.warning("Could not remove temporary audio file")
-            else:
-                await asyncio.sleep(delay)
-        except OSError:
-            logger.warning("Could not remove temporary audio file")
-            return

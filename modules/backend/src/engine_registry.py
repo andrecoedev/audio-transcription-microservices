@@ -52,9 +52,6 @@ class DiarizationEngineProtocol(Protocol):
     ) -> dict:
         ...
 
-    def convert_to_wav(self, input_path: str, output_path: str = "temp_converted.wav") -> str:
-        ...
-
     def get_device(self) -> str:
         ...
 
@@ -68,9 +65,6 @@ class MeetingMinutesGeneratorProtocol(Protocol):
         transcription: str,
         meeting_context: Optional[dict] = None,
     ) -> dict:
-        ...
-
-    def get_config_status(self) -> dict:
         ...
 
 

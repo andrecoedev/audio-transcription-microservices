@@ -211,10 +211,6 @@ class Settings(BaseSettings):
         return self.APP_ENV == "prod"
 
     @property
-    def is_auth_strict(self) -> bool:
-        return self.AUTH_MODE == "strict"
-    
-    @property
     def allowed_extensions_list(self) -> list[str]:
         """Retorna lista de extensões permitidas."""
         return [ext.strip() for ext in self.ALLOWED_EXTENSIONS.split(",")]

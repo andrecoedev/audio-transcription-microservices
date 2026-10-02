@@ -303,10 +303,3 @@ Por favor, analise a transcrição acima e gere uma ata de reunião completa e e
         
         except Exception:
             return []
-    
-    def get_config_status(self) -> Dict:
-        """Retorna status da configuração."""
-        return {
-            "configured": bool(self.api_key),
-            "model": settings.GEMINI_MODEL
-        }

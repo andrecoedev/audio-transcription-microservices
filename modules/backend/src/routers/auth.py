@@ -29,10 +29,6 @@ class LoginResponse(BaseModel):
     user: dict
 
 
-def _admin_credentials_configured() -> bool:
-    return bool(settings.AUTH_ADMIN_PASSWORD_HASH or settings.AUTH_ADMIN_PASSWORD)
-
-
 @router.post("/login", response_model=LoginResponse)
 async def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     enforce_rate_limit(request, "login", payload.username)

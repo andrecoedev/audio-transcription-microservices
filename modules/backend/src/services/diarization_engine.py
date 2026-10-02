@@ -3,7 +3,6 @@ Engine de diarização usando Pyannote - carregado uma vez e reutilizado.
 """
 
 import logging
-import os
 from importlib.metadata import version
 import numpy as np
 import librosa
@@ -17,7 +16,6 @@ torch.backends.cudnn.allow_tf32 = False
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 from huggingface_hub.utils import GatedRepoError, HfHubHTTPError
-from pydub import AudioSegment
 from ..config import settings
 from .diarization_compat import pipeline_config, speaker_turns
 
@@ -134,18 +132,6 @@ class DiarizationEngine:
         except Exception as e:
             logger.error(f"Erro ao carregar pipeline de diarização: {e}")
             raise
-    
-    def convert_to_wav(self, input_path: str, output_path: str = "temp_converted.wav") -> str:
-        """Converte arquivo de áudio para WAV."""
-        try:
-            audio = AudioSegment.from_file(input_path)
-            audio.export(output_path, format="wav")
-            if not os.path.exists(output_path):
-                raise ValueError(f"Falha ao criar arquivo WAV: {output_path}")
-            logger.info("Audio converted to normalized WAV")
-            return output_path
-        except Exception as e:
-            raise ValueError(f"Erro ao converter para WAV: {str(e)}")
     
     def is_valid_segment(
         self,

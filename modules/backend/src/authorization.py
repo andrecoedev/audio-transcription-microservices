@@ -45,20 +45,3 @@ def enforce_transcription_access(
     )
     if not (stable_match or exact_legacy_match):
         raise HTTPException(status_code=404, detail="Transcription not found")
-
-
-def create_transcription_owner(
-    db: Session,
-    transcription_id: int,
-    current_user: Optional[TokenData],
-):
-    """Persiste owner de novas transcrições quando usuário autenticado existir."""
-    if not current_user or current_user.user_id is None or not current_user.username:
-        raise ValueError("Authenticated persistent user is required for ownership")
-
-    owner = TranscriptionOwnership(
-        transcription_id=transcription_id,
-        owner_sub=current_user.username,
-        user_id=current_user.user_id,
-    )
-    db.add(owner)
