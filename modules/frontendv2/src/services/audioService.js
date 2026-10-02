@@ -123,6 +123,16 @@ export const audioService = {
     return data
   },
 
+  async acceptMeetingActionSuggestion(id, revision, sourceIndex, payload = {}) {
+    const { data } = await api.post(`/meetings/${id}/actions/suggestions/${revision}/${sourceIndex}`, payload)
+    return data
+  },
+
+  async dismissMeetingActionSuggestion(id, revision, sourceIndex) {
+    const { data } = await api.post(`/meetings/${id}/actions/suggestions/${revision}/${sourceIndex}/dismiss`)
+    return data
+  },
+
   async updateMeetingAction(id, actionId, payload) {
     const { data } = await api.patch(`/meetings/${id}/actions/${actionId}`, payload)
     return data
@@ -143,8 +153,8 @@ export const audioService = {
     return data
   },
 
-  async getMeetingIntelligenceResult(id) {
-    const { data } = await api.get(`/meetings/${id}/intelligence/result`)
+  async getMeetingIntelligenceResult(id, revision) {
+    const { data } = await api.get(`/meetings/${id}/intelligence/result`, { params: revision ? { revision } : {} })
     return data
   },
 

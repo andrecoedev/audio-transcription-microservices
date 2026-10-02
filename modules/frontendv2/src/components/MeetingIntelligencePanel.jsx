@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Card, { CardContent, CardHeader, CardTitle } from './Card'
 import Button from './Button'
 import { audioService } from '../services/audioService'
@@ -12,12 +12,13 @@ function EvidenceLinks({ evidence, references }) {
   })}</div>
 }
 
-export default function MeetingIntelligencePanel({ meetingId }) {
+export default function MeetingIntelligencePanel({ meetingId, onResultChange }) {
   const [status, setStatus] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [refresh, setRefresh] = useState(0)
+  const notifiedRevision = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -29,6 +30,10 @@ export default function MeetingIntelligencePanel({ meetingId }) {
         if (cancelled) return
         setStatus(current)
         setResult(content)
+        if (content?.revision !== notifiedRevision.current) {
+          notifiedRevision.current = content?.revision ?? null
+          onResultChange?.(content?.revision ?? null)
+        }
         setError('')
         if (['pending', 'processing'].includes(current.generation?.status)) timer = setTimeout(poll, 3000)
       } catch {
@@ -37,7 +42,7 @@ export default function MeetingIntelligencePanel({ meetingId }) {
     }
     poll()
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [meetingId, refresh])
+  }, [meetingId, refresh, onResultChange])
 
   async function generate() {
     setSubmitting(true)
