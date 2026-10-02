@@ -157,8 +157,12 @@ def main() -> None:
             availability.raise_for_status()
             if not availability.json()["configured"]:
                 unavailable = session.post(base_url + f"/meetings/{job_id}/intelligence", timeout=20)
-                assert unavailable.status_code == 503
-                print("intelligence_unconfigured_http=503", flush=True)
+                # Transcript validation precedes provider availability. A silent
+                # synthetic sample may complete without any non-empty text.
+                has_text = any(segment.get("text", "").strip() for segment in result_data["segments"])
+                expected_status = 503 if has_text else 422
+                print(f"intelligence_unconfigured_http={unavailable.status_code}", flush=True)
+                assert unavailable.status_code == expected_status
             if args.intelligence:
                 analysis = session.post(base_url + f"/meetings/{job_id}/intelligence", timeout=20)
                 print(f"intelligence_request_http={analysis.status_code}", flush=True)
