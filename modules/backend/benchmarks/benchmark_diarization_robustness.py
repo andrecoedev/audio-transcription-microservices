@@ -11,10 +11,12 @@ import os
 import sys
 import time
 from datetime import datetime, timezone
+from importlib.metadata import version
 from pathlib import Path
 
 import librosa
 import numpy as np
+import torch
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
@@ -26,6 +28,7 @@ from pyannote.core import Annotation, Segment, Timeline
 from pyannote.metrics.diarization import DiarizationErrorRate
 from src.config import settings
 from src.services.diarization_engine import DiarizationEngine
+from src.services.diarization_compat import speaker_turns
 
 
 FILTERS = (
@@ -101,6 +104,7 @@ def _segment_dbfs(audio: np.ndarray, rate: int, start: float, end: float) -> flo
 
 
 def _raw_rows(diarization, audio: np.ndarray, rate: int, duration: float) -> list[dict]:
+    diarization = getattr(diarization, "speaker_diarization", diarization)
     rows = []
     for turn, _, speaker in diarization.itertracks(yield_label=True):
         start = max(0.0, float(turn.start))
@@ -283,12 +287,25 @@ def run(args) -> dict:
                 ("automatic", {}),
                 ("known_num_speakers", {"num_speakers": expected}),
             ):
+                if torch.cuda.is_available():
+                    torch.cuda.reset_peak_memory_stats()
                 with ResourceSampler(interval=0.05) as resources:
                     started = time.perf_counter()
                     diarization = diarization_engine.pipeline(
                         str(audio_path), **pipeline_options
                     )
                     diarization_seconds = time.perf_counter() - started
+                    annotation = getattr(diarization, "speaker_diarization", diarization)
+                    native_turns = sorted(
+                        (float(turn.start), float(turn.end), str(speaker))
+                        for turn, _, speaker in annotation.itertracks(yield_label=True)
+                    )
+                    adapted_turns = sorted(
+                        (float(turn.start), float(turn.end), str(speaker))
+                        for turn, speaker in speaker_turns(diarization)
+                    )
+                    if adapted_turns != native_turns:
+                        raise RuntimeError("Pyannote output adapter changed diarization tracks")
                     raw = _raw_rows(diarization, audio, rate, duration)
                     experiments = _evaluate_filters(reference, raw, duration)
                     current = next(
@@ -320,7 +337,18 @@ def run(args) -> dict:
                         "vram_start_mb": resources.vram_start,
                         "vram_peak_mb": resources.vram_peak,
                         "vram_measurement": resources.vram_measurement,
+                        "torch_cuda_peak_allocated_mb": (
+                            round(torch.cuda.max_memory_allocated() / 1024**2, 2)
+                            if torch.cuda.is_available() else None
+                        ),
+                        "torch_cuda_peak_reserved_mb": (
+                            round(torch.cuda.max_memory_reserved() / 1024**2, 2)
+                            if torch.cuda.is_available() else None
+                        ),
                         "raw_segments": len(raw),
+                        "native_segments": len(native_turns),
+                        "adapter_segments": len(adapted_turns),
+                        "adapter_preserved_all_tracks": True,
                         "raw_speakers": sorted({row["speaker"] for row in raw}),
                         "raw_overlap_seconds": round(
                             _union_duration(raw, only_overlap=True), 3
@@ -374,7 +402,11 @@ def run(args) -> dict:
             },
         },
         "engines": {
-            "pyannote_model": "pyannote/speaker-diarization-3.1",
+            "pyannote_model": (
+                "pyannote/speaker-diarization-community-1"
+                if int(version("pyannote.audio").split(".", 1)[0]) >= 4
+                else "pyannote/speaker-diarization-3.1"
+            ),
             "pyannote_device": diarization_engine.get_device(),
             "pyannote_load_seconds": round(diarization_load_seconds, 6),
             "pyannote_pipeline_instances": 1,

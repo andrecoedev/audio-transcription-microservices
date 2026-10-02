@@ -4,6 +4,7 @@ Engine de diarização usando Pyannote - carregado uma vez e reutilizado.
 
 import logging
 import os
+from importlib.metadata import version
 import numpy as np
 import librosa
 from huggingface_hub import hf_hub_download
@@ -18,6 +19,7 @@ from pyannote.audio.pipelines.utils.hook import ProgressHook
 from huggingface_hub.utils import GatedRepoError, HfHubHTTPError
 from pydub import AudioSegment
 from ..config import settings
+from .diarization_compat import pipeline_config, speaker_turns
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,8 @@ class DiarizationEngine:
         """Carrega o pipeline de diarização com configuração otimizada de GPU."""
         try:
             logger.info("Carregando pipeline de diarização Pyannote...")
+            pyannote_version = version("pyannote.audio")
+            model_repo, auth_kwargs = pipeline_config(pyannote_version, self.hf_token)
             
             # Verificar disponibilidade de CUDA e configuração
             cuda_available = torch.cuda.is_available() and not settings.FORCE_CPU
@@ -49,33 +53,18 @@ class DiarizationEngine:
             
             try:
                 # Validar acesso aos repositórios gated necessários antes de carregar o pipeline.
-                hf_hub_download(
-                    repo_id="pyannote/speaker-diarization-3.1",
-                    filename="config.yaml",
-                    token=self.hf_token
-                )
-                hf_hub_download(
-                    repo_id="pyannote/segmentation-3.0",
-                    filename="config.yaml",
-                    token=self.hf_token
-                )
-
-                self.pipeline = Pipeline.from_pretrained(
-                    "pyannote/speaker-diarization-3.1",
-                    use_auth_token=self.hf_token
-                )
+                hf_hub_download(repo_id=model_repo, filename="config.yaml", token=self.hf_token)
+                if int(pyannote_version.split(".", 1)[0]) < 4:
+                    hf_hub_download(
+                        repo_id="pyannote/segmentation-3.0",
+                        filename="config.yaml",
+                        token=self.hf_token,
+                    )
+                self.pipeline = Pipeline.from_pretrained(model_repo, **auth_kwargs)
             except GatedRepoError as e:
-                error_text = str(e)
-                if "pyannote/segmentation-3.0" in error_text:
-                    raise ValueError(
-                        "Acesso negado ao modelo gated 'pyannote/segmentation-3.0'. "
-                        "Acesse https://huggingface.co/pyannote/segmentation-3.0, "
-                        "clique em Request access/Accept terms e aguarde aprovação."
-                    ) from e
                 raise ValueError(
-                    "Acesso negado ao modelo gated 'pyannote/speaker-diarization-3.1'. "
-                    "Entre em https://huggingface.co/pyannote/speaker-diarization-3.1, "
-                    "solicite/aceite acesso e aguarde aprovação da conta."
+                    f"Acesso negado ao pipeline Pyannote '{model_repo}' ou dependência gated. "
+                    "Verifique os termos aceitos pela conta do HF_TOKEN."
                 ) from e
             except HfHubHTTPError as e:
                 raise ValueError(
@@ -86,22 +75,17 @@ class DiarizationEngine:
                 if "NoneType" in str(e) and "eval" in str(e):
                     raise ValueError(
                         "Falha ao inicializar Pyannote por falta de acesso a modelos dependentes. "
-                        "Confirme acesso em https://huggingface.co/pyannote/speaker-diarization-3.1 "
-                        "e https://huggingface.co/pyannote/segmentation-3.0"
+                        f"Confirme acesso a https://huggingface.co/{model_repo}"
                     ) from e
                 raise
 
             if self.pipeline is None:
                 try:
-                    hf_hub_download(
-                        repo_id="pyannote/speaker-diarization-3.1",
-                        filename="config.yaml",
-                        token=self.hf_token
-                    )
+                    hf_hub_download(repo_id=model_repo, filename="config.yaml", token=self.hf_token)
                 except GatedRepoError as e:
                     raise ValueError(
-                        "Acesso negado ao modelo gated 'pyannote/speaker-diarization-3.1'. "
-                        "Acesse https://huggingface.co/pyannote/speaker-diarization-3.1, "
+                        f"Acesso negado ao modelo gated '{model_repo}'. "
+                        f"Acesse https://huggingface.co/{model_repo}, "
                         "clique em Request access/Accept terms e aguarde aprovação."
                     ) from e
                 except HfHubHTTPError as e:
@@ -112,7 +96,7 @@ class DiarizationEngine:
 
                 raise ValueError(
                     "Falha ao carregar pipeline de diarização. "
-                    "Confirme HF_TOKEN e termos em https://hf.co/pyannote/speaker-diarization-3.1"
+                    f"Confirme HF_TOKEN e termos em https://huggingface.co/{model_repo}"
                 )
             
             # Configurar device otimizado
@@ -158,7 +142,7 @@ class DiarizationEngine:
             audio.export(output_path, format="wav")
             if not os.path.exists(output_path):
                 raise ValueError(f"Falha ao criar arquivo WAV: {output_path}")
-            logger.info(f"Arquivo convertido para WAV: {output_path}")
+            logger.info("Audio converted to normalized WAV")
             return output_path
         except Exception as e:
             raise ValueError(f"Erro ao converter para WAV: {str(e)}")
@@ -222,14 +206,14 @@ class DiarizationEngine:
         post_filter_enabled = min_duration > 0.0 or silence_threshold > -100.0
         
         try:
-            logger.info(f"Iniciando diarização de: {audio_path}")
+            logger.info("Starting local diarization")
             with ProgressHook() as hook:
-                diarization = self.pipeline(audio_path, hook=hook)
+                output = self.pipeline(audio_path, hook=hook)
             
             segments = []
             speakers = set()
             
-            for turn, _, speaker in diarization.itertracks(yield_label=True):
+            for turn, speaker in speaker_turns(output):
                 if not post_filter_enabled or self.is_valid_segment(
                     audio_path, turn.start, turn.end, min_duration, silence_threshold
                 ):
