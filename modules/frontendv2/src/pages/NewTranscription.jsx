@@ -34,6 +34,7 @@ export default function NewTranscription() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected: () => toast.error('Arquivo rejeitado. Selecione um único arquivo em um dos formatos suportados.'),
     accept: {
       'audio/*': ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.opus'],
       'video/*': ['.mp4']
@@ -55,7 +56,8 @@ export default function NewTranscription() {
       const result = await audioService.createTranscriptionJob(file, {
         ...options,
         onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          const percentCompleted = progressEvent.total
+            ? Math.min(100, Math.round((progressEvent.loaded * 100) / progressEvent.total)) : 0
           setProgress(percentCompleted)
         }
       })
@@ -63,7 +65,6 @@ export default function NewTranscription() {
       toast.success('Arquivo enviado. Job de transcrição enfileirado!')
       navigate(`/transcriptions/${result.id}`)
     } catch (error) {
-      console.error('Erro ao transcrever:', error)
       toast.error(error.message || 'Erro ao processar arquivo')
     } finally {
       setUploading(false)
@@ -126,6 +127,7 @@ export default function NewTranscription() {
                   variant="ghost"
                   size="sm"
                   onClick={removeFile}
+                  aria-label="Remover arquivo selecionado"
                   disabled={uploading}
                 >
                   <X className="w-4 h-4" />
@@ -177,8 +179,8 @@ export default function NewTranscription() {
                     options.transcriptionModel === 'whisper' ? 'text-primary-600' : 'text-gray-400'
                   }`} />
                   <div className="text-left">
-                    <p className="font-medium text-gray-900">Whisper</p>
-                    <p className="text-xs text-gray-500">Local, mais rápido</p>
+                    <p className="font-medium text-gray-900">Faster-Whisper</p>
+                    <p className="text-xs text-gray-500">Processamento local</p>
                   </div>
                 </div>
               </button>
@@ -198,7 +200,7 @@ export default function NewTranscription() {
                   }`} />
                   <div className="text-left">
                     <p className="font-medium text-gray-900">AssemblyAI</p>
-                    <p className="text-xs text-gray-500">Cloud, maior precisão</p>
+                    <p className="text-xs text-gray-500">Cloud, requer configuração do servidor</p>
                   </div>
                 </div>
               </button>
@@ -217,6 +219,7 @@ export default function NewTranscription() {
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
+                aria-label="Segmentação de Falantes"
                 checked={options.useDiarization}
                 onChange={(e) => setOptions({ ...options, useDiarization: e.target.checked })}
                 disabled={uploading}

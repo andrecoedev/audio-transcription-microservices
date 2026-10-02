@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Cpu, RefreshCw, Save } from 'lucide-react'
+import { RefreshCw, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import Button from '../components/Button'
@@ -9,11 +9,8 @@ import { useAuthStore } from '../stores/authStore'
 
 export default function Settings() {
   const { user, updateProfile } = useAuthStore()
-  const isAdmin = user?.roles?.includes('admin') ?? false
   const [health, setHealth] = useState(null)
-  const [credentialStatus, setCredentialStatus] = useState(null)
-  const [gpuDiag, setGpuDiag] = useState(null)
-  const [loadingGpu, setLoadingGpu] = useState(false)
+  const [statusError, setStatusError] = useState(false)
   const [profile, setProfile] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -21,30 +18,19 @@ export default function Settings() {
 
   const refreshStatus = useCallback(async () => {
     try {
+      setStatusError(false)
       const healthData = await audioService.checkHealth()
       setHealth(healthData)
-      if (isAdmin) {
-        setCredentialStatus(await audioService.getApiKeysStatus())
-      }
     } catch (error) {
+      setHealth(null)
+      setStatusError(true)
       toast.error(error.message || 'Erro ao verificar o sistema')
     }
-  }, [isAdmin])
+  }, [])
 
   useEffect(() => {
     refreshStatus()
   }, [refreshStatus])
-
-  const checkGpuDiagnostics = async () => {
-    try {
-      setLoadingGpu(true)
-      setGpuDiag(await audioService.getSystemGpu())
-    } catch (error) {
-      toast.error(error.message || 'Erro ao verificar o worker')
-    } finally {
-      setLoadingGpu(false)
-    }
-  }
 
   const saveProfileLocally = () => {
     updateProfile(profile)
@@ -96,11 +82,18 @@ export default function Settings() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <StatusRow label="Banco" value={health?.database || 'indisponível'} />
-          <StatusRow label="Whisper local" value={health?.models?.whisper?.configured ? 'configurado' : 'não configurado'} />
-          <StatusRow label="Pyannote local" value={health?.models?.diarization?.configured ? 'configurado' : 'não configurado'} />
-          <StatusRow label="AssemblyAI externo" value={credentialStatus?.aai_api_key?.configured ? 'configurado' : 'não configurado'} />
-          <StatusRow label="Gemini externo" value={credentialStatus?.gemini_api_key?.configured ? 'configurado' : 'não configurado'} />
+          {statusError && <p role="alert">Não foi possível consultar o sistema. Use Atualizar para tentar novamente.</p>}
+          <StatusRow label="Banco" value={health?.database || 'não verificado'} />
+          <StatusRow label="Redis" value={health?.processing?.redis || 'não verificado'} />
+          <StatusRow label="Worker RQ" value={health?.processing
+            ? health.processing.worker_available ? 'disponível' : 'indisponível' : 'não verificado'} />
+          {[
+            ['Faster-Whisper local', 'whisper'], ['Pyannote local', 'diarization'],
+            ['AssemblyAI externo', 'assemblyai'], ['Gemini externo', 'gemini'],
+          ].map(([label, provider]) => <StatusRow key={provider} label={label} value={
+            health?.models?.[provider] ? health.models[provider].configured ? 'configurado' : 'não configurado' : 'não verificado'
+          } />)}
+          <p className="text-xs text-gray-500">Configuração não comprova carregamento dos modelos ou disponibilidade das APIs externas.</p>
         </CardContent>
       </Card>
 
@@ -117,24 +110,11 @@ export default function Settings() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Diagnóstico de processamento</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={checkGpuDiagnostics}
-              loading={loadingGpu}
-              icon={Cpu}
-            >
-              Verificar worker
-            </Button>
-          </div>
+          <CardTitle>Diagnóstico de processamento</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-600">
-            {gpuDiag?.deprecated
-              ? 'CUDA e modelos pertencem ao RQ worker; consulte os logs do worker.'
-              : 'O diagnóstico detalhado fica disponível no processo de worker.'}
+            CUDA e modelos pertencem ao RQ worker; o diagnóstico detalhado é operacional, nos logs do worker.
           </p>
         </CardContent>
       </Card>

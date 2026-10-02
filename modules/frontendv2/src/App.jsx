@@ -53,7 +53,7 @@ function App() {
   }, [setSession, logout])
 
   if (!bootstrapped) {
-    return null
+    return <p role="status" className="p-6 text-gray-600">Verificando sessão...</p>
   }
 
   const requiresLogin = !isAuthenticated

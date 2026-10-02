@@ -6,7 +6,6 @@ import {
   Settings,
   Activity,
   Users,
-  TrendingUp,
   Sparkles
 } from 'lucide-react'
 
@@ -15,14 +14,12 @@ const navigation = [
   { name: 'Nova Transcrição', href: '/new-transcription', icon: PlusCircle },
   { name: 'Transcrições', href: '/transcriptions', icon: FileAudio },
   { name: 'Reuniões', href: '/meetings', icon: Users },
-  { name: 'Atas de Reunião', href: '/meeting-minutes', icon: Sparkles },
+  { name: 'Atas legadas (IA)', href: '/meeting-minutes', icon: Sparkles },
   { name: 'Configurações', href: '/settings', icon: Settings },
 ]
 
 const secondaryNav = [
-  { name: 'Status do Sistema', icon: Activity },
-  { name: 'Modelos Ativos', icon: TrendingUp },
-  { name: 'Falantes', icon: Users },
+  { name: 'Status do Sistema', href: '/settings', icon: Activity },
 ]
 
 export default function Sidebar() {
@@ -62,13 +59,14 @@ export default function Sidebar() {
             Informações
           </p>
           {secondaryNav.map((item) => (
-            <button
+            <NavLink
               key={item.name}
+              to={item.href}
               className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <item.icon className="w-5 h-5" />
               {item.name}
-            </button>
+            </NavLink>
           ))}
         </nav>
 

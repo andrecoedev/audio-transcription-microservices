@@ -21,6 +21,7 @@ export default function TranscriptionDetail() {
   const [transcription, setTranscription] = useState(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const canExportTranscript = transcription?.status === 'completed' && Boolean(transcription?.segments?.length)
 
   const loadTranscription = useCallback(async ({ silent = false } = {}) => {
     try {
@@ -168,15 +169,18 @@ export default function TranscriptionDetail() {
                 Ver reunião estruturada
               </Link>
             )}
+            {transcription.status === 'failed' && <p role="alert" className="text-red-700 mt-2">
+              O processamento falhou. Envie uma nova transcrição para tentar novamente.
+            </p>}
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={copyToClipboard}>
+          <Button variant="outline" size="sm" onClick={copyToClipboard} disabled={!canExportTranscript}>
             {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             {copied ? 'Copiado!' : 'Copiar'}
           </Button>
-          <Button variant="outline" size="sm" onClick={downloadAsText}>
+          <Button variant="outline" size="sm" onClick={downloadAsText} disabled={!canExportTranscript}>
             <Download className="w-4 h-4" />
             TXT
           </Button>
@@ -184,7 +188,7 @@ export default function TranscriptionDetail() {
             <Download className="w-4 h-4" />
             JSON
           </Button>
-          <Button variant="outline" size="sm" onClick={downloadAsSRT}>
+          <Button variant="outline" size="sm" onClick={downloadAsSRT} disabled={!canExportTranscript}>
             <Download className="w-4 h-4" />
             SRT
           </Button>
@@ -211,7 +215,7 @@ export default function TranscriptionDetail() {
         <StatCard
           icon={FileAudio}
           label="Modelo"
-          value={transcription.transcription_model === 'whisper' ? 'Whisper' : 'AssemblyAI'}
+          value={transcription.transcription_model === 'whisper' ? 'Faster-Whisper' : transcription.transcription_model === 'assemblyai' ? 'AssemblyAI' : 'Não informado'}
         />
       </div>
 
