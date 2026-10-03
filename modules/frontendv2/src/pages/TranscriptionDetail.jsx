@@ -13,7 +13,9 @@ import {
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import Button from '../components/Button'
 import ProcessingStatus from '../components/ProcessingStatus'
+import PageHeader from '../components/PageHeader'
 import { audioService } from '../services/audioService'
+import { formatDuration } from '../utils/format'
 import toast from 'react-hot-toast'
 
 export default function TranscriptionDetail() {
@@ -169,6 +171,16 @@ export default function TranscriptionDetail() {
     )
   }
 
+  if (['queued', 'processing'].includes(transcription.status)) {
+    return <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader title="Transcrevendo áudio" description={`${transcription.filename} · ${formatDuration(transcription.duration_seconds)}`} />
+      <ProcessingStatus status={transcription.status} />
+      <Link to="/transcriptions" className="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-900">
+        <ArrowLeft className="mr-2 h-4 w-4" />Voltar ao histórico
+      </Link>
+    </div>
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -250,7 +262,7 @@ export default function TranscriptionDetail() {
       {/* Transcrição */}
       <Card>
         <CardHeader>
-          <CardTitle>📝 Transcrição Completa</CardTitle>
+          <CardTitle>Transcrição completa</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">

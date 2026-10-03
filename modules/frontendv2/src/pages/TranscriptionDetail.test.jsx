@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import TranscriptionDetail from './TranscriptionDetail'
 import { audioService } from '../services/audioService'
@@ -8,6 +8,7 @@ vi.mock('../services/audioService', () => ({ audioService: { getTranscription: v
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() } }))
 
 beforeEach(() => vi.resetAllMocks())
+afterEach(cleanup)
 
 describe('TranscriptionDetail loading', () => {
   it('keeps the page available and retries after a request failure', async () => {
@@ -26,5 +27,23 @@ describe('TranscriptionDetail loading', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
     expect(await screen.findByRole('heading', { name: 'call.wav' })).toBeTruthy()
     await waitFor(() => expect(audioService.getTranscription).toHaveBeenCalledTimes(2))
+  })
+
+  it.each(['queued', 'processing'])('renders a focused real-status view for %s jobs', async (status) => {
+    audioService.getTranscription.mockResolvedValue({
+      id: 9, filename: 'review.m4a', status, created_at: '2026-10-03T10:00:00Z',
+      duration_seconds: 52 * 60, word_count: null, num_speakers: null, segments: [],
+    })
+    render(<MemoryRouter initialEntries={['/transcriptions/9']}><Routes>
+      <Route path="/transcriptions/:id" element={<TranscriptionDetail />} />
+    </Routes></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'Transcrevendo áudio' })).toBeTruthy()
+    expect(screen.getByText('review.m4a · 52min 0s')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Voltar ao histórico/ })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Status do processamento' })).toBeTruthy()
+    expect(screen.queryByText('Palavras')).toBeNull()
+    expect(screen.queryByText('Falantes')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'TXT' })).toBeNull()
+    expect(screen.queryByText('Transcrição completa')).toBeNull()
   })
 })

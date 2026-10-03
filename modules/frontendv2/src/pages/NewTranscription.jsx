@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import { Upload, FileAudio, X, Zap, Users } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import ProcessingStatus from '../components/ProcessingStatus'
 import Button from '../components/Button'
+import PageHeader from '../components/PageHeader'
 import { audioService } from '../services/audioService'
 import { MAX_FILE_SIZE } from '../utils/constants'
 import toast from 'react-hot-toast'
@@ -135,23 +136,19 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Nova Transcrição</h1>
-        <p className="text-gray-600 mt-1">Faça upload de um arquivo de áudio ou vídeo para transcrever</p>
+      <PageHeader title="Nova Transcrição" description="Envie um arquivo de áudio e obtenha uma transcrição para revisar e compartilhar.">
+        {user && <Link to="/transcriptions" className="rounded-lg border bg-white px-4 py-2 text-sm hover:bg-gray-50">Histórico</Link>}
+      </PageHeader>
         {guestPolicy && !processingAllowed && <p role="status" className="text-sm text-gray-600 mt-2">{guestPolicy.unavailable_reason}</p>}
-      </div>
 
       {limits && <div className="flex flex-wrap gap-2 text-sm text-gray-700" aria-label="Limites desta conta">
         <span className="rounded-full bg-primary-50 px-3 py-1.5">Máximo {limits.max_upload_mb} MB por arquivo</span>
         {limits.max_audio_seconds && <span className="rounded-full bg-primary-50 px-3 py-1.5">Até {Math.floor(limits.max_audio_seconds / 60)} minutos de áudio</span>}
-        {guestPolicy && <span className="rounded-full bg-primary-50 px-3 py-1.5">1 transcrição temporária por sessão</span>}
+        {guestPolicy && <span className="rounded-full bg-primary-50 px-3 py-1.5">{guestPolicy.jobs_per_session} transcrição temporária por sessão</span>}
       </div>}
 
       {/* Upload Area */}
       <Card>
-        <CardHeader>
-          <CardTitle>Envie seu áudio</CardTitle>
-        </CardHeader>
         <CardContent>
           {!policyReady ? (
             <div role="status">
@@ -160,20 +157,22 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
           ) : !file ? (
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${
+              className={`flex flex-wrap items-center justify-between gap-6 rounded-xl px-2 py-5 cursor-pointer transition-colors ${
                 isDragActive
                   ? 'border-primary-600 bg-primary-50'
                   : 'border-gray-300 bg-gray-50 hover:border-primary-500 hover:bg-primary-50/40'
               }`}
             >
               <input {...getInputProps()} />
-              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-lg font-medium text-gray-900 mb-2">
+              <div className="min-w-0 flex-1">
+              <p className="text-xl font-semibold text-gray-900 mb-2">
                 {isDragActive ? 'Solte o arquivo aqui' : 'Arraste um arquivo ou clique para selecionar'}
               </p>
               <p className="text-sm text-gray-500">
                 Formatos suportados: MP3, WAV, MP4, M4A, FLAC, OGG, OPUS (máx. {(maxFileSize / (1024 * 1024)).toFixed(0)}MB)
               </p>
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-medium text-white"><Upload className="h-4 w-4" aria-hidden="true" />Escolher arquivo</span>
             </div>
           ) : (
             <div className="border border-gray-200 rounded-lg p-6">
@@ -182,8 +181,8 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                   <div className="p-3 bg-primary-100 rounded-lg">
                     <FileAudio className="w-6 h-6 text-primary-600" />
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{file.name}</p>
+                  <div className="min-w-0">
+                    <p className="break-all font-medium text-gray-900">{file.name}</p>
                     <p className="text-sm text-gray-500">
                       {(file.size / (1024 * 1024)).toFixed(2)} MB
                     </p>
@@ -207,13 +206,13 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
       </Card>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <Card className="bg-gray-50 p-4"><p className="text-xs font-medium text-gray-500">Formatos aceitos</p><p className="mt-1 text-sm text-gray-800">MP3, WAV, M4A, FLAC, OGG, OPUS e MP4.</p></Card>
-        <Card className="bg-gray-50 p-4"><p className="text-xs font-medium text-gray-500">Limites de envio</p><p className="mt-1 text-sm text-gray-800">Máximo de {(maxFileSize / (1024 * 1024)).toFixed(0)} MB{limits?.max_audio_seconds ? ` e ${Math.floor(limits.max_audio_seconds / 60)} min por áudio` : ''}.</p></Card>
-        <Card className="bg-gray-50 p-4"><p className="text-xs font-medium text-gray-500">Exportação</p><p className="mt-1 text-sm text-gray-800">Transcrição disponível em TXT, SRT, VTT e JSON.</p></Card>
+        <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Formatos aceitos</p><p className="mt-1 text-sm text-gray-800">MP3, WAV, M4A, FLAC, OGG, OPUS e MP4.</p></Card>
+        <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Limites de envio</p><p className="mt-1 text-sm text-gray-800">Máximo de {(maxFileSize / (1024 * 1024)).toFixed(0)} MB{limits?.max_audio_seconds ? ` e ${Math.floor(limits.max_audio_seconds / 60)} min por áudio` : ''}.</p></Card>
+        <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Exportação</p><p className="mt-1 text-sm text-gray-800">Transcrição disponível em TXT, SRT, VTT e JSON após a conclusão.</p></Card>
       </div>
 
       {/* Opções */}
-      <Card className="p-4">
+      <Card className="!p-4">
         <CardHeader>
           <CardTitle>Preferências da transcrição</CardTitle>
         </CardHeader>
@@ -226,7 +225,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Modelo de Transcrição
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               {user && <button
                 onClick={() => setOptions({ ...options, transcriptionModel: 'automatic' })}
                 aria-label="Automático"
@@ -283,7 +282,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
           </div>}
 
           {/* Diarização */}
-          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+          <div className="flex items-center justify-between gap-3 p-3 border border-gray-200 rounded-lg">
             <div className="flex items-center gap-3">
               <Users className="w-5 h-5 text-gray-600" />
               <div>

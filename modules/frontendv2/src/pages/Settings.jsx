@@ -261,8 +261,9 @@ function ProviderCard({ title, provider, configuredProvider, credential, setting
   const usesWhisper = provider === 'assemblyai'
     && settings.providers.whisper.allowed
     && ['automatic', 'whisper'].includes(settings.preferences.transcription_provider)
-  const current = source === 'user' ? 'AssemblyAI · Sua própria conta'
-    : source === 'platform' ? 'AssemblyAI · Fornecido pela USAGI'
+  const providerName = provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'
+  const current = source === 'user' ? `${providerName} · Sua própria conta`
+    : source === 'platform' ? `${providerName} · Fornecido pela USAGI`
       : provider === 'assemblyai' && usesWhisper ? 'Faster-Whisper' : 'Não conectado'
   const allowed = configuredProvider.allowed
   const statusLabel = allowed ? 'Disponível nesta conta'

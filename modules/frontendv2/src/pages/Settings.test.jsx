@@ -90,6 +90,8 @@ describe('Settings', () => {
     await waitFor(() => expect(input.value).toBe(''))
     expect(screen.queryByText('synthetic-secret')).toBeNull()
     expect(screen.getByText('Credencial própria salva')).toBeTruthy()
+    expect(screen.getByText('Gemini · Sua própria conta')).toBeTruthy()
+    expect(screen.queryByText('AssemblyAI · Sua própria conta')).toBeNull()
   })
 
   it('does not claim any transcription provider is active when the account has none', async () => {
