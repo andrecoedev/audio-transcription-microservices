@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import { Upload, FileAudio, X, Zap, Users } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
+import ProcessingStatus from '../components/ProcessingStatus'
 import Button from '../components/Button'
 import { audioService } from '../services/audioService'
 import { MAX_FILE_SIZE } from '../utils/constants'
@@ -132,7 +133,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Nova Transcrição</h1>
@@ -140,10 +141,16 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
         {guestPolicy && !processingAllowed && <p role="status" className="text-sm text-gray-600 mt-2">{guestPolicy.unavailable_reason}</p>}
       </div>
 
+      {limits && <div className="flex flex-wrap gap-2 text-sm text-gray-700" aria-label="Limites desta conta">
+        <span className="rounded-full bg-primary-50 px-3 py-1.5">Máximo {limits.max_upload_mb} MB por arquivo</span>
+        {limits.max_audio_seconds && <span className="rounded-full bg-primary-50 px-3 py-1.5">Até {Math.floor(limits.max_audio_seconds / 60)} minutos de áudio</span>}
+        {guestPolicy && <span className="rounded-full bg-primary-50 px-3 py-1.5">1 transcrição temporária por sessão</span>}
+      </div>}
+
       {/* Upload Area */}
       <Card>
         <CardHeader>
-          <CardTitle>📁 Upload de Arquivo</CardTitle>
+          <CardTitle>Envie seu áudio</CardTitle>
         </CardHeader>
         <CardContent>
           {!policyReady ? (
@@ -153,10 +160,10 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
           ) : !file ? (
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
+              className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${
                 isDragActive
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-gray-300 hover:border-primary-400'
+                  ? 'border-primary-600 bg-primary-50'
+                  : 'border-gray-300 bg-gray-50 hover:border-primary-500 hover:bg-primary-50/40'
               }`}
             >
               <input {...getInputProps()} />
@@ -193,29 +200,22 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                 </Button>
               </div>
 
-              {uploading && (
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-600">Processando...</span>
-                    <span className="font-medium text-primary-600">{progress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+              {uploading && <ProcessingStatus status="uploading" uploadProgress={progress} />}
             </div>
           )}
         </CardContent>
       </Card>
 
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card className="bg-gray-50 p-4"><p className="text-xs font-medium text-gray-500">Formatos aceitos</p><p className="mt-1 text-sm text-gray-800">MP3, WAV, M4A, FLAC, OGG, OPUS e MP4.</p></Card>
+        <Card className="bg-gray-50 p-4"><p className="text-xs font-medium text-gray-500">Limites de envio</p><p className="mt-1 text-sm text-gray-800">Máximo de {(maxFileSize / (1024 * 1024)).toFixed(0)} MB{limits?.max_audio_seconds ? ` e ${Math.floor(limits.max_audio_seconds / 60)} min por áudio` : ''}.</p></Card>
+        <Card className="bg-gray-50 p-4"><p className="text-xs font-medium text-gray-500">Exportação</p><p className="mt-1 text-sm text-gray-800">Transcrição disponível em TXT, SRT, VTT e JSON.</p></Card>
+      </div>
+
       {/* Opções */}
-      <Card>
+      <Card className="p-4">
         <CardHeader>
-          <CardTitle>⚙️ Configurações</CardTitle>
+          <CardTitle>Preferências da transcrição</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Modelo de Transcrição */}

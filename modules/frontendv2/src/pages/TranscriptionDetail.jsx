@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import Button from '../components/Button'
+import ProcessingStatus from '../components/ProcessingStatus'
 import { audioService } from '../services/audioService'
 import toast from 'react-hot-toast'
 
@@ -20,6 +21,7 @@ export default function TranscriptionDetail() {
   const navigate = useNavigate()
   const [transcription, setTranscription] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [copied, setCopied] = useState(false)
   const canExportTranscript = transcription?.status === 'completed' && Boolean(transcription?.segments?.length)
 
@@ -28,16 +30,16 @@ export default function TranscriptionDetail() {
       if (!silent) setLoading(true)
       const data = await audioService.getTranscription(id)
       setTranscription(data)
-    } catch (error) {
+      setLoadError(false)
+    } catch {
+      if (!silent) setLoadError(true)
       if (!silent) {
         toast.error('Erro ao carregar transcrição')
-        navigate('/transcriptions')
       }
-      console.error(error)
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [id, navigate])
+  }, [id])
 
   useEffect(() => {
     loadTranscription()
@@ -74,7 +76,6 @@ export default function TranscriptionDetail() {
     const text = transcription.segments
       .map(seg => `[${seg.speaker}] (${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s)\n${seg.text}`)
       .join('\n\n')
-    
     const blob = new Blob([text], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -94,29 +95,55 @@ export default function TranscriptionDetail() {
     URL.revokeObjectURL(url)
   }
 
-  const downloadAsSRT = () => {
-    let srt = ''
-    transcription.segments.forEach((seg, i) => {
-      const start = formatSRTTime(seg.start)
-      const end = formatSRTTime(seg.end)
-      srt += `${i + 1}\n${start} --> ${end}\n${seg.text}\n\n`
+  const downloadAsVTT = () => {
+    let vtt = 'WEBVTT\n\n'
+    transcription.segments.forEach((seg) => {
+      const start = formatVTTTime(seg.start)
+      const end = formatVTTTime(seg.end)
+      vtt += `${start} --> ${end}\n${seg.text}\n\n`
     })
     
-    const blob = new Blob([srt], { type: 'text/plain' })
+    const blob = new Blob([vtt], { type: 'text/vtt' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${transcription.filename}_legendas.srt`
+    a.download = `${transcription.filename}_legendas.vtt`
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  const formatSRTTime = (seconds) => {
+  const downloadAsSRT = () => {
+    let srt = ''
+    transcription.segments.forEach((seg, i) => {
+      srt += `${i + 1}\n${formatSubtitleTime(seg.start, ',')} --> ${formatSubtitleTime(seg.end, ',')}\n${seg.text}\n\n`
+    })
+    downloadTextFile(srt, `${transcription.filename}_legendas.srt`, 'text/plain')
+  }
+
+  const formatSubtitleTime = (seconds, decimalSeparator) => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const wholeSeconds = Math.floor(seconds % 60)
+    const milliseconds = Math.floor((seconds % 1) * 1000)
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(wholeSeconds).padStart(2, '0')}${decimalSeparator}${String(milliseconds).padStart(3, '0')}`
+  }
+
+  const downloadTextFile = (text, filename, type) => {
+    const blob = new Blob([text], { type })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const formatVTTTime = (seconds) => {
     const hours = Math.floor(seconds / 3600)
     const minutes = Math.floor((seconds % 3600) / 60)
     const secs = Math.floor(seconds % 60)
     const ms = Math.floor((seconds % 1) * 1000)
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(3, '0')}`
   }
 
   if (loading) {
@@ -132,8 +159,9 @@ export default function TranscriptionDetail() {
 
   if (!transcription) {
     return (
-      <div className="text-center py-12">
+      <div role={loadError ? 'alert' : undefined} className="text-center py-12">
         <p className="text-gray-600">Transcrição não encontrada</p>
+        {loadError && <Button variant="outline" className="mt-4" onClick={() => loadTranscription()}>Tentar novamente</Button>}
         <Link to="/transcriptions">
           <Button variant="primary" className="mt-4">Voltar para Transcrições</Button>
         </Link>
@@ -159,11 +187,7 @@ export default function TranscriptionDetail() {
             <p className="text-gray-600 mt-1">
               Criado em {new Date(transcription.created_at).toLocaleString('pt-BR')}
             </p>
-            {['queued', 'processing'].includes(transcription.status) && (
-              <p className="text-sm text-amber-700 mt-2">
-                Status: {transcription.status === 'queued' ? 'na fila' : 'processando'}
-              </p>
-            )}
+            {['queued', 'processing'].includes(transcription.status) && <div className="mt-4 max-w-md"><ProcessingStatus status={transcription.status} /></div>}
             {transcription.status === 'completed' && (
               <Link className="text-primary-700 hover:underline" to={`/meetings/${transcription.id}`}>
                 Ver reunião estruturada
@@ -187,6 +211,10 @@ export default function TranscriptionDetail() {
           <Button variant="outline" size="sm" onClick={downloadAsJSON}>
             <Download className="w-4 h-4" />
             JSON
+          </Button>
+          <Button variant="outline" size="sm" onClick={downloadAsVTT} disabled={!canExportTranscript}>
+            <Download className="w-4 h-4" />
+            VTT
           </Button>
           <Button variant="outline" size="sm" onClick={downloadAsSRT} disabled={!canExportTranscript}>
             <Download className="w-4 h-4" />

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import Button from '../components/Button'
 import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
+import ProcessingStatus from '../components/ProcessingStatus'
 import NewTranscription from './NewTranscription'
 import { guestService } from '../services/guestService'
 import { useAuthStore } from '../stores/authStore'
@@ -112,16 +113,15 @@ export default function Guest() {
 
   if (authenticated && !session?.resultId && !error) return null
 
-  return <div className="max-w-4xl mx-auto space-y-6">
+  return <div className="max-w-6xl mx-auto space-y-6">
       {error && <Card><CardContent><div role="alert">{error}<Button variant="outline" onClick={() => setRetry((n) => n + 1)}>Tentar novamente</Button></div></CardContent></Card>}
       {!authenticated && !policy && !error && <p role="status">Carregando limites...</p>}
       {session?.resultId ? <Card>
         <CardHeader><CardTitle>{authenticated ? 'Salve sua transcrição anterior' : 'Resultado da transcrição'}</CardTitle></CardHeader>
         <CardContent className="space-y-4">
         {!result ? <p role="status">Carregando resultado...</p> : <>
-          <p>Status: {result.status}</p>
-          {result.status === 'failed' && <p role="alert">{result.error_message || 'Processamento falhou'}</p>}
-          {result.segments?.map((segment, index) => <p key={index}>
+          <ProcessingStatus status={result.status} errorMessage={result.error_message} />
+          {result.status === 'completed' && result.segments?.map((segment, index) => <p key={index}>
             [{segment.start}s–{segment.end}s] {segment.text}
           </p>)}
           <div className="flex gap-3">
