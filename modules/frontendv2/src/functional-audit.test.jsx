@@ -52,16 +52,17 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('functional frontend contracts', () => {
-  it('has no inert information buttons and links system status to its existing page', () => {
+  it('offers working navigation and an account area without inert information buttons', () => {
     render(<MemoryRouter><Sidebar /></MemoryRouter>)
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
-    expect(screen.getByRole('link', { name: 'Status do Sistema' }).getAttribute('href')).toBe('/settings')
+    expect(screen.getByRole('button', { name: 'Área da conta' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Configurações' }).getAttribute('href')).toBe('/settings')
+    expect(screen.getByRole('link', { name: 'Tarefas' }).getAttribute('href')).toBe('/tasks')
     expect(screen.queryByText('Modelos Ativos')).toBeNull()
     expect(screen.queryByText('Falantes', { exact: true })).toBeNull()
   })
 
   it('shows provider configuration for non-admins without requesting secrets/status admin APIs', async () => {
-    render(<Settings />)
+    render(<MemoryRouter><Settings /></MemoryRouter>)
     await screen.findByText('disponível')
     const provider = screen.getByText('Gemini externo').parentElement
     expect(provider.textContent).toContain('configurado')
@@ -87,7 +88,7 @@ describe('functional frontend contracts', () => {
     audioService.getProviderSettings.mockResolvedValue(metadata)
     audioService.updateProviderPreferences.mockResolvedValue(metadata)
     audioService.saveProviderCredential.mockResolvedValue(metadata)
-    render(<Settings />)
+    render(<MemoryRouter><Settings /></MemoryRouter>)
     const transcription = await screen.findByLabelText('Provedor de transcrição')
     fireEvent.change(transcription, { target: { value: 'whisper' } })
     fireEvent.click(screen.getByRole('button', { name: 'Salvar preferências' }))
@@ -115,7 +116,7 @@ describe('functional frontend contracts', () => {
       credentials: { assemblyai: { configured: false, updated_at: null }, gemini: { configured: false, updated_at: null } },
     })
     audioService.saveProviderCredential.mockRejectedValue(new Error('provider returned sensitive detail'))
-    render(<Settings />)
+    render(<MemoryRouter><Settings /></MemoryRouter>)
     const secretInput = await screen.findByLabelText('Credencial AssemblyAI')
     fireEvent.change(secretInput, { target: { value: 'synthetic-key' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[0])
@@ -148,7 +149,7 @@ describe('functional frontend contracts', () => {
     })
     audioService.getProviderSettings.mockResolvedValue(metadata(true, true))
     audioService.deleteProviderCredential.mockResolvedValue(metadata(false, false))
-    render(<Settings />)
+    render(<MemoryRouter><Settings /></MemoryRouter>)
     const selector = await screen.findByLabelText(label)
     expect(selector.value).toBe(provider)
     fireEvent.click(screen.getByRole('button', { name: `Remover credencial ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}` }))
@@ -159,12 +160,12 @@ describe('functional frontend contracts', () => {
   })
 
   it('does not disguise dashboard failure as empty data and can retry', async () => {
-    audioService.getStats.mockRejectedValueOnce(new Error('offline'))
+    audioService.listTranscriptions.mockRejectedValueOnce(new Error('offline'))
     render(<MemoryRouter><Dashboard /></MemoryRouter>)
     expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.queryByText('Nenhuma transcrição ainda')).toBeNull()
+    expect(screen.queryByText('Nenhuma transcrição ainda.')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
-    expect(await screen.findByText('Nenhuma transcrição ainda')).toBeTruthy()
+    expect(await screen.findByText('Nenhuma transcrição ainda.')).toBeTruthy()
   })
 
   it('labels queued transcriptions honestly', async () => {

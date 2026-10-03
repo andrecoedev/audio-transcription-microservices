@@ -85,6 +85,7 @@ describe('public React flow', () => {
     </Routes></MemoryRouter>)
     fireEvent.click(await screen.findByRole('link', { name: 'Reunião' }))
     expect(await screen.findByText('Olá')).toBeTruthy()
+    fireEvent.click(screen.getByText('Falantes', { selector: 'summary' }))
     fireEvent.change(screen.getByLabelText('Nome de SPEAKER_00'), { target: { value: 'Maria' } })
     fireEvent.click(screen.getByRole('button', { name: 'Renomear' }))
     await waitFor(() => expect(audioService.renameMeetingSpeaker).toHaveBeenCalledWith('42', 'SPEAKER_00', 'Maria'))
@@ -129,7 +130,7 @@ describe('public React flow', () => {
     fireEvent.change(screen.getByLabelText('Usuário'), {
       target: { value: 'alice' },
     })
-    fireEvent.change(screen.getByPlaceholderText('********'), {
+    fireEvent.change(screen.getByLabelText('Senha'), {
       target: { value: 'correct-password' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
@@ -250,7 +251,7 @@ describe('public React flow', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Excluir meeting.wav' }))
     await waitFor(() => expect(audioService.deleteTranscription).toHaveBeenCalledWith(42))
     await waitFor(() => expect(audioService.listTranscriptions).toHaveBeenCalledTimes(2))
-    expect(toast.success).toHaveBeenCalled()
+    await waitFor(() => expect(toast.success).toHaveBeenCalled())
   })
 
   it('polls a queued result until completion', async () => {
@@ -273,7 +274,7 @@ describe('public React flow', () => {
         </Routes>
       </MemoryRouter>
     )
-    expect(await screen.findByText('Status: na fila')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Na fila' })).toBeTruthy()
     expect(await screen.findByText('Olá mundo', {}, { timeout: 5000 })).toBeTruthy()
     expect(audioService.getTranscription).toHaveBeenCalledTimes(2)
   }, 7000)

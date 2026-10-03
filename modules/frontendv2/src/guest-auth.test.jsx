@@ -55,7 +55,7 @@ describe('Guest and account boundaries', () => {
     render(<App />)
     fireEvent.change(await screen.findByLabelText('Usuário'), { target: { value: 'visitor' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'test password long' } })
-    if (signup) fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'visitor@example.test' } })
+    if (signup) fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'visitor@example.test' } })
     fireEvent.click(screen.getByRole('button', { name: signup ? 'Criar conta' : 'Entrar' }))
     expect(await screen.findByRole('heading', { name: 'Experiência autenticada' })).toBeTruthy()
     expect(window.location.pathname).toBe('/')
@@ -154,7 +154,7 @@ describe('Guest and account boundaries', () => {
       <Route path="/" element={<p>Experiência autenticada</p>} />
     </Routes></MemoryRouter>)
     fireEvent.change(screen.getByLabelText('Usuário'), { target: { value: 'visitor' } })
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'visitor@example.test' } })
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'visitor@example.test' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'test password long' } })
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
     expect(await screen.findByText('Experiência autenticada')).toBeTruthy()
