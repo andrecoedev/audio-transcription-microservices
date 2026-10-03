@@ -91,3 +91,37 @@ O browser integrado estava indisponível; não se afirma walkthrough manual nele
 
 Não houve homologação de produção, nova homologação Gemini/AssemblyAI, promoção de
 Pyannote 4 ou alteração da matriz ML. Aprovação visual humana no PR continua necessária.
+
+## Correções após revisão da interface
+
+Início agora é uma Home/dashboard: apresentação simples e CTA para Nova Transcrição;
+contas autenticadas também veem atividade recente. O upload existe somente em
+`/new-transcription`; a rota legada `/guest` redireciona para ela. Resultados Guest
+pendentes e sua conversão explícita continuam acessíveis na Home, sem transferir
+ownership automaticamente e sem consultar a política de upload na Home vazia.
+
+AssemblyAI exibe **Indisponível** quando o backend não permite seu uso: contas usam
+`available` e `allowed` de `/settings/providers`; Guest usa `can_create_job` de
+`/guest/policy`. Seleção/envio e seletor Guest são bloqueados coerentemente.
+Esses estados não atestam disponibilidade da rede ou validade externa da chave.
+
+O formulário de tarefas usa colunas responsivas, labels empilhados e inputs
+compartilhados de altura igual; texto/data nativos antes diferiam por 2 px.
+O detalhe da transcrição reutiliza `max-w-6xl`, com quebra de nome longo, toolbar
+flexível e grid 1/2/4 colunas. A inspeção também detectou e corrigiu overflow de
+nomes longos na atividade recente da Home autenticada.
+
+Validação desta rodada: **110 testes frontend**, lint e build aprovados. Aplicação
+iniciada com Vite; Playwright/Chromium local autorizado pelo usuário depois da falha
+de conexão MCP. Screenshots capturadas e inspecionadas em 1480, 1280, 900, 640 e
+390 px; nenhum erro de console/JavaScript ou overflow horizontal nos cenários
+testados. O grid e a transcrição têm a mesma largura; responsável/prazo têm iguais
+larguras/alturas e se empilham no mobile. Backend não alterado ou re-homologado
+nesta rodada; API e estados são representados por fixtures sintéticas na inspeção.
+
+| Tela | Desktop | Mobile |
+| --- | --- | --- |
+| Home | [Conta](implemented/home.png) | [Guest](implemented/guest-home-mobile.png) / [Conta](implemented/home-mobile.png) |
+| Nova Transcrição | [AssemblyAI indisponível](implemented/upload.png) | [Guest indisponível](implemented/upload-mobile.png) |
+| Reunião | [Campos da tarefa](implemented/meeting-fields.png) | [Campos empilhados](implemented/meeting-fields-mobile.png) |
+| Transcrição | [Container e grid](implemented/transcription.png) | [Nome longo sem overflow](implemented/transcription-mobile.png) |
