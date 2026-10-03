@@ -69,6 +69,8 @@ assert 'google.generativeai' not in sys.modules
             "HF_TOKEN": "",
             "AAI_API_KEY": "",
             "GEMINI_API_KEY": "",
+            "FIREBASE_AUTH_ENABLED": "true",
+            "FIREBASE_PROJECT_ID": "synthetic-project-123",
         }
     )
 
