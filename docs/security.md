@@ -27,8 +27,10 @@ não foram desprotegidas. Guest AssemblyAI exige opt-in explícito, chave soment
 no Worker e reserva financeira cumulativa no PostgreSQL, desligados por padrão.
 Não há fallback local nem repetição automática de submissão em recovery.
 Quotas de Guest/contas públicas não equivalem a orçamento financeiro;
-contas públicas não recebem acesso à chave platform. BYOK completo
-é próximo trabalho, sem persistência de novas chaves nesta Task. Ver
+contas públicas não recebem acesso à chave platform. BYOK cifra chaves próprias
+com envelope Fernet ligado ao usuário/provider; respostas têm apenas metadados,
+referências nos jobs não contêm secrets e revogação não faz fallback. Ver
+[proteção e implantação BYOK](provider_preferences.md) e
 [políticas de Guest/contas](guest_and_accounts.md) para limites, cleanup e contexto
 de identidades locais provisionadas explicitamente pelo operador.
 Ver [AssemblyAI](assemblyai.md) para teto financeiro, resultados locais e gates
@@ -42,6 +44,7 @@ dimensionamento pelo operador. Não confiar em forwarded headers não validados.
 salvar upload; consultas de resultados já persistidos não dependem do provider.
 
 Compose separa segredos: API recebe JWT/admin; Worker HF/AssemblyAI/Gemini;
+API/Worker compartilham somente a chave independente de criptografia BYOK;
 migrate/maintenance apenas conexão de banco. Flags *_CONFIGURED não são chaves.
 Cache de modelos só no Worker. .env/dados/results/cache/archive ficam fora de build.
 Não logar transcript, minutos, originais/paths, email, hashes de senha, bearer

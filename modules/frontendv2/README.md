@@ -65,12 +65,15 @@ concluído com segmentos. JSON pode exportar os metadados de qualquer estado.
 A entrada usa a mesma interface sem exigir login: Guest usa AssemblyAI limitado
 (opt-in explícito, orçamento e chave no Worker; desligado por padrão, sem fallback local), com resultado
 temporário isolado. Signup/login permitem salvar mediante prova Guest validada
-pelo servidor. Contas públicas não recebem credenciais externas USAGI; BYOK
-completo ficará nas próximas Tasks. Veja [Guest e contas](../../docs/guest_and_accounts.md).
+pelo servidor. Contas públicas não recebem credenciais externas USAGI; Settings
+permite BYOK protegido. Veja [providers](../../docs/provider_preferences.md)
+e [Guest e contas](../../docs/guest_and_accounts.md).
 O perfil em Settings é apenas local e pode ser substituído pela identidade retornada em
 `/auth/me`; não é preferência persistente de conta nem muda a identidade no
-servidor. A escolha de transcrição/diarização é por job, não uma preferência
-de conta. Automatic ainda não existe na UI. AssemblyAI foi validado localmente
+servidor. Overrides de transcrição/detecção continuam disponíveis por job.
+Preferências de providers/detecção são persistentes por conta;
+Automático usa AssemblyAI próprio configurado ou Whisper, sem fallback em erro.
+AssemblyAI foi validado localmente
 com e sem detecção de falantes; opt-in e reserva financeira são obrigatórios.
 Produção permanece não homologada; ver [operação AssemblyAI](../../docs/assemblyai.md).
 Não restaurar inputs de secrets antigos de Settings.

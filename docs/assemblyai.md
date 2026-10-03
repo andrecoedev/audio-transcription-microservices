@@ -17,7 +17,8 @@ podem mudar de modelo no servidor. Client tem chave própria, não altera settin
 globais. Modelo solicitado é registrado como metadata; não é benchmark de qualidade
 comparativo nem garantia de versão imutável do modelo hospedado.
 API não importa SDK/ML; jobs cloud não inicializam Torch/CUDA/Whisper/Pyannote/Gemini.
-Whisper/P3 mantêm contratos existentes. Automatic/Settings/BYOK ficam P4-03.
+Whisper/P3 mantêm contratos existentes. Automatic/Settings/BYOK são descritos em
+[preferências por conta](provider_preferences.md); reservas abaixo são somente platform.
 
 ## Configuração (valores não secretos)
 

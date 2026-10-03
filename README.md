@@ -56,8 +56,9 @@ recriar apenas o serviço que a recebe.
 A entrada pública compartilha a interface do app. Guest usa somente AssemblyAI,
 com falantes nativos, habilitação explícita e orçamento cumulativo; fica desligado
 por padrão e nunca usa fallback local. Veja [operação AssemblyAI](docs/assemblyai.md). Criar conta
-não concede acesso às credenciais externas USAGI; BYOK completo permanece nas
-próximas Tasks. Veja [Guest, contas, limites e BYOK](docs/guest_and_accounts.md).
+não concede acesso às credenciais externas USAGI. Contas podem configurar BYOK e
+preferências protegidas em Settings; veja [providers](docs/provider_preferences.md)
+e [Guest, contas e limites](docs/guest_and_accounts.md).
 
 ## Fluxos oficiais
 
