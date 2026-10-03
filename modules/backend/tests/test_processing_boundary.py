@@ -31,7 +31,7 @@ import importlib.abc
 import sys
 
 blocked = {
-    "assemblyai", "ctranslate2", "faster_whisper", "librosa",
+    "assemblyai", "ctranslate2", "faster_whisper", "firebase_admin", "librosa",
     "pydub", "pyannote", "torch", "transformers"
 }
 baseline_modules = set(sys.modules)

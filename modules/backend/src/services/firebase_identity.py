@@ -28,7 +28,8 @@ def _verify_with_sdk(token: str) -> dict:
     # Lazy, API-only: no credentials/models/network at web import/startup.
     import firebase_admin
     from firebase_admin import auth, exceptions
-    from google.auth.exceptions import DefaultCredentialsError
+    from google.auth.exceptions import GoogleAuthError
+    from requests.exceptions import RequestException
 
     try:
         with _app_lock:
@@ -40,7 +41,7 @@ def _verify_with_sdk(token: str) -> dict:
                     'projectId': settings.FIREBASE_PROJECT_ID,
                     'httpTimeout': settings.FIREBASE_HTTP_TIMEOUT_SECONDS,
                 }, name=name)
-    except (DefaultCredentialsError, ValueError, OSError):
+    except (GoogleAuthError, ValueError, OSError):
         raise HTTPException(503, 'Authentication service temporarily unavailable') from None
     try:
         return auth.verify_id_token(token, app=app, check_revoked=True, clock_skew_seconds=0)
@@ -49,7 +50,7 @@ def _verify_with_sdk(token: str) -> dict:
     except (auth.InvalidIdTokenError, auth.RevokedIdTokenError, auth.UserDisabledError,
             auth.UserNotFoundError, ValueError):
         raise HTTPException(401, 'Could not validate credentials', headers={'WWW-Authenticate': 'Bearer'}) from None
-    except exceptions.FirebaseError:
+    except (exceptions.FirebaseError, GoogleAuthError, RequestException):
         raise HTTPException(503, 'Authentication service temporarily unavailable') from None
 
 
@@ -94,6 +95,10 @@ def resolve_firebase_user(db: Session, identity: VerifiedFirebaseIdentity) -> tu
         return user, False
     if (db.query(User.id).filter(User.email == identity.email).first()
             or identity.email == settings.AUTH_ADMIN_EMAIL.strip().lower()):
+        # A concurrent first login may have committed after the initial lookup.
+        user = find_firebase_user(db, identity)
+        if user:
+            return user, False
         raise HTTPException(409, 'Sign in to your existing USAGI account to link Google')
     try:
         with db.begin_nested():

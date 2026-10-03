@@ -1,11 +1,13 @@
 """Firebase authentication boundaries with synthetic verified claims only."""
 import time
+import secrets
+from cryptography.fernet import Fernet
 
 from fastapi import HTTPException
 import pytest
 
 from src.config import settings
-from src.models import AuditEvent, FirebaseIdentity, GuestSession, User
+from src.models import AuditEvent, FirebaseIdentity, GuestSession, User, Transcription, TranscriptionOwnership
 from src.routers import auth
 from src.security import create_access_token, get_password_hash
 from src.services import firebase_identity
@@ -245,3 +247,47 @@ def test_guest_session_remains_usable_with_firebase_auth_enabled(db_context):
     assert current.status_code == 200
     assert "expires_at" in current.json()
     assert db_context["session_factory"]().query(GuestSession).count() == 1
+
+
+def test_new_firebase_user_cannot_access_existing_account_preferences(db_context, auth_headers, monkeypatch):
+    monkeypatch.setattr(settings, 'PROVIDER_CREDENTIAL_ENCRYPTION_KEY', Fernet.generate_key().decode())
+    assert db_context['client'].post('/settings/providers/gemini/credential',
+        headers=auth_headers(), json={'secret': secrets.token_urlsafe(32)}).status_code == 200
+    db = db_context['session_factory']()
+    transcription = Transcription(filename='synthetic.wav', original_filename='synthetic.wav',
+        file_size_mb=0.1, duration_seconds=1, transcription_model='whisper', status='completed')
+    db.add(transcription)
+    db.flush()
+    resource_id = transcription.id
+    db.add(TranscriptionOwnership(transcription_id=resource_id, user_id=1, owner_sub='alice'))
+    db.commit()
+    db.close()
+    monkeypatch.setattr(auth, 'verify_firebase_token', lambda _token: _identity())
+    response = db_context['client'].post('/auth/firebase', headers={'Authorization': 'Bearer synthetic-id-proof'})
+    internal_id = response.json()['user']['id']
+    monkeypatch.setattr(firebase_identity, 'verify_firebase_token', lambda _token: _identity())
+    headers = {'Authorization': 'Bearer synthetic-id-proof'}
+    settings_response = db_context['client'].get('/settings/providers', headers=headers)
+    assert settings_response.status_code == 200
+    assert settings_response.json()['credentials']['gemini']['configured'] is False
+    assert internal_id not in (1, 2)
+    assert db_context['client'].get(f'/transcriptions/{resource_id}', headers=headers).status_code == 404
+    assert db_context['client'].get('/settings/providers', headers=auth_headers()).json()['credentials']['gemini']['configured'] is True
+
+
+def test_signup_disabled_only_when_google_enabled(db_context, monkeypatch):
+    assert db_context['client'].get('/auth/config').json()['local_signup_enabled'] is False
+    result = db_context['client'].post('/auth/signup', json={
+        'username': 'synthetic-new-account', 'email': 'new@example.test', 'password': 'synthetic long password',
+    })
+    assert result.status_code == 409
+    monkeypatch.setattr(settings, 'FIREBASE_AUTH_ENABLED', False)
+    assert db_context['client'].get('/auth/config').json()['local_signup_enabled'] is True
+
+
+def test_emulator_configuration_is_rejected_before_verification(monkeypatch):
+    monkeypatch.setenv('FIREBASE_AUTH_EMULATOR_HOST', 'localhost:9099')
+    monkeypatch.setattr(firebase_identity, '_verify_with_sdk', lambda token: pytest.fail('must fail closed'))
+    with pytest.raises(HTTPException) as error:
+        firebase_identity.verify_firebase_token('synthetic-unsigned-emulator-proof')
+    assert error.value.status_code == 503
