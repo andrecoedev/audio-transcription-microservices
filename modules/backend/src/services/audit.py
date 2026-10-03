@@ -12,6 +12,7 @@ from ..models import AuditEvent
 
 
 ALLOWED_EVENTS = {
+    "user.identity_linked",
     "provider.credential_saved",
     "provider.credential_removed",
     "user.login",

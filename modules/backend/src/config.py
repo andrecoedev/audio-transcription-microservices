@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 import os
+import re
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -59,6 +60,9 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=False, description="Debug mode")
     
     # Security
+    FIREBASE_AUTH_ENABLED: bool = Field(default=False)
+    FIREBASE_PROJECT_ID: Optional[str] = Field(default=None)
+    FIREBASE_HTTP_TIMEOUT_SECONDS: int = Field(default=10, ge=1, le=30)
     SECRET_KEY: Optional[str] = Field(
         default=None,
         description="Secret key for JWT (required in production)",
@@ -331,6 +335,12 @@ class Settings(BaseSettings):
 
         if self.AUTH_MODE not in {"permissive", "strict"}:
             errors.append("AUTH_MODE must be 'permissive' or 'strict'")
+
+        if require_api_security and self.FIREBASE_AUTH_ENABLED:
+            if not self.FIREBASE_PROJECT_ID or not re.fullmatch(r"[a-z0-9][a-z0-9-]{4,127}", self.FIREBASE_PROJECT_ID):
+                errors.append("FIREBASE_PROJECT_ID must be configured for Firebase authentication")
+            if os.getenv("FIREBASE_AUTH_EMULATOR_HOST"):
+                errors.append("Firebase emulator tokens are not accepted by this application")
 
         # Security checks are strict in production only (low-risk migration).
         if self.is_production and require_api_security:

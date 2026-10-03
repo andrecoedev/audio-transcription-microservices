@@ -37,6 +37,12 @@ def enforce_rate_limit(request: Request, category: str, identity: str | None = N
             ("login-ip", ip, settings.LOGIN_RATE_LIMIT_PER_IP, 300),
             ("login-account", (identity or "").casefold(), settings.LOGIN_RATE_LIMIT_PER_ACCOUNT, 300),
         ]
+    elif category == "firebase-login":
+        rules = [("login-ip", ip, settings.LOGIN_RATE_LIMIT_PER_IP, 300)]
+    elif category == "firebase-account":
+        rules = [("firebase-account", identity or "", settings.LOGIN_RATE_LIMIT_PER_ACCOUNT, 300)]
+    elif category == "firebase-link":
+        rules = [("firebase-link", identity or "", settings.LOGIN_RATE_LIMIT_PER_ACCOUNT, 300)]
     elif category == "upload-ip":
         rules = [("upload-ip", ip, settings.UPLOAD_RATE_LIMIT_PER_IP, 3600)]
     elif category == "job-user":
