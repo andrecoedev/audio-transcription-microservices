@@ -22,21 +22,21 @@ Os resultados continuam no PostgreSQL, não no estado efêmero RQ.
 
 ## Operações e limites
 
-O provider desejado para Guest é exclusivamente AssemblyAI com detecção de
-falantes nativa. **Processamento Guest está bloqueado pela P4-04**, sem fallback
-para Whisper nem cobrança externa: política publica `can_create_job=false` e a
-API retorna 503. Sessão, leitura de resultados existentes, claim e exclusão
-continuam funcionando. Jobs Guest antigos/recovered também são rejeitados no
-Worker antes de carregar engines, com estado failed consistente.
+Guest usa exclusivamente AssemblyAI com detecção de falantes nativa, sem
+Whisper/Pyannote/CUDA nem fallback. Uma submissão por arquivo, com timestamps
+normalizados em segundos e falhas propagadas, não texto falso de sucesso.
+Fica desligado por padrão: exige política explícita, chave no Worker, indicação
+segura na API e orçamento PostgreSQL. A política publica `can_create_job` conforme
+essa admissão; configuração ausente retorna 503, quota/orçamento esgotado 429.
+Jobs legados sem reserva ou Guest Whisper são rejeitados antes de engines.
+Sessão, leitura de resultados, claim e exclusão continuam protegidos.
 
-Auditoria do adapter atual: retorna somente texto, ignora status/error, não
-habilita speaker labels, e o pipeline usa Pyannote local com chamadas externas
-por segmento. Não atende a este contrato. P4-04 deve recuperar speakers/timestamps,
-falhas/timeouts, duração validada antes de upload ao provider e reserva atômica
-de orçamento platform (incluindo retries/recovery/claim), seguida de smoke real
-autorizado. Quotas de jobs não são orçamento financeiro; não existe opt-in de
-ambiente para liberar esse caminho inseguro. Não habilitar mediante presença da
-chave apenas. BYOK fica separado, sem consumo do orçamento platform.
+O ledger financeiro persiste origem platform/contexto original mesmo após claim,
+reserva custo conservador antes do enqueue e marca tentativa antes de upload.
+Não há reembolso/reset em exclusão nem segunda submissão automática em recovery.
+BYOK permanece P4-03, sem fallback para a chave da plataforma. Consulte
+[configuração, recuperação e limites AssemblyAI](assemblyai.md), inclusive a
+retenção externa, que não é coberta pela exclusão local.
 Contas públicas podem salvar e revisar reuniões, editar ações e usar os recursos
 P3 locais; não herdam credenciais externas da plataforma. A diarização local
 permanece permitida para contas autenticadas, conforme configuração existente.
@@ -131,5 +131,5 @@ metadados seguros, remoção/substituição explícitas e estratégia de proteç
 
 P4-04: AssemblyAI híbrido. Credencial `user` usa cota do usuário; eventual franquia
 `platform` exige habilitação e orçamento próprios, separados de BYOK. A recuperação
-do adapter continua nessa Task. Não habilitar consumo público de chaves do operador
+do adapter foi validada localmente. Não habilitar consumo público de chaves do operador
 por apenas criar conta. Produção segue não homologada; Pyannote 4 não promovido.
