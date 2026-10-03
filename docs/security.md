@@ -68,8 +68,13 @@ Não existe fallback silencioso local → cloud.
 
 A validação de 2026-10-02 antes desta revisão de higiene registrou pip check
 limpo, pip-audit API **1** e Worker **24** (PyJWT + 23 entradas Torch).
-npm audit do frontend atual retornou zero; o push também reportou 29 alertas
-Dependabot na branch padrão remota, não uma auditoria da branch de trabalho.
+Na validação P5-02 de 2026-10-03, `npm audit` retornou **5 high** na cadeia de
+desenvolvimento Tailwind/braces/chokidar/micromatch/fast-glob; `npm audit --omit=dev`
+retornou **zero**. Manifests/lockfile não mudaram nesta Task: achados preexistentes,
+sem nova entrada de padrões controlados por usuário no build. A correção exige
+validação dedicada, não um upgrade major incidental ao trabalho de UX.
+O push anterior também reportou 29 alertas Dependabot na branch padrão remota,
+não uma auditoria da branch de trabalho.
 Não declarar essas vulnerabilidades corrigidas pela remoção de arquivos.
 
 PyJWT 2.14.0: PYSEC-2026-4141 / GHSA-42vr-xj54-vc7v, correção indicada 2.15.0.

@@ -69,7 +69,7 @@ describe('functional frontend contracts', () => {
     expect(provider.textContent).not.toContain('não configurado')
     expect(audioService.getApiKeysStatus).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Verificar worker' })).toBeNull()
-    expect(screen.getByText('Worker RQ').parentElement.textContent).toContain('disponível')
+    expect(screen.getByText('Processamento de áudio').parentElement.textContent).toContain('disponível')
     fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }))
     await waitFor(() => expect(audioService.checkHealth).toHaveBeenCalledTimes(2))
   })
@@ -89,7 +89,7 @@ describe('functional frontend contracts', () => {
     audioService.updateProviderPreferences.mockResolvedValue(metadata)
     audioService.saveProviderCredential.mockResolvedValue(metadata)
     render(<MemoryRouter><Settings /></MemoryRouter>)
-    const transcription = await screen.findByLabelText('Provedor de transcrição')
+    const transcription = await screen.findByLabelText('Como transcrever seu áudio')
     fireEvent.change(transcription, { target: { value: 'whisper' } })
     fireEvent.click(screen.getByRole('button', { name: 'Salvar preferências' }))
     await waitFor(() => expect(audioService.updateProviderPreferences).toHaveBeenCalledWith({
@@ -126,8 +126,8 @@ describe('functional frontend contracts', () => {
   })
 
   it.each([
-    ['assemblyai', 'transcription_provider', 'Provedor de transcrição'],
-    ['gemini', 'intelligence_provider', 'Provedor de inteligência de reuniões'],
+    ['assemblyai', 'transcription_provider', 'Como transcrever seu áudio'],
+    ['gemini', 'intelligence_provider', 'Resumos inteligentes'],
   ])('preserves explicit %s preference after its credential is removed', async (provider, preferenceKey, label) => {
     const preferences = {
       transcription_provider: provider === 'assemblyai' ? 'assemblyai' : 'automatic',
@@ -153,6 +153,8 @@ describe('functional frontend contracts', () => {
     const selector = await screen.findByLabelText(label)
     expect(selector.value).toBe(provider)
     fireEvent.click(screen.getByRole('button', { name: `Remover credencial ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}` }))
+    expect(audioService.deleteProviderCredential).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: `Confirmar remoção ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}` }))
     await waitFor(() => expect(audioService.deleteProviderCredential).toHaveBeenCalledWith(provider))
     expect(selector.value).toBe(provider)
     expect(selector.selectedOptions[0].disabled).toBe(true)
