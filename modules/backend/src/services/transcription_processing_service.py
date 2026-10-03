@@ -58,7 +58,14 @@ class TranscriptionProcessingService:
             conversion_seconds = time.perf_counter() - conversion_started
             temporary_bytes = wav_path.stat().st_size
 
-            if use_diarization:
+            if transcription_model == "assemblyai":
+                transcription_started = time.perf_counter()
+                native = self._get_engine(transcription_model).transcribe_file(
+                    converted_path, duration_seconds=duration, use_diarization=use_diarization)
+                segments, num_speakers = native["segments"], native["num_speakers"]
+                diarization_seconds = 0.0
+                transcription_seconds = time.perf_counter() - transcription_started
+            elif use_diarization:
                 (
                     segments,
                     num_speakers,
