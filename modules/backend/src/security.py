@@ -36,7 +36,9 @@ class TokenData(BaseModel):
     registration_source: str = "local"
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_password(plain_password: str, hashed_password: str | None) -> bool:
+    if not hashed_password:
+        return False
     try:
         return bcrypt.checkpw(
             plain_password.encode("utf-8"),

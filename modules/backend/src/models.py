@@ -130,7 +130,7 @@ class Transcription(Base):
 
 
 class User(Base):
-    """Persistent local identity used by authentication and ownership."""
+    """Persistent application identity used by authentication and ownership."""
 
     __tablename__ = "users"
     __table_args__ = (
@@ -142,7 +142,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(50), nullable=False)
     email = Column(String(255), nullable=False)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)
     registration_source = Column(String(16), nullable=False, default="local", server_default=text("'local'"))
     is_active = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     is_superuser = Column(
@@ -163,6 +163,22 @@ class User(Base):
 
     def __repr__(self):
         return f"<User(id={self.id}, username={self.username})>"
+
+
+class FirebaseIdentity(Base):
+    """Firebase identity bound to one internal user."""
+
+    __tablename__ = "firebase_identities"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_firebase_identity_user"),
+    )
+
+    project_id = Column(String(128), primary_key=True)
+    uid = Column(String(128), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
 
 class UserProviderPreferences(Base):
