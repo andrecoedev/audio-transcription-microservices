@@ -36,7 +36,7 @@ export default function ProviderConnectionCard({ provider, details, credential, 
         <p>Chave salva com segurança. A validade e o acesso serão verificados ao usar o serviço.</p>
         {date && !Number.isNaN(date.getTime()) && <p className="mt-1 text-xs">Atualizada em {date.toLocaleString('pt-BR')}</p>}
       </div>}
-      {!canUse && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Indisponível no momento. {!storageAvailable ? 'O armazenamento seguro está indisponível. Tente novamente mais tarde ou procure o suporte da USAGI.' : connected ? 'Atualize as configurações. Se continuar, procure o suporte da USAGI.' : `Conecte sua conta ${name} para habilitar este serviço.`}</p>}
+      {(!canUse || !storageAvailable) && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{!storageAvailable ? 'Conexão própria indisponível: o armazenamento seguro está indisponível. Tente novamente mais tarde ou procure o suporte da USAGI.' : connected ? 'Indisponível no momento. Atualize as configurações. Se continuar, procure o suporte da USAGI.' : `Indisponível no momento. Conecte sua conta ${name} para habilitar este serviço.`}</p>}
       {storageAvailable && editing && <form onSubmit={submit} className="space-y-3">
         <label className="block text-sm font-medium text-gray-700" htmlFor={`credential-${provider}`}>{replacing ? 'Nova chave de API' : 'Chave de API'}
           <input id={`credential-${provider}`} aria-label={`Credencial ${name}`} type="password" autoComplete="off" spellCheck={false}

@@ -173,4 +173,18 @@ describe('Settings', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Não foi possível salvar as preferências')
     expect(screen.queryByText('private detail')).toBeNull()
   })
+
+  it('explains unavailable BYOK storage even when the platform service is allowed', async () => {
+    audioService.getProviderSettings.mockResolvedValue(settings({ credential_storage_available: false,
+      providers: {
+        whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
+        assemblyai: { available: true, allowed: true, configured: true, credential_source: 'platform' },
+        gemini: { available: true, allowed: true, configured: true, credential_source: 'platform' },
+      } }))
+    renderSettings()
+    expect((await screen.findAllByText(/Conexão própria indisponível/)).length).toBe(2)
+    expect(screen.queryByLabelText('Credencial AssemblyAI')).toBeNull()
+    expect(screen.queryByLabelText('Credencial Gemini')).toBeNull()
+    expect(screen.getAllByText(/Fornecido pela USAGI está disponível/).length).toBe(2)
+  })
 })
