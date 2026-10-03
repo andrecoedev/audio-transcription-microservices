@@ -19,7 +19,7 @@ function storedSession() {
   }
 }
 
-export default function Guest() {
+export default function Guest({ showUpload = true }) {
   const navigate = useNavigate()
   const authenticated = useAuthStore((state) => state.isAuthenticated)
   const [session, setSession] = useState(storedSession)
@@ -36,12 +36,12 @@ export default function Guest() {
   }
 
   useEffect(() => {
-    if (authenticated) return
+    if (authenticated || !showUpload) return
     let active = true
     guestService.policy().then((value) => { if (active) { setPolicy(value); setError('') } })
       .catch(() => { if (active) setError('Não foi possível carregar os limites. Tente novamente.') })
     return () => { active = false }
-  }, [retry, authenticated])
+  }, [retry, authenticated, showUpload])
 
   useEffect(() => {
     if (!session?.guest_token) return
@@ -111,11 +111,11 @@ export default function Guest() {
     }
   }
 
-  if (authenticated && !session?.resultId && !error) return null
+  if ((authenticated || !showUpload) && !session?.resultId && !error) return null
 
   return <div className="max-w-6xl mx-auto space-y-6">
       {error && <Card><CardContent><div role="alert">{error}<Button variant="outline" onClick={() => setRetry((n) => n + 1)}>Tentar novamente</Button></div></CardContent></Card>}
-      {!authenticated && !policy && !error && <p role="status">Carregando limites...</p>}
+      {showUpload && !authenticated && !policy && !error && <p role="status">Carregando limites...</p>}
       {session?.resultId ? <Card>
         <CardHeader><CardTitle>{authenticated ? 'Salve sua transcrição anterior' : 'Resultado da transcrição'}</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -129,7 +129,7 @@ export default function Guest() {
             <Button variant="outline" onClick={remove} disabled={busy || ['queued', 'processing'].includes(result.status)}>Excluir resultado temporário</Button>
           </div>
         </>}
-      </CardContent></Card> : !authenticated && policy && !session?.spent && <NewTranscription guestPolicy={policy} onCreate={createJob} onCreated={() => {}} />}
+      </CardContent></Card> : showUpload && !authenticated && policy && !session?.spent && <NewTranscription guestPolicy={policy} onCreate={createJob} onCreated={() => {}} />}
       {!authenticated && policy && <div className="text-sm text-gray-500 space-y-2">
         <p>Até {policy.max_upload_mb} MB e {Math.floor(policy.max_audio_seconds / 60)} minutos. {policy.jobs_per_session} transcrição por sessão; resultado temporário por {policy.retention_hours}h nesta aba.</p>
         <p><Link className="text-primary-700" to="/login?saveGuest=1">Entrar</Link> ou <Link className="text-primary-700" to="/signup?saveGuest=1">criar conta</Link> para salvar suas reuniões.</p>

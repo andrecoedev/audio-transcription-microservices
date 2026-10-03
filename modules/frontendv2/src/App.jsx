@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-ro
 import { useEffect, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
+import Home from './pages/Home'
 import Transcriptions from './pages/Transcriptions'
 import TranscriptionDetail from './pages/TranscriptionDetail'
 import Meetings from './pages/Meetings'
@@ -94,9 +94,9 @@ function App() {
       />
       
       <Routes>
-        <Route path="/guest" element={<Navigate to="/" replace />} />
+        <Route path="/guest" element={<Navigate to="/new-transcription" replace />} />
         <Route path="/" element={<Layout />}>
-          <Route index element={<div className="space-y-8"><Guest />{isAuthenticated && <><NewTranscription /><Dashboard /></>}</div>} />
+          <Route index element={<Home />} />
           <Route path="login" element={<Login />} />
           <Route path="signup" element={<Login signup />} />
           <Route path="transcriptions" element={<AccountRequired><Transcriptions /></AccountRequired>} />
