@@ -51,8 +51,8 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   const policyReady = !publicAccount || Boolean(publicLimits)
   const processingAllowed = !guestPolicy || guestPolicy.can_create_job === true
   const maxFileSize = limits ? limits.max_upload_mb * 1024 * 1024 : MAX_FILE_SIZE
-  const canUseAssemblyAI = !guestPolicy && providerSettings?.providers.assemblyai.allowed
-  const canUseWhisper = !user || providerSettings?.providers.whisper.allowed
+  const canUseAssemblyAI = !guestPolicy && providerSettings?.providers.assemblyai.available === true && providerSettings?.providers.assemblyai.allowed === true
+  const canUseWhisper = !user || (providerSettings?.providers.whisper.available === true && providerSettings?.providers.whisper.allowed === true)
   const providerReady = !user || Boolean(providerSettings)
   const [file, setFile] = useState(null)
   const [options, setOptions] = useState({
@@ -67,7 +67,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
     })
   }, [providerSettings])
   const selectedProviderAvailable = options.transcriptionModel === 'automatic'
-    || Boolean(providerSettings?.providers[options.transcriptionModel]?.allowed)
+    || (providerSettings?.providers[options.transcriptionModel]?.available === true && providerSettings?.providers[options.transcriptionModel]?.allowed === true)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
 
@@ -218,7 +218,10 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Modelo de Transcrição */}
-          {guestPolicy ? <p className="text-sm text-gray-600">Transcrição com AssemblyAI</p> : user && !providerSettings ? <div role={providerError ? 'alert' : 'status'} className="space-y-2">
+          {guestPolicy ? <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+            <span>Transcrição com AssemblyAI</span>
+            {!processingAllowed && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">Indisponível</span>}
+          </div> : user && !providerSettings ? <div role={providerError ? 'alert' : 'status'} className="space-y-2">
             <p>{providerLoading ? 'Carregando preferências dos provedores...' : 'Não foi possível carregar as preferências dos provedores. O envio permanece bloqueado.'}</p>
             {providerError && <Button variant="outline" onClick={() => setProviderAttempt((value) => value + 1)}>Tentar novamente</Button>}
           </div> : <div>
@@ -259,7 +262,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
               {user && providerSettings && <button
                 onClick={() => setOptions({ ...options, transcriptionModel: 'assemblyai' })}
                 disabled={uploading || !canUseAssemblyAI}
-                className={`p-4 border-2 rounded-lg transition-all ${
+                className={`p-4 border-2 rounded-lg transition-all ${!canUseAssemblyAI ? 'border-gray-200 bg-gray-50 cursor-not-allowed' :
                   options.transcriptionModel === 'assemblyai'
                     ? 'border-primary-600 bg-primary-50'
                     : 'border-gray-200 hover:border-gray-300'
@@ -271,7 +274,8 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                   }`} />
                   <div className="text-left">
                     <p className="font-medium text-gray-900">AssemblyAI</p>
-                    <p className="text-xs text-gray-500">{canUseAssemblyAI ? 'Credencial pronta para esta conta' : 'Credencial necessária nas Configurações'}</p>
+                    {!canUseAssemblyAI && <span className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Indisponível</span>}
+                    <p className="mt-1 text-xs text-gray-500">{canUseAssemblyAI ? 'Habilitado para esta conta' : 'Verifique sua credencial e a disponibilidade em Configurações'}</p>
                   </div>
                 </div>
               </button>}
@@ -302,7 +306,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>
           </div>
-          {!guestPolicy && user && providerSettings && !canUseAssemblyAI && options.transcriptionModel !== 'assemblyai' && <p className="text-sm text-gray-600">AssemblyAI está disponível após conectar uma credencial própria nas configurações.</p>}
+          {!guestPolicy && user && providerSettings && !canUseAssemblyAI && <Link to="/settings" className="inline-block text-sm text-primary-700 hover:underline">Ver serviços de IA em Configurações</Link>}
         </CardContent>
       </Card>
 
