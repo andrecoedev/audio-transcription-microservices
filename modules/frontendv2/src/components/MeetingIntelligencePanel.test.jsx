@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import MeetingIntelligencePanel from './MeetingIntelligencePanel'
 import { audioService } from '../services/audioService'
+import { useAuthStore } from '../stores/authStore'
 
 vi.mock('../services/audioService', () => ({ audioService: {
   getMeetingIntelligenceStatus: vi.fn(), getMeetingIntelligenceResult: vi.fn(), requestMeetingIntelligence: vi.fn(),
@@ -44,5 +45,14 @@ it('allows explicit retry after failure', async () => {
   audioService.requestMeetingIntelligence.mockResolvedValue({ status: 'pending' })
   render(<MeetingIntelligencePanel meetingId="42" />)
   fireEvent.click(await screen.findByRole('button', { name: 'Tentar novamente' }))
+  await waitFor(() => expect(audioService.requestMeetingIntelligence).toHaveBeenCalledWith('42', false))
+})
+
+it('uses per-account configured status for a public account', async () => {
+  useAuthStore.setState({ user: { registration_source: 'public' }, isAuthenticated: true })
+  audioService.getMeetingIntelligenceStatus.mockResolvedValue({ configured: true, generation: null, completed_revision: null })
+  audioService.requestMeetingIntelligence.mockResolvedValue({ status: 'pending' })
+  render(<MeetingIntelligencePanel meetingId="42" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Gerar resumo' }))
   await waitFor(() => expect(audioService.requestMeetingIntelligence).toHaveBeenCalledWith('42', false))
 })

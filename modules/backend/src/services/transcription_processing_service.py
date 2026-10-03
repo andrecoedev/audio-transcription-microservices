@@ -38,6 +38,9 @@ class ProcessingResult:
 class TranscriptionProcessingService:
     """Coordinate normalization, diarization and a reusable transcription engine."""
 
+    def __init__(self, cloud_engine=None):
+        self.cloud_engine = cloud_engine
+
     def process_transcription(
         self,
         file_path: str,
@@ -182,12 +185,11 @@ class TranscriptionProcessingService:
             }
         ], 1
 
-    @staticmethod
-    def _get_engine(transcription_model: str):
+    def _get_engine(self, transcription_model: str):
         if transcription_model == "whisper":
             engine = engine_registry.whisper_engine
         elif transcription_model == "assemblyai":
-            engine = engine_registry.assemblyai_engine
+            engine = self.cloud_engine if self.cloud_engine is not None else engine_registry.assemblyai_engine
         else:
             raise TranscriptionProcessingError(
                 f"Unknown transcription model: {transcription_model}"

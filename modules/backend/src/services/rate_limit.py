@@ -41,6 +41,9 @@ def enforce_rate_limit(request: Request, category: str, identity: str | None = N
         rules = [("upload-ip", ip, settings.UPLOAD_RATE_LIMIT_PER_IP, 3600)]
     elif category == "job-user":
         rules = [("job-user", identity or "", settings.JOB_RATE_LIMIT_PER_USER, 3600)]
+    elif category == "provider-settings-user":
+        # Same configurable ceiling, independent counter from job creation.
+        rules = [("provider-settings-user", identity or "", settings.JOB_RATE_LIMIT_PER_USER, 3600)]
     elif category == "signup":
         rules = [("signup-ip", ip, settings.SIGNUP_RATE_LIMIT_PER_IP, 3600)]
     elif category == "guest-session":

@@ -1,4 +1,5 @@
 import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -16,7 +17,7 @@ os.environ.update(
         "AUTH_MODE": "strict",
         "AUTH_PROTECT_PROCESSING": "true",
         "AUTH_PROTECT_READS": "true",
-        "SECRET_KEY": "test-secret-key-with-at-least-32-characters",
+        "SECRET_KEY": secrets.token_urlsafe(32),
         "DATABASE_URL": "sqlite:///:memory:",
         "DEBUG": "false",
     }
@@ -30,7 +31,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.database import get_db
 from src.models import Base, User
-from src.routers import auth, guests, meeting_actions, meeting_intelligence, meeting_minutes, meetings, reviewed_meeting_minutes, transcriptions
+from src.routers import auth, guests, meeting_actions, meeting_intelligence, meeting_minutes, meetings, provider_preferences, reviewed_meeting_minutes, transcriptions
 from src.security import create_access_token
 
 
@@ -99,6 +100,7 @@ def db_context(tmp_path, monkeypatch):
 
     app = FastAPI()
     app.include_router(auth.router)
+    app.include_router(provider_preferences.router)
     app.include_router(guests.router)
     app.include_router(transcriptions.router)
     app.include_router(meetings.router)

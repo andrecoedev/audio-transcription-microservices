@@ -34,7 +34,7 @@ Sessão, leitura de resultados, claim e exclusão continuam protegidos.
 O ledger financeiro persiste origem platform/contexto original mesmo após claim,
 reserva custo conservador antes do enqueue e marca tentativa antes de upload.
 Não há reembolso/reset em exclusão nem segunda submissão automática em recovery.
-BYOK permanece P4-03, sem fallback para a chave da plataforma. Consulte
+BYOK por conta está separado deste orçamento, sem fallback de execução para a chave da plataforma. Consulte
 [configuração, recuperação e limites AssemblyAI](assemblyai.md), inclusive a
 retenção externa, que não é coberta pela exclusão local.
 Contas públicas podem salvar e revisar reuniões, editar ações e usar os recursos
@@ -111,8 +111,9 @@ conta pública em identidade local privilegiada nem descarta dados temporários.
 
 ## BYOK e providers
 
-BYOK é a direção padrão, **não implementado nesta Task**. Não existem endpoints
-para salvar chaves de usuário, nem secrets em JWT/schema Guest. Não usar uma flag
+BYOK é o padrão para contas públicas e está disponível em Settings, com proteção
+de armazenamento e respostas somente de metadados; ver [providers](provider_preferences.md).
+Não há secrets em JWT/schema Guest. Não usar uma flag
 `cloud_enabled`: disponibilidade do provider, permissão por contexto, preferência,
 origem da credencial e orçamento são conceitos separados.
 
@@ -120,8 +121,8 @@ origem da credencial e orçamento são conceitos separados.
 não um plano/provedor. Identidades locais provisionadas pelo operador, incluindo
 admin e contas pré-existentes, preservam contratos privados. A política central
 nega `credential_source=platform` para identidade pública, independentemente de
-flags `*_CONFIGURED` ou claims enviados pelo cliente. Credencial `user` permanece
-indisponível até implementação protegida em P4-03/P4-04; não há fallback.
+flags `*_CONFIGURED` ou claims enviados pelo cliente. Credencial `user` consome a
+cota do usuário, sem orçamento platform nem fallback durante execução.
 
 P4-03: Settings → Providers → credencial própria protegida → preferência.
 Intelligence inicialmente Gemini, extensível a providers efetivamente suportados,

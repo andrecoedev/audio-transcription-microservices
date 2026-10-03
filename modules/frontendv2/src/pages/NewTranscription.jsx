@@ -15,6 +15,10 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   const user = useAuthStore((state) => state.user)
   const publicAccount = !guestPolicy && user?.registration_source === 'public'
   const [publicLimits, setPublicLimits] = useState(null)
+  const [providerSettings, setProviderSettings] = useState(null)
+  const [providerError, setProviderError] = useState(false)
+  const [providerLoading, setProviderLoading] = useState(false)
+  const [providerAttempt, setProviderAttempt] = useState(0)
   const [policyError, setPolicyError] = useState(false)
   const [policyAttempt, setPolicyAttempt] = useState(0)
   useEffect(() => {
@@ -26,16 +30,42 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
     }).catch(() => { if (active) setPolicyError(true) })
     return () => { active = false }
   }, [publicAccount, policyAttempt])
+  useEffect(() => {
+    if (guestPolicy || !user) return
+    let active = true
+    setProviderLoading(true)
+    setProviderError(false)
+    audioService.getProviderSettings().then((settings) => {
+      if (active) setProviderSettings(settings)
+    }).catch(() => {
+      if (active) {
+        setProviderSettings(null)
+        setProviderError(true)
+      }
+    }).finally(() => { if (active) setProviderLoading(false) })
+    return () => { active = false }
+  }, [guestPolicy, user, providerAttempt])
   const limits = guestPolicy || (publicAccount ? publicLimits : null)
   const policyReady = !publicAccount || Boolean(publicLimits)
   const processingAllowed = !guestPolicy || guestPolicy.can_create_job === true
   const maxFileSize = limits ? limits.max_upload_mb * 1024 * 1024 : MAX_FILE_SIZE
-  const canUsePlatform = !guestPolicy && !publicAccount
+  const canUseAssemblyAI = !guestPolicy && providerSettings?.providers.assemblyai.allowed
+  const canUseWhisper = !user || providerSettings?.providers.whisper.allowed
+  const providerReady = !user || Boolean(providerSettings)
   const [file, setFile] = useState(null)
   const [options, setOptions] = useState({
     useDiarization: false,
-    transcriptionModel: 'whisper'
+    transcriptionModel: 'automatic'
   })
+  useEffect(() => {
+    if (!providerSettings) return
+    setOptions({
+      useDiarization: providerSettings.preferences.use_diarization,
+      transcriptionModel: providerSettings.preferences.transcription_provider,
+    })
+  }, [providerSettings])
+  const selectedProviderAvailable = options.transcriptionModel === 'automatic'
+    || Boolean(providerSettings?.providers[options.transcriptionModel]?.allowed)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
 
@@ -66,7 +96,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   })
 
   const handleSubmit = async () => {
-    if (!file || !policyReady || !processingAllowed) {
+    if (!file || !policyReady || !processingAllowed || !providerReady) {
       toast.error('Selecione um arquivo primeiro')
       return
     }
@@ -189,14 +219,27 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Modelo de Transcrição */}
-          {guestPolicy ? <p className="text-sm text-gray-600">Transcrição com AssemblyAI</p> : <div>
+          {guestPolicy ? <p className="text-sm text-gray-600">Transcrição com AssemblyAI</p> : user && !providerSettings ? <div role={providerError ? 'alert' : 'status'} className="space-y-2">
+            <p>{providerLoading ? 'Carregando preferências dos provedores...' : 'Não foi possível carregar as preferências dos provedores. O envio permanece bloqueado.'}</p>
+            {providerError && <Button variant="outline" onClick={() => setProviderAttempt((value) => value + 1)}>Tentar novamente</Button>}
+          </div> : <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Modelo de Transcrição
             </label>
             <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setOptions({ ...options, transcriptionModel: 'whisper' })}
+              {user && <button
+                onClick={() => setOptions({ ...options, transcriptionModel: 'automatic' })}
+                aria-label="Automático"
                 disabled={uploading}
+                className={`p-4 border-2 rounded-lg transition-all ${options.transcriptionModel === 'automatic' ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
+              >
+                <p className="font-medium text-gray-900">Automático</p>
+                <p className="text-xs text-gray-500">AssemblyAI próprio quando configurado; caso contrário, processamento local</p>
+              </button>}
+
+              {(!user || providerSettings) && <button
+                onClick={() => setOptions({ ...options, transcriptionModel: 'whisper' })}
+                disabled={uploading || (user && !canUseWhisper)}
                 className={`p-4 border-2 rounded-lg transition-all ${
                   options.transcriptionModel === 'whisper'
                     ? 'border-primary-600 bg-primary-50'
@@ -212,11 +255,11 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                     <p className="text-xs text-gray-500">Processamento local</p>
                   </div>
                 </div>
-              </button>
+              </button>}
 
-              {canUsePlatform && <button
+              {user && providerSettings && <button
                 onClick={() => setOptions({ ...options, transcriptionModel: 'assemblyai' })}
-                disabled={uploading}
+                disabled={uploading || !canUseAssemblyAI}
                 className={`p-4 border-2 rounded-lg transition-all ${
                   options.transcriptionModel === 'assemblyai'
                     ? 'border-primary-600 bg-primary-50'
@@ -229,11 +272,14 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                   }`} />
                   <div className="text-left">
                     <p className="font-medium text-gray-900">AssemblyAI</p>
-                    <p className="text-xs text-gray-500">Cloud, requer configuração do servidor</p>
+                    <p className="text-xs text-gray-500">{canUseAssemblyAI ? 'Credencial pronta para esta conta' : 'Credencial necessária nas Configurações'}</p>
                   </div>
                 </div>
               </button>}
             </div>
+            {user && options.transcriptionModel !== 'automatic' && !selectedProviderAvailable && <p role="alert" className="text-sm text-amber-800">
+              A preferência salva para {options.transcriptionModel === 'assemblyai' ? 'AssemblyAI' : 'Faster-Whisper'} não está disponível. Conecte a credencial em Configurações ou escolha Automático ou um provedor disponível.
+            </p>}
           </div>}
 
           {/* Diarização */}
@@ -257,7 +303,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>
           </div>
-          {!guestPolicy && !canUsePlatform && <p className="text-sm text-gray-600">Para usar serviços externos nesta conta, será necessário conectar sua própria credencial. Esse recurso estará disponível em breve.</p>}
+          {!guestPolicy && user && providerSettings && !canUseAssemblyAI && options.transcriptionModel !== 'assemblyai' && <p className="text-sm text-gray-600">AssemblyAI está disponível após conectar uma credencial própria nas configurações.</p>}
         </CardContent>
       </Card>
 
@@ -272,7 +318,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={!file || uploading || !policyReady || !processingAllowed}
+          disabled={!file || uploading || !policyReady || !processingAllowed || !providerReady || !selectedProviderAvailable}
           loading={uploading}
         >
           Iniciar Transcrição

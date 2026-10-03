@@ -17,6 +17,8 @@ import toast from 'react-hot-toast'
 
 vi.mock('./services/audioService', () => ({ audioService: {
   checkHealth: vi.fn(), getStats: vi.fn(), listTranscriptions: vi.fn(),
+  getProviderSettings: vi.fn(), updateProviderPreferences: vi.fn(),
+  saveProviderCredential: vi.fn(), deleteProviderCredential: vi.fn(),
   listMeetings: vi.fn(), getTranscription: vi.fn(), getApiKeysStatus: vi.fn(),
   getMeetingMinutesStatus: vi.fn(), createTranscriptionJob: vi.fn(),
   getMeeting: vi.fn(), getMeetingTranscript: vi.fn(), getMeetingMinutes: vi.fn(),
@@ -32,6 +34,16 @@ beforeEach(() => {
   audioService.checkHealth.mockResolvedValue({ database: 'connected',
     processing: { redis: 'connected', worker_available: true, worker_count: 1 },
     models: { gemini: { configured: true }, assemblyai: { configured: true } } })
+  audioService.getProviderSettings.mockResolvedValue({
+    preferences: { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: false },
+    credential_storage_available: true,
+    providers: {
+      whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
+      assemblyai: { available: true, allowed: true, configured: true, credential_source: 'platform' },
+      gemini: { available: true, allowed: true, configured: true, credential_source: 'platform' },
+    },
+    credentials: { assemblyai: { configured: false, updated_at: null }, gemini: { configured: false, updated_at: null } },
+  })
   audioService.getStats.mockResolvedValue({})
   audioService.listTranscriptions.mockResolvedValue({ transcriptions: [], total: 0 })
   audioService.listMeetings.mockResolvedValue({ meetings: [], total: 0 })
@@ -59,6 +71,91 @@ describe('functional frontend contracts', () => {
     expect(screen.getByText('Worker RQ').parentElement.textContent).toContain('disponível')
     fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }))
     await waitFor(() => expect(audioService.checkHealth).toHaveBeenCalledTimes(2))
+  })
+
+  it('saves account provider preferences and clears the transient credential field', async () => {
+    const metadata = {
+      preferences: { transcription_provider: 'assemblyai', intelligence_provider: 'gemini', use_diarization: true },
+      credential_storage_available: true,
+      providers: {
+        whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
+        assemblyai: { available: true, allowed: true, configured: true, credential_source: 'user' },
+        gemini: { available: true, allowed: true, configured: true, credential_source: 'user' },
+      },
+      credentials: { assemblyai: { configured: true, updated_at: null }, gemini: { configured: false, updated_at: null } },
+    }
+    audioService.getProviderSettings.mockResolvedValue(metadata)
+    audioService.updateProviderPreferences.mockResolvedValue(metadata)
+    audioService.saveProviderCredential.mockResolvedValue(metadata)
+    render(<Settings />)
+    const transcription = await screen.findByLabelText('Provedor de transcrição')
+    fireEvent.change(transcription, { target: { value: 'whisper' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar preferências' }))
+    await waitFor(() => expect(audioService.updateProviderPreferences).toHaveBeenCalledWith({
+      transcription_provider: 'whisper', intelligence_provider: 'gemini', use_diarization: true,
+    }))
+
+    const secretInput = screen.getByLabelText('Credencial Gemini')
+    fireEvent.change(secretInput, { target: { value: 'synthetic-key-never-rendered' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[0])
+    await waitFor(() => expect(audioService.saveProviderCredential).toHaveBeenCalledWith('gemini', 'synthetic-key-never-rendered'))
+    await waitFor(() => expect(secretInput.value).toBe(''))
+    expect(screen.queryByText('synthetic-key-never-rendered')).toBeNull()
+  })
+
+  it('clears credential input after a failed save and shows safe error copy', async () => {
+    audioService.getProviderSettings.mockResolvedValue({
+      preferences: { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: false },
+      credential_storage_available: true,
+      providers: {
+        whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
+        assemblyai: { available: true, allowed: false, configured: false, credential_source: null },
+        gemini: { available: true, allowed: false, configured: false, credential_source: null },
+      },
+      credentials: { assemblyai: { configured: false, updated_at: null }, gemini: { configured: false, updated_at: null } },
+    })
+    audioService.saveProviderCredential.mockRejectedValue(new Error('provider returned sensitive detail'))
+    render(<Settings />)
+    const secretInput = await screen.findByLabelText('Credencial AssemblyAI')
+    fireEvent.change(secretInput, { target: { value: 'synthetic-key' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[0])
+    await waitFor(() => expect(secretInput.value).toBe(''))
+    expect(toast.error).toHaveBeenCalledWith('Não foi possível salvar a credencial')
+    expect(toast.error).not.toHaveBeenCalledWith('provider returned sensitive detail')
+  })
+
+  it.each([
+    ['assemblyai', 'transcription_provider', 'Provedor de transcrição'],
+    ['gemini', 'intelligence_provider', 'Provedor de inteligência de reuniões'],
+  ])('preserves explicit %s preference after its credential is removed', async (provider, preferenceKey, label) => {
+    const preferences = {
+      transcription_provider: provider === 'assemblyai' ? 'assemblyai' : 'automatic',
+      intelligence_provider: provider === 'gemini' ? 'gemini' : 'automatic',
+      use_diarization: false,
+    }
+    const metadata = (credentialConfigured, allowed) => ({
+      preferences,
+      credential_storage_available: true,
+      providers: {
+        whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
+        assemblyai: { available: true, allowed: provider === 'assemblyai' ? allowed : true, configured: true, credential_source: provider === 'assemblyai' && allowed ? 'user' : null },
+        gemini: { available: true, allowed: provider === 'gemini' ? allowed : true, configured: true, credential_source: provider === 'gemini' && allowed ? 'user' : null },
+      },
+      credentials: {
+        assemblyai: { configured: provider === 'assemblyai' ? credentialConfigured : true, updated_at: null },
+        gemini: { configured: provider === 'gemini' ? credentialConfigured : true, updated_at: null },
+      },
+    })
+    audioService.getProviderSettings.mockResolvedValue(metadata(true, true))
+    audioService.deleteProviderCredential.mockResolvedValue(metadata(false, false))
+    render(<Settings />)
+    const selector = await screen.findByLabelText(label)
+    expect(selector.value).toBe(provider)
+    fireEvent.click(screen.getByRole('button', { name: `Remover credencial ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}` }))
+    await waitFor(() => expect(audioService.deleteProviderCredential).toHaveBeenCalledWith(provider))
+    expect(selector.value).toBe(provider)
+    expect(selector.selectedOptions[0].disabled).toBe(true)
+    expect(audioService.updateProviderPreferences).not.toHaveBeenCalled()
   })
 
   it('does not disguise dashboard failure as empty data and can retry', async () => {

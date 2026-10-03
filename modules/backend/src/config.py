@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = Field(default=None, description="Google Gemini API Key")
     HF_TOKEN_CONFIGURED: bool = Field(default=False)
     AAI_API_KEY_CONFIGURED: bool = Field(default=False)
+    PROVIDER_CREDENTIAL_ENCRYPTION_KEY: Optional[str] = Field(default=None, repr=False)
     AAI_PLATFORM_ENABLED: bool = Field(default=False)
     AAI_GUEST_ENABLED: bool = Field(default=False)
     AAI_PLATFORM_BUDGET_CENTS: int = Field(default=0, ge=0, le=100000)

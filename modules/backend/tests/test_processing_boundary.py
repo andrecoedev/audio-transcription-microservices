@@ -1,4 +1,5 @@
 import os
+import secrets
 import subprocess
 import sys
 from pathlib import Path
@@ -62,7 +63,7 @@ assert 'google.generativeai' not in sys.modules
         {
             "APP_ENV": "test",
             "AUTH_MODE": "strict",
-            "SECRET_KEY": "test-secret-key-with-at-least-32-characters",
+            "SECRET_KEY": secrets.token_urlsafe(32),
             "DATABASE_URL": "sqlite:///:memory:",
             "DEBUG": "false",
             "HF_TOKEN": "",
@@ -207,7 +208,7 @@ assert not loaded, loaded
         {
             "APP_ENV": "test",
             "AUTH_MODE": "strict",
-            "SECRET_KEY": "test-secret-key-with-at-least-32-characters",
+            "SECRET_KEY": secrets.token_urlsafe(32),
             "DATABASE_URL": "sqlite:///:memory:",
             "DEBUG": "false",
             "HF_TOKEN": "hf-test",

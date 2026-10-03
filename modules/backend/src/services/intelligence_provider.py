@@ -80,7 +80,10 @@ class GeminiIntelligenceProvider:
         return self.generator.generate_intelligence(prompt)
 
 
-def get_provider() -> MeetingIntelligenceProvider:
+def get_provider(api_key: str | None = None) -> MeetingIntelligenceProvider:
+    if api_key is not None:
+        from .meeting_minutes import MeetingMinutesGenerator
+        return GeminiIntelligenceProvider(MeetingMinutesGenerator(api_key))
     if not settings.GEMINI_API_KEY:
         raise RuntimeError("Gemini is not configured")
     if engine_registry.meeting_minutes_generator is None:

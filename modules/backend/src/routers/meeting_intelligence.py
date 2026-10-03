@@ -13,7 +13,7 @@ from ..security import TokenData, require_scope
 from ..services.audit import append_audit_event
 from ..services.meeting_intelligence import fingerprint, latest_revision, metadata_view, snapshot
 from ..services.rate_limit import enforce_rate_limit
-from ..services.provider_policy import require_provider_credential
+from ..services.provider_credentials import resolve_intelligence
 from ..workers.config import get_transcription_queue, is_redis_available
 
 router = APIRouter(prefix="/meetings", tags=["meeting intelligence"])
@@ -38,13 +38,11 @@ def request_generation(meeting_id, request, response, db, user, *, regenerate):
         response.status_code = 200 if current.status == "completed" else 202
         return metadata_view(current)
     source, segments = snapshot(meeting)
-    require_provider_credential(user, "gemini")
+    selection = resolve_intelligence(db, user)
     if meeting.transcription.status != "completed" or not any(item.get("text", "").strip() for item in segments):
         raise HTTPException(422, "A completed meeting with transcript is required")
     if sum(len(item.get("text", "")) for item in segments) > settings.INTELLIGENCE_MAX_INPUT_CHARACTERS:
         raise HTTPException(422, "Meeting transcript exceeds analysis input limit")
-    if not (settings.GEMINI_API_KEY_CONFIGURED or settings.GEMINI_API_KEY):
-        raise HTTPException(503, "Meeting intelligence is not configured")
     enforce_rate_limit(request, "job-user", str(user.user_id))
     try:
         queue = get_transcription_queue()
@@ -56,6 +54,8 @@ def request_generation(meeting_id, request, response, db, user, *, regenerate):
         meeting_id=meeting_id, revision=current.revision + 1 if current else 1,
         schema_version="1", provider="gemini", model=settings.GEMINI_MODEL,
         status="pending", source_metadata=source, input_fingerprint=fingerprint(source, segments),
+        credential_source=selection["credential_source"], credential_id=selection["credential_id"],
+        credential_user_id=selection["credential_user_id"],
     )
     db.add(row)
     db.flush()
@@ -95,7 +95,12 @@ def status(meeting_id: int, db: Session = Depends(get_db), user: TokenData = Dep
     owned_meeting(db, meeting_id, user)
     rows = db.query(MeetingIntelligence).filter_by(meeting_id=meeting_id).order_by(MeetingIntelligence.revision.desc()).all()
     last_completed = next((item.revision for item in rows if item.status == "completed"), None)
-    return {"configured": bool(settings.GEMINI_API_KEY_CONFIGURED or settings.GEMINI_API_KEY),
+    try:
+        resolve_intelligence(db, user)
+        configured = True
+    except HTTPException:
+        configured = False
+    return {"configured": configured,
             "generation": metadata_view(rows[0]) if rows else None,
             "completed_revision": last_completed, "revisions": [metadata_view(item) for item in rows]}
 

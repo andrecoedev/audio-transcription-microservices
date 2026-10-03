@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import Card, { CardContent, CardHeader, CardTitle } from './Card'
 import Button from './Button'
 import { audioService } from '../services/audioService'
-import { useAuthStore } from '../stores/authStore'
 
 function EvidenceLinks({ evidence, references }) {
   return <div className="text-sm text-gray-500 mt-1">{evidence.map((item, index) => {
@@ -14,7 +13,6 @@ function EvidenceLinks({ evidence, references }) {
 }
 
 export default function MeetingIntelligencePanel({ meetingId, onResultChange }) {
-  const publicAccount = useAuthStore((state) => state.user?.registration_source === 'public')
   const [status, setStatus] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
@@ -69,8 +67,7 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange }) 
       {status && !status.configured && <p>Geração indisponível neste ambiente.</p>}
       {busy && <p role="status">{result ? 'Gerando novamente; a versão anterior continua disponível.' : 'Gerando resumo...'}</p>}
       {state === 'failed' && <p role="alert" className="text-red-700">A geração falhou. Você pode tentar novamente.</p>}
-      {publicAccount && <p>Para gerar um resumo com serviços externos, será necessário conectar sua própria credencial. Esse recurso estará disponível em breve.</p>}
-      {status && !publicAccount && <Button onClick={generate} disabled={submitting || busy || !status.configured}>
+      {status && <Button onClick={generate} disabled={submitting || busy || !status.configured}>
         {submitting ? 'Solicitando...' : result ? 'Gerar novamente' : state === 'failed' ? 'Tentar novamente' : 'Gerar resumo'}
       </Button>}
       {content && <div className="space-y-5">

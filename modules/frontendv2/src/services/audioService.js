@@ -7,6 +7,26 @@ export const audioService = {
     return data
   },
 
+  async getProviderSettings() {
+    const { data } = await api.get('/settings/providers')
+    return data
+  },
+
+  async updateProviderPreferences(preferences) {
+    const { data } = await api.patch('/settings/providers', { preferences })
+    return data
+  },
+
+  async saveProviderCredential(provider, secret) {
+    const { data } = await api.post(`/settings/providers/${provider}/credential`, { secret })
+    return data
+  },
+
+  async deleteProviderCredential(provider) {
+    const { data } = await api.delete(`/settings/providers/${provider}/credential`)
+    return data
+  },
+
   // Upload e criação de job assíncrono local
   async createTranscriptionJob(file, options = {}) {
     const formData = new FormData()

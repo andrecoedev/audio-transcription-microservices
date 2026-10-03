@@ -1,7 +1,7 @@
 """Permission and credential origin are separate from provider availability.
 
-BYOK storage/resolution is deferred to P4-03/P4-04. Operator-provisioned local
-identities retain private contracts; public identities never inherit credentials.
+BYOK is resolved separately by provider_credentials. Operator-provisioned local
+identities retain explicit platform contracts; public identities never inherit credentials.
 """
 
 from fastapi import HTTPException
