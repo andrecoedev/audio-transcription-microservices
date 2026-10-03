@@ -169,11 +169,16 @@ describe('functional frontend contracts', () => {
   })
 
   it('labels queued transcriptions honestly', async () => {
+    const filename = `${'reuniao_de_planejamento_'.repeat(6)}.wav`
     audioService.listTranscriptions.mockResolvedValue({ total: 1, transcriptions: [
-      { id: 1, filename: 'fixture.wav', status: 'queued', created_at: '2026-10-02' },
+      { id: 1, filename, status: 'queued', created_at: '2026-10-02' },
     ] })
     render(<MemoryRouter><Dashboard /></MemoryRouter>)
     expect(await screen.findByText('Na fila')).toBeTruthy()
+    const link = screen.getByRole('link', { name: new RegExp(filename) })
+    expect(link.getAttribute('href')).toBe('/transcriptions/1')
+    expect(link.className).toContain('min-w-0')
+    expect(link.parentElement.className).toContain('grid-cols-1')
   })
 
   it.each(['transcriptions', 'meetings'])('retries failed %s instead of claiming there are no records', async kind => {
