@@ -217,8 +217,8 @@ export default function Settings() {
                 {statusError && <p role="alert" className="mb-2 text-sm text-red-700">Não foi possível consultar o sistema. Tente novamente.</p>}
                 <div className="space-y-2 text-sm">
                   <StatusRow label="Banco" value={health?.database || 'não verificado'} />
-                  <StatusRow label="Redis" value={health?.processing?.redis || 'não verificado'} />
-                  <StatusRow label="Worker RQ" value={health?.processing
+                  <StatusRow label="Fila de processamento" value={health?.processing?.redis || 'não verificado'} />
+                  <StatusRow label="Processamento de áudio" value={health?.processing
                     ? health.processing.worker_available ? 'disponível' : 'indisponível' : 'não verificado'} />
                   {[
                     ['Faster-Whisper local', 'whisper'], ['Pyannote local', 'diarization'],

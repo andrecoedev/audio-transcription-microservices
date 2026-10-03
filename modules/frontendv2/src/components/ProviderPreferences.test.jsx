@@ -80,7 +80,7 @@ it('marks a saved unavailable explicit choice and blocks saving until it is chan
   expect(screen.getByRole('option', { name: 'AssemblyAI (indisponível)' }).disabled).toBe(true)
   expect(screen.getAllByText(/Conecte ou atualize a credencial em Serviços de IA/).length).toBeGreaterThan(0)
   expect(screen.getByRole('button', { name: 'Salvar preferências' }).disabled).toBe(true)
-  fireEvent.change(screen.getByLabelText('Provedor de transcrição'), { target: { value: 'whisper' } })
+  fireEvent.change(screen.getByLabelText('Como transcrever seu áudio'), { target: { value: 'whisper' } })
   expect(updatePreference).toHaveBeenCalledWith('transcription_provider', 'whisper')
 })
 
@@ -149,7 +149,7 @@ it('disables all preference controls while saving', () => {
   }
   render(<ProviderPreferences settings={settings} preferences={settings.preferences} updatePreference={vi.fn()}
     savePreferences={vi.fn()} saving />)
-  expect(screen.getByLabelText('Provedor de transcrição').disabled).toBe(true)
-  expect(screen.getByLabelText('Provedor de inteligência de reuniões').disabled).toBe(true)
+  expect(screen.getByLabelText('Como transcrever seu áudio').disabled).toBe(true)
+  expect(screen.getByLabelText('Resumos inteligentes').disabled).toBe(true)
   expect(screen.getByRole('checkbox').disabled).toBe(true)
 })

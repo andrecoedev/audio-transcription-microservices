@@ -94,10 +94,10 @@ export default function ProviderPreferences({ settings, preferences, updatePrefe
       <p className="text-gray-600">Automático: usa sua conta AssemblyAI se houver uma chave salva; caso contrário, usa processamento local quando disponível. Para resumos, usa Gemini, o único serviço suportado nesta versão.</p>
     </div>
     <fieldset disabled={saving} className="grid gap-4 md:grid-cols-2">
-      <ProviderSelect kind="transcription" label="Como transcrever seu áudio" ariaLabel="Provedor de transcrição"
+      <ProviderSelect kind="transcription" label="Como transcrever seu áudio" ariaLabel="Como transcrever seu áudio"
         savedValue={savedTranscription} value={draftTranscription} providers={providers} busy={saving}
         onChange={(value) => updatePreference('transcription_provider', value)} />
-      <ProviderSelect kind="intelligence" label="Resumos inteligentes" ariaLabel="Provedor de inteligência de reuniões"
+      <ProviderSelect kind="intelligence" label="Resumos inteligentes" ariaLabel="Resumos inteligentes"
         savedValue={savedIntelligence} value={draftIntelligence} providers={providers} busy={saving}
         onChange={(value) => updatePreference('intelligence_provider', value)} />
       <label className="flex items-center gap-2 text-sm text-gray-700 md:col-span-2">

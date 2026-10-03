@@ -50,7 +50,7 @@ describe('Settings', () => {
   it('keeps operational health diagnostics available but collapsed by default', async () => {
     renderSettings()
     await screen.findByText('Gemini externo')
-    expect(screen.getByText('Worker RQ').parentElement.textContent).toContain('disponível')
+    expect(screen.getByText('Processamento de áudio').parentElement.textContent).toContain('disponível')
     const diagnostics = screen.getByText('Diagnóstico do sistema').closest('details')
     expect(diagnostics.open).toBe(false)
     expect(audioService.checkHealth).toHaveBeenCalledTimes(1)
@@ -64,7 +64,7 @@ describe('Settings', () => {
     } }))
     audioService.updateProviderPreferences.mockRejectedValue(new Error('sensitive detail'))
     renderSettings()
-    fireEvent.change(await screen.findByLabelText('Provedor de transcrição'), { target: { value: 'whisper' } })
+    fireEvent.change(await screen.findByLabelText('Como transcrever seu áudio'), { target: { value: 'whisper' } })
     fireEvent.click(screen.getByRole('button', { name: 'Salvar preferências' }))
     await waitFor(() => expect(audioService.updateProviderPreferences).toHaveBeenCalledWith({
       transcription_provider: 'whisper', intelligence_provider: 'automatic', use_diarization: false,
@@ -165,9 +165,9 @@ describe('Settings', () => {
   it('does not claim an edited preference is already active and shows failure on the transcription tab', async () => {
     audioService.updateProviderPreferences.mockRejectedValue(new Error('private detail'))
     renderSettings()
-    await screen.findByLabelText('Provedor de transcrição')
+    await screen.findByLabelText('Como transcrever seu áudio')
     fireEvent.click(screen.getByRole('tab', { name: 'Transcrição' }))
-    fireEvent.change(screen.getByLabelText('Provedor de transcrição'), { target: { value: 'whisper' } })
+    fireEvent.change(screen.getByLabelText('Como transcrever seu áudio'), { target: { value: 'whisper' } })
     expect(screen.getByText(/Rascunho:/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Salvar preferências' }))
     expect((await screen.findByRole('alert')).textContent).toContain('Não foi possível salvar as preferências')
