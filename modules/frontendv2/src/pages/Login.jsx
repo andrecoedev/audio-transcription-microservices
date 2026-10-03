@@ -128,9 +128,9 @@ export default function Login({ signup = false }) {
               </label>
               {signup && <p className="text-xs text-gray-500">Use uma senha com pelo menos 12 caracteres.</p>}
 
-              {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
               <Button type="submit" className="w-full" loading={loading}>{signup ? 'Criar conta' : 'Entrar'}</Button>
             </form>}
+            {error && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
 
             <div className="mt-5 flex flex-col items-center gap-3 text-sm text-primary-800">
               {(signup || localSignupEnabled || googleEnabled) && <Link to={`${signup ? '/login' : '/signup'}${guestQuery}`}>
