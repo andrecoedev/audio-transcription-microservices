@@ -1,85 +1,43 @@
-import { NavLink } from 'react-router-dom'
-import { 
-  LayoutDashboard, 
-  FileAudio, 
-  PlusCircle, 
-  Settings,
-  Activity,
-  Users,
-  Sparkles
-} from 'lucide-react'
+import { useState } from 'react'
+import { Link, NavLink } from 'react-router-dom'
+import { Home, FileAudio, Plus, Settings, Users, ListChecks, ChevronUp, LogOut } from 'lucide-react'
+import { useAuthStore } from '../stores/authStore'
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Nova Transcrição', href: '/new-transcription', icon: PlusCircle },
-  { name: 'Transcrições', href: '/transcriptions', icon: FileAudio },
+  { name: 'Início', href: '/', icon: Home },
+  { name: 'Nova transcrição', href: '/new-transcription', icon: Plus },
   { name: 'Reuniões', href: '/meetings', icon: Users },
-  { name: 'Atas legadas (IA)', href: '/meeting-minutes', icon: Sparkles },
+  { name: 'Histórico', href: '/transcriptions', icon: FileAudio },
+  { name: 'Tarefas', href: '/tasks', icon: ListChecks },
   { name: 'Configurações', href: '/settings', icon: Settings },
 ]
 
-const secondaryNav = [
-  { name: 'Status do Sistema', href: '/settings', icon: Activity },
-]
-
-export default function Sidebar() {
-  return (
-    <aside className="w-64 bg-white border-r border-gray-200 overflow-y-auto">
-      <div className="p-4">
-        {/* Navegação Principal */}
-        <nav className="space-y-1">
-          <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Principal
-          </p>
-          {navigation.map((item) => (
-            <NavLink
-              key={item.name}
-              to={item.href}
-              end={item.href === '/'}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  isActive
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`
-              }
-            >
-              <item.icon className="w-5 h-5" />
-              {item.name}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Divisor */}
-        <div className="my-4 border-t border-gray-200" />
-
-        {/* Navegação Secundária */}
-        <nav className="space-y-1">
-          <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-            Informações
-          </p>
-          {secondaryNav.map((item) => (
-            <NavLink
-              key={item.name}
-              to={item.href}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <item.icon className="w-5 h-5" />
-              {item.name}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Card de Informação */}
-        <div className="mt-6 p-4 bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg">
-          <h3 className="text-sm font-semibold text-primary-900 mb-1">
-            💡 Dica Rápida
-          </h3>
-          <p className="text-xs text-primary-700">
-            Use a detecção de falantes para identificar quem está falando no áudio.
-          </p>
-        </div>
-      </div>
-    </aside>
-  )
+export default function Sidebar({ onNavigate }) {
+  const { user, isAuthenticated, logout } = useAuthStore()
+  const [accountOpen, setAccountOpen] = useState(false)
+  return <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-gray-200 bg-white px-4 py-7">
+    <Link to="/" onClick={onNavigate} className="mb-10 px-3">
+      <span className="block text-2xl font-semibold tracking-[0.16em] text-primary-600">USAGI</span>
+      <span className="mt-1 block text-xs text-gray-500">Inteligência de áudio</span>
+    </Link>
+    <nav aria-label="Navegação principal" className="space-y-1">
+      {navigation.map(({ name, href, icon: Icon }) => <NavLink key={href} to={href} end={href === '/'} onClick={onNavigate}
+        className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? 'bg-primary-50 font-medium text-primary-800' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+        <Icon className="h-4 w-4" aria-hidden="true" />{name}
+      </NavLink>)}
+    </nav>
+    <div className="relative mt-auto pt-8">
+      {accountOpen && <div className="mb-2 space-y-1 rounded-xl border bg-white p-2 text-sm shadow-sm">
+        {isAuthenticated ? <><Link to="/settings" onClick={() => { setAccountOpen(false); onNavigate?.() }} className="block rounded-lg p-2 hover:bg-gray-50">Minha conta</Link>
+          <button type="button" onClick={() => { logout(); setAccountOpen(false); onNavigate?.() }} className="flex w-full items-center gap-2 rounded-lg p-2 text-left hover:bg-gray-50"><LogOut className="h-4 w-4" />Sair</button></>
+          : <><Link to="/login" onClick={onNavigate} className="block rounded-lg p-2 hover:bg-gray-50">Entrar</Link><Link to="/signup" onClick={onNavigate} className="block rounded-lg p-2 hover:bg-gray-50">Criar conta</Link></>}
+      </div>}
+      <button type="button" aria-label="Área da conta" aria-expanded={accountOpen} onClick={() => setAccountOpen(!accountOpen)} className="flex w-full items-center gap-3 rounded-xl border p-3 text-left hover:bg-gray-50">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-xs font-semibold text-primary-800">{user?.initials || 'V'}</span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{user?.name || 'Visitante'}</span><span className="block truncate text-[11px] text-gray-500">{user?.email || 'Salvar com uma conta'}</span></span>
+        <ChevronUp className="h-3 w-3 text-gray-500" aria-hidden="true" />
+      </button>
+      {!isAuthenticated && <div className="mt-3 flex justify-center gap-3 text-xs text-primary-700"><Link to="/login" onClick={onNavigate}>Entrar</Link><Link to="/signup" onClick={onNavigate}>Criar conta</Link></div>}
+    </div>
+  </aside>
 }

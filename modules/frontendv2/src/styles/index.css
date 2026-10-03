@@ -3,22 +3,32 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --usagi-canvas: #f7f8fa;
+    --usagi-surface: #fff;
+    --usagi-ink: #14191d;
+    --usagi-border: #e0e4e9;
+    --usagi-radius: 12px;
+  }
   * {
     @apply border-gray-200;
   }
   body {
-    @apply bg-gray-50 text-gray-900;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-      sans-serif;
+    background: var(--usagi-canvas);
+    color: var(--usagi-ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  :focus-visible { @apply outline outline-2 outline-offset-2 outline-primary-500; }
+  button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 }
 
 @layer components {
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200;
+    background: var(--usagi-surface);
+    border: 1px solid var(--usagi-border);
+    border-radius: var(--usagi-radius);
   }
   
   .btn-primary {
@@ -30,7 +40,7 @@
   }
   
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500;
   }
   
   .badge {
@@ -65,8 +75,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  background: #c0c9c3;
   border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
 ::-webkit-scrollbar-thumb:hover {
