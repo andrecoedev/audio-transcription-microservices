@@ -1,5 +1,7 @@
 """Permanent security and persistence coverage for account provider settings."""
 
+import secrets
+
 from cryptography.fernet import Fernet
 import pytest
 
@@ -15,7 +17,10 @@ def credential_cipher(monkeypatch):
     return key
 
 
-def _save(client, headers, provider="assemblyai", secret="private-aai-key-123"):
+def _save(client, headers, provider="assemblyai", secret=None):
+    # Synthetic input generated per call; never a real provider credential.
+    if secret is None:
+        secret = secrets.token_urlsafe(32)
     return client.post(
         f"/settings/providers/{provider}/credential",
         json={"secret": secret},
@@ -36,7 +41,7 @@ def test_settings_are_account_scoped_and_credentials_are_write_only(
         "use_diarization": False,
     }
 
-    secret = "alice-aai-secret-987"
+    secret = secrets.token_urlsafe(32)
     saved = _save(client, alice_headers, secret=secret)
     assert saved.status_code == 200
     assert secret not in saved.text
@@ -97,7 +102,7 @@ def test_rotation_revokes_queued_reference_and_delete_is_owner_scoped_and_idempo
 ):
     client = db_context["client"]
     headers = auth_headers()
-    assert _save(client, headers, secret="old-secret-123456").status_code == 200
+    assert _save(client, headers).status_code == 200
     db = db_context["session_factory"]()
     old = db.query(UserProviderCredential).filter_by(user_id=1, provider="assemblyai").one()
     transcription = Transcription(
@@ -112,7 +117,7 @@ def test_rotation_revokes_queued_reference_and_delete_is_owner_scoped_and_idempo
     old_id = old.id
     db.close()
 
-    rotated = _save(client, headers, secret="new-secret-123456")
+    rotated = _save(client, headers)
     assert rotated.status_code == 200
     db = db_context["session_factory"]()
     try:
@@ -140,16 +145,17 @@ def test_credential_configuration_and_provider_inputs_fail_closed(
     db_context, auth_headers, monkeypatch
 ):
     client, headers = db_context["client"], auth_headers()
+    secret = secrets.token_urlsafe(32)
     monkeypatch.setattr(settings, "PROVIDER_CREDENTIAL_ENCRYPTION_KEY", None)
-    unavailable = _save(client, headers)
+    unavailable = _save(client, headers, secret=secret)
     assert unavailable.status_code == 503
-    assert "private-aai-key-123" not in unavailable.text
+    assert secret not in unavailable.text
     # The JWT signing key is not an acceptable substitute for the independent
     # at-rest encryption key, even though it is valid key material.
     monkeypatch.setattr(settings, "PROVIDER_CREDENTIAL_ENCRYPTION_KEY", settings.SECRET_KEY)
-    reused_jwt_key = _save(client, headers)
+    reused_jwt_key = _save(client, headers, secret=secret)
     assert reused_jwt_key.status_code == 503
-    assert "private-aai-key-123" not in reused_jwt_key.text
+    assert secret not in reused_jwt_key.text
     db = db_context["session_factory"]()
     try:
         assert db.query(UserProviderCredential).count() == 0
@@ -170,7 +176,7 @@ def test_main_validation_handler_never_echoes_rejected_secret():
     from fastapi.exceptions import RequestValidationError
     from src.main import safe_validation_error
 
-    rejected = "malicious-token-with-whitespace"
+    rejected = "synthetic invalid input with spaces"
     error = RequestValidationError([{
         "type": "value_error", "loc": ("body", "secret"),
         "msg": "Invalid provider credential format", "input": rejected,
@@ -184,9 +190,9 @@ def test_ciphertext_swap_between_accounts_or_providers_cannot_decrypt(
     db_context, auth_headers, credential_cipher
 ):
     client = db_context["client"]
-    assert _save(client, auth_headers(), secret="assembly-secret-123").status_code == 200
-    assert _save(client, auth_headers(username="bob"), secret="bobs-assembly-secret").status_code == 200
-    assert _save(client, auth_headers(), provider="gemini", secret="gemini-secret-123").status_code == 200
+    assert _save(client, auth_headers()).status_code == 200
+    assert _save(client, auth_headers(username="bob")).status_code == 200
+    assert _save(client, auth_headers(), provider="gemini").status_code == 200
     db = db_context["session_factory"]()
     try:
         aai = db.query(UserProviderCredential).filter_by(user_id=1, provider="assemblyai").one()
@@ -239,7 +245,7 @@ def test_public_account_upload_queues_byok_reference_without_platform_reservatio
     from src.models import User
     from src.routers import transcriptions
 
-    assert _save(db_context["client"], auth_headers(), secret="public-account-aai-key").status_code == 200
+    assert _save(db_context["client"], auth_headers()).status_code == 200
     db = db_context["session_factory"]()
     try:
         db.get(User, 1).registration_source = "public"

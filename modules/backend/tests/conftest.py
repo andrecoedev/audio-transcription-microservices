@@ -1,4 +1,5 @@
 import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -16,7 +17,7 @@ os.environ.update(
         "AUTH_MODE": "strict",
         "AUTH_PROTECT_PROCESSING": "true",
         "AUTH_PROTECT_READS": "true",
-        "SECRET_KEY": "test-secret-key-with-at-least-32-characters",
+        "SECRET_KEY": secrets.token_urlsafe(32),
         "DATABASE_URL": "sqlite:///:memory:",
         "DEBUG": "false",
     }
