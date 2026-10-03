@@ -1,19 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { 
-  Search, 
-  Filter, 
-  FileAudio, 
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Eye,
-  Trash2
-} from 'lucide-react'
-import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
+import { FileAudio, Search, Trash2 } from 'lucide-react'
+import Card, { CardContent } from '../components/Card'
 import Button from '../components/Button'
 import { audioService } from '../services/audioService'
+import { formatDuration, formatTimestamp } from '../utils/format'
 import toast from 'react-hot-toast'
+
+const STATUS_LABELS = { queued: 'Na fila', processing: 'Processando', completed: 'Concluída', failed: 'Falhou' }
 
 export default function Transcriptions() {
   const [transcriptions, setTranscriptions] = useState([])
@@ -25,211 +19,30 @@ export default function Transcriptions() {
   const [pagination, setPagination] = useState({ skip: 0, limit: 10 })
 
   const loadTranscriptions = useCallback(async () => {
+    setLoading(true); setError(false)
     try {
-      setLoading(true)
-      setError(false)
-      const params = { 
-        ...pagination,
-        status: statusFilter !== 'all' ? statusFilter : undefined 
-      }
-      const data = await audioService.listTranscriptions(params)
+      const data = await audioService.listTranscriptions({ ...pagination, status: statusFilter !== 'all' ? statusFilter : undefined })
       setTranscriptions(data.transcriptions || [])
       setTotal(data.total ?? data.transcriptions?.length ?? 0)
-    } catch (error) {
-      setError(true)
-      toast.error('Erro ao carregar transcrições')
-    } finally {
-      setLoading(false)
-    }
+    } catch { setError(true) } finally { setLoading(false) }
   }, [pagination, statusFilter])
+  useEffect(() => { loadTranscriptions() }, [loadTranscriptions])
 
-  useEffect(() => {
-    loadTranscriptions()
-  }, [loadTranscriptions])
-
-  const handleDelete = async (id) => {
-    if (!confirm('Tem certeza que deseja excluir esta transcrição?')) return
-
-    try {
-      await audioService.deleteTranscription(id)
-      toast.success('Transcrição excluída com sucesso')
-      loadTranscriptions()
-    } catch (error) {
-      toast.error('Erro ao excluir transcrição')
-    }
+  const handleDelete = async (item) => {
+    if (!window.confirm(`Tem certeza que deseja excluir “${item.filename}”?`)) return
+    try { await audioService.deleteTranscription(item.id); toast.success('Transcrição excluída'); await loadTranscriptions() } catch { toast.error('Não foi possível excluir a transcrição') }
   }
+  const visible = transcriptions.filter((item) => (item.filename || '').toLowerCase().includes(searchTerm.toLowerCase()))
 
-  const getStatusBadge = (status) => {
-    const badges = {
-      queued: { text: 'Na fila', class: 'badge-warning', icon: Clock },
-      completed: { 
-        text: 'Concluída', 
-        class: 'badge-success',
-        icon: CheckCircle2 
-      },
-      processing: { 
-        text: 'Processando', 
-        class: 'badge-warning',
-        icon: Clock
-      },
-      failed: { 
-        text: 'Falhou', 
-        class: 'badge-error',
-        icon: XCircle
-      },
-    }
-    const badge = badges[status] || badges.processing
-    const Icon = badge.icon
-    return (
-      <span className={`badge ${badge.class} flex items-center gap-1`}>
-        <Icon className="w-3 h-3" />
-        {badge.text}
-      </span>
-    )
-  }
-
-  const filteredTranscriptions = transcriptions.filter(t =>
-    t.filename.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Transcrições</h1>
-          <p className="text-gray-600 mt-1">Gerencie todas as suas transcrições</p>
-        </div>
-        <Link to="/new-transcription">
-          <Button icon={FileAudio}>Nova Transcrição</Button>
-        </Link>
-      </div>
-
-      {/* Filtros */}
-      <Card>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Busca */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar nesta página por nome do arquivo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-
-            {/* Filtro de Status */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5 text-gray-400" />
-              <select
-                aria-label="Filtrar por status"
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value)
-                  setPagination(current => ({ ...current, skip: 0 }))
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="all">Todos os status</option>
-                <option value="completed">Concluídas</option>
-                <option value="processing">Processando</option>
-                <option value="queued">Na fila</option>
-                <option value="failed">Falharam</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Lista de Transcrições */}
-      <Card>
-        <CardHeader>
-          <CardTitle>📋 Transcrições nesta página ({filteredTranscriptions.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Carregando transcrições...</p>
-            </div>
-          ) : error ? <div className="space-y-3">
-            <p role="alert">Não foi possível carregar as transcrições.</p>
-            <Button onClick={loadTranscriptions}>Tentar novamente</Button>
-          </div> : filteredTranscriptions.length === 0 ? (
-            <div className="text-center py-12">
-              <FileAudio className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600 mb-4">
-                {searchTerm ? 'Nenhuma transcrição encontrada nesta página' : pagination.skip > 0 || statusFilter !== 'all' ? 'Nenhuma transcrição nesta página' : 'Nenhuma transcrição ainda'}
-              </p>
-              {!searchTerm && pagination.skip === 0 && statusFilter === 'all' && (
-                <Link to="/new-transcription">
-                  <Button size="sm">Criar Primeira Transcrição</Button>
-                </Link>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredTranscriptions.map((transcription) => (
-                <div
-                  key={transcription.id}
-                  className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="p-3 bg-primary-100 rounded-lg">
-                        <FileAudio className="w-6 h-6 text-primary-600" />
-                      </div>
-                      
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{transcription.filename}</h3>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
-                          <span>📅 {new Date(transcription.created_at).toLocaleDateString('pt-BR')}</span>
-                          <span>⏱️ {transcription.duration_seconds?.toFixed(1)}s</span>
-                          <span>📝 {transcription.word_count || 0} palavras</span>
-                          {transcription.num_speakers && (
-                            <span>🗣️ {transcription.num_speakers} falantes</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {getStatusBadge(transcription.status)}
-                      
-                      <div className="flex items-center gap-2">
-                        <Link to={`/transcriptions/${transcription.id}`}>
-                          <Button variant="outline" size="sm" icon={Eye}>
-                            Ver
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Excluir ${transcription.filename}`}
-                          onClick={() => handleDelete(transcription.id)}
-                          className="text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      {!error && <div className="flex items-center justify-between gap-3">
-        <Button variant="outline" disabled={loading || pagination.skip === 0}
-          onClick={() => setPagination(current => ({ ...current, skip: Math.max(0, current.skip - current.limit) }))}>Anterior</Button>
-        <p>Página {Math.floor(pagination.skip / pagination.limit) + 1} · {total} transcrições</p>
-        <Button variant="outline" disabled={loading || pagination.skip + pagination.limit >= total}
-          onClick={() => setPagination(current => ({ ...current, skip: current.skip + current.limit }))}>Próxima</Button>
-      </div>}
-    </div>
-  )
+  return <div className="space-y-6">
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-3xl font-bold text-gray-900">Histórico</h1><p className="mt-1 text-gray-600">Acompanhe transcrições e status de processamento.</p></div><Link to="/new-transcription"><Button icon={FileAudio}>Nova transcrição</Button></Link></div>
+    <Card className="p-4"><CardContent><div className="flex flex-col gap-3 md:flex-row md:items-center">
+      <label className="relative min-w-0 flex-1"><Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500"/><span className="sr-only">Buscar transcrições</span><input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Buscar por nome do arquivo..." className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3"/></label>
+      <select aria-label="Filtrar por status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPagination((current) => ({ ...current, skip: 0 })) }} className="rounded-lg border border-gray-300 px-3 py-2"><option value="all">Todos os status</option><option value="completed">Concluídas</option><option value="processing">Processando</option><option value="queued">Na fila</option><option value="failed">Falharam</option></select>
+    </div></CardContent></Card>
+    <Card className="overflow-hidden p-0"><CardContent>
+      {loading ? <p role="status" className="p-8 text-center text-gray-600">Carregando transcrições...</p> : error ? <div className="space-y-3 p-6"><p role="alert">Não foi possível carregar ou atualizar o histórico.</p><Button onClick={loadTranscriptions}>Tentar novamente</Button></div> : visible.length === 0 ? <div className="p-10 text-center"><p className="text-gray-600">{searchTerm || statusFilter !== 'all' ? 'Nenhuma transcrição corresponde aos filtros.' : 'Nenhuma transcrição ainda.'}</p>{!searchTerm && statusFilter === 'all' && <Link className="mt-3 inline-block text-primary-700 hover:underline" to="/new-transcription">Enviar primeiro áudio</Link>}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-5 py-3">Arquivo</th><th className="px-4 py-3">Data</th><th className="px-4 py-3">Duração</th><th className="px-4 py-3">Palavras</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y divide-gray-200">{visible.map((item) => <tr key={item.id} className="hover:bg-gray-50"><td className="max-w-sm px-5 py-4"><Link className="block truncate font-medium text-gray-900 hover:underline" to={`/transcriptions/${item.id}`}>{item.filename}</Link>{item.num_speakers > 0 && <p className="mt-1 text-xs text-gray-500">{item.num_speakers} falantes</p>}</td><td className="whitespace-nowrap px-4 py-4 text-gray-600">{formatTimestamp(item.created_at)}</td><td className="whitespace-nowrap px-4 py-4 text-gray-600">{formatDuration(item.duration_seconds)}</td><td className="px-4 py-4 text-gray-600">{item.word_count ?? '—'}</td><td className="px-4 py-4"><span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">{STATUS_LABELS[item.status] || item.status}</span></td><td className="px-4 py-4 text-right"><div className="inline-flex items-center gap-2"><Link to={`/transcriptions/${item.id}`}><Button size="sm" variant="outline">Abrir</Button></Link><Button size="sm" variant="ghost" aria-label={`Excluir ${item.filename}`} onClick={() => handleDelete(item)}><Trash2 className="h-4 w-4"/></Button></div></td></tr>)}</tbody></table></div>}
+    </CardContent></Card>
+    {!error && <div className="flex items-center justify-between gap-3"><Button variant="outline" disabled={loading || pagination.skip === 0} onClick={() => setPagination((current) => ({ ...current, skip: Math.max(0, current.skip - current.limit) }))}>Anterior</Button><p className="text-sm text-gray-600">Página {Math.floor(pagination.skip / pagination.limit) + 1} · {total} transcrições</p><Button variant="outline" disabled={loading || pagination.skip + pagination.limit >= total} onClick={() => setPagination((current) => ({ ...current, skip: current.skip + current.limit }))}>Próxima</Button></div>}
+  </div>
 }
