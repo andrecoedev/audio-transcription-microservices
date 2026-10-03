@@ -138,6 +138,22 @@ it('creates manual work without intelligence and retains it after reload', async
   expect(screen.getByText(/Criada manualmente/)).toBeTruthy()
 })
 
+it('keeps action field labels stacked with aligned full-width inputs', async () => {
+  render(<MeetingActionsPanel meetingId="42" />)
+  const description = await screen.findByLabelText('Nova tarefa descrição')
+  const assignee = screen.getByLabelText('Nova tarefa responsável')
+  const dueDate = screen.getByLabelText('Nova tarefa prazo')
+  const fields = description.closest('label').parentElement
+
+  expect(fields.className).toContain('sm:grid-cols-2')
+  expect(description.closest('label').className).toContain('sm:col-span-2')
+  for (const input of [description, assignee, dueDate]) {
+    expect(input.closest('label').className).toContain('flex-col')
+    expect(input.className).toContain('w-full')
+    expect(input.className).toContain('min-w-0')
+  }
+})
+
 it('completes and reopens tasks, then honors explicit deletion', async () => {
   actions = [{ id: 1, description: 'Original', assignee: 'Bruno', due_date: '2026-10-05', status: 'open' }]
   render(<MeetingActionsPanel meetingId="42" />)
