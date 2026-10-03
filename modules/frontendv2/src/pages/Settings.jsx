@@ -7,6 +7,7 @@ import Button from '../components/Button'
 import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import PageHeader from '../components/PageHeader'
 import ProviderConnectionCard from '../components/ProviderConnectionCard'
+import ProviderPreferences from '../components/ProviderPreferences'
 import { audioService } from '../services/audioService'
 import { useAuthStore } from '../stores/authStore'
 
@@ -22,6 +23,7 @@ export default function Settings() {
   const updateProfile = useAuthStore((state) => state.updateProfile)
   const [activeTab, setActiveTab] = useState('ai')
   const [providerSettings, setProviderSettings] = useState(null)
+  const [preferences, setPreferences] = useState(null)
   const [health, setHealth] = useState(null)
   const [statusError, setStatusError] = useState(false)
   const [statusLoading, setStatusLoading] = useState(false)
@@ -37,7 +39,9 @@ export default function Settings() {
     setProviderLoading(true)
     setErrorMessage('')
     try {
-      setProviderSettings(await audioService.getProviderSettings())
+      const result = await audioService.getProviderSettings()
+      setProviderSettings(result)
+      setPreferences(result.preferences)
       setProviderError(false)
     } catch {
       setProviderSettings(null)
@@ -65,18 +69,17 @@ export default function Settings() {
     refreshStatus()
   }, [refreshProviderSettings, refreshStatus])
 
-  const updatePreference = (key, value) => setProviderSettings((current) => ({
-    ...current,
-    preferences: { ...current.preferences, [key]: value },
-  }))
+  const updatePreference = (key, value) => setPreferences((current) => ({ ...current, [key]: value }))
 
   const savePreferences = async (event) => {
     event.preventDefault()
     setProviderSaving(true)
     setErrorMessage('')
     try {
-      setProviderSettings(await audioService.updateProviderPreferences(providerSettings.preferences))
-      toast.success('Preferências de provedores salvas')
+      const result = await audioService.updateProviderPreferences(preferences)
+      setProviderSettings(result)
+      setPreferences(result.preferences)
+      toast.success('Preferências salvas')
     } catch {
       setErrorMessage('Não foi possível salvar as preferências. Tente novamente.')
       toast.error('Não foi possível salvar as preferências de provedores')
@@ -141,7 +144,7 @@ export default function Settings() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <PageHeader title="Configurações" description="Gerencie preferências, serviços de IA e credenciais da sua conta.">
+      <PageHeader title="Configurações" description="Escolha como processar seu áudio e conecte suas contas de IA.">
         <Button variant="outline" size="sm" onClick={() => { refreshStatus(); refreshProviderSettings() }} loading={statusLoading || providerLoading} disabled={statusLoading || providerLoading || providerSaving} icon={RefreshCw}>Atualizar</Button>
       </PageHeader>
 
@@ -156,6 +159,7 @@ export default function Settings() {
           {tab.label}
         </button>)}
       </div>
+      {errorMessage && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>}
 
       <section role="tabpanel" id={`settings-panel-${activeTab}`} aria-labelledby={`settings-tab-${activeTab}`}>
         {activeTab === 'account' && <Card>
@@ -174,8 +178,8 @@ export default function Settings() {
 
         {activeTab === 'transcription' && <Card>
           <CardHeader><CardTitle>Preferências de transcrição</CardTitle></CardHeader>
-          <CardContent>{providerSettings ? <PreferencesForm settings={providerSettings} updatePreference={updatePreference}
-            savePreferences={savePreferences} providerSaving={providerSaving} /> : <LoadingState loading={providerLoading} error={providerError} retry={refreshProviderSettings} />}</CardContent>
+          <CardContent>{providerSettings ? <ProviderPreferences settings={providerSettings} preferences={preferences} updatePreference={updatePreference}
+            savePreferences={savePreferences} saving={providerSaving} /> : <LoadingState loading={providerLoading} error={providerError} retry={refreshProviderSettings} />}</CardContent>
         </Card>}
 
         {activeTab === 'ai' && <div className="space-y-6">
@@ -186,9 +190,8 @@ export default function Settings() {
           {providerSettings && <>
             <div>
               <h2 className="text-2xl font-semibold text-gray-900">Serviços de IA</h2>
-              <p className="mt-1 text-gray-600">As opções disponíveis refletem as permissões e credenciais desta conta.</p>
+              <p className="mt-1 text-gray-600">Escolha o processamento nas preferências abaixo. Conectar sua própria conta define quem fornece e paga pelo serviço externo.</p>
             </div>
-            {errorMessage && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>}
             <div className="grid gap-4 lg:grid-cols-2">
               <ProviderCard title="Transcrição de áudio" provider="assemblyai" configuredProvider={providerSettings.providers.assemblyai}
                 credential={providerSettings.credentials.assemblyai} settings={providerSettings} saving={providerSaving} operation={credentialOperation}
@@ -199,8 +202,8 @@ export default function Settings() {
                 value={credentials.gemini} onChange={(value) => setCredentials({ ...credentials, gemini: value })}
                 onSave={() => saveCredential('gemini')} onRemove={() => removeCredential('gemini')} />
             </div>
-            <PreferencesForm settings={providerSettings} updatePreference={updatePreference}
-              savePreferences={savePreferences} providerSaving={providerSaving} />
+            <ProviderPreferences settings={providerSettings} preferences={preferences} updatePreference={updatePreference}
+              savePreferences={savePreferences} saving={providerSaving} />
             <div className="flex gap-3 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary-800" />
               <p><span className="font-medium text-gray-900">Credenciais protegidas.</span> Depois de salvas, as chaves não são exibidas novamente. “Configurada” indica que foi salva; não confirma validade ou acesso no serviço externo.</p>
@@ -245,35 +248,6 @@ export default function Settings() {
   )
 }
 
-function PreferencesForm({ settings, updatePreference, savePreferences, providerSaving }) {
-  const { preferences, providers } = settings
-  const label = (provider) => providers[provider].allowed ? provider === 'whisper' ? 'Faster-Whisper' : provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini' : `${provider === 'assemblyai' ? 'AssemblyAI' : provider === 'gemini' ? 'Gemini' : 'Faster-Whisper'} (indisponível nesta conta)`
-  return <form onSubmit={savePreferences} className="rounded-lg border border-gray-200 bg-white p-5">
-    <h3 className="mb-4 text-lg font-semibold text-gray-900">Preferências de provedores</h3>
-    <div className="grid gap-4 md:grid-cols-2">
-      <label className="block text-sm font-medium text-gray-700">Provedor de transcrição
-        <select aria-label="Provedor de transcrição" className="input mt-2" value={preferences.transcription_provider}
-          onChange={(event) => updatePreference('transcription_provider', event.target.value)}>
-          <option value="automatic">Automático</option>
-          <option value="whisper" disabled={!providers.whisper.allowed}>{label('whisper')}</option>
-          <option value="assemblyai" disabled={!providers.assemblyai.allowed}>{label('assemblyai')}</option>
-        </select>
-      </label>
-      <label className="block text-sm font-medium text-gray-700">Provedor de inteligência de reuniões
-        <select aria-label="Provedor de inteligência de reuniões" className="input mt-2" value={preferences.intelligence_provider}
-          onChange={(event) => updatePreference('intelligence_provider', event.target.value)}>
-          <option value="automatic">Automático</option>
-          <option value="gemini" disabled={!providers.gemini.allowed}>{label('gemini')}</option>
-        </select>
-      </label>
-    </div>
-    <label className="mt-4 flex items-center gap-2 text-sm text-gray-700">
-      <input type="checkbox" checked={preferences.use_diarization} onChange={(event) => updatePreference('use_diarization', event.target.checked)} />
-      Ativar detecção de falantes por padrão
-    </label>
-    <div className="mt-4"><Button type="submit" icon={Save} loading={providerSaving} disabled={providerSaving}>Salvar preferências</Button></div>
-  </form>
-}
 
 function ProviderCard({ provider, configuredProvider, credential, settings, saving, operation, value, onChange, onSave, onRemove }) {
   return <ProviderConnectionCard provider={provider} details={configuredProvider} credential={credential}
