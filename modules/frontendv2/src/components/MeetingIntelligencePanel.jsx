@@ -1,18 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import Card, { CardContent, CardHeader, CardTitle } from './Card'
 import Button from './Button'
 import { audioService } from '../services/audioService'
 
-function EvidenceLinks({ evidence, references }) {
-  return <div className="text-sm text-gray-500 mt-1">{evidence.map((item, index) => {
+function EvidenceLinks({ evidence = [], references = [] }) {
+  return <div className="mt-1 text-sm text-gray-500">{evidence.map((item, index) => {
     const reference = references.find(ref => ref.segment_order === item.segment_order)
-    return <a key={index} href={`#segment-${item.segment_order}`} title={item.quote} className="text-primary-700 underline mr-3">
+    return <a key={index} href={`#segment-${item.segment_order}`} title={item.quote} className="mr-3 text-primary-700 underline">
       {reference ? `${reference.start.toFixed(1)}s–${reference.end.toFixed(1)}s` : `Segmento ${item.segment_order + 1}`}
     </a>
   })}</div>
 }
 
-export default function MeetingIntelligencePanel({ meetingId, onResultChange }) {
+export default function MeetingIntelligencePanel({ meetingId, onResultChange, initialTab = 'all' }) {
   const [status, setStatus] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
@@ -58,35 +57,34 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange }) 
   const state = status?.generation?.status
   const busy = ['pending', 'processing'].includes(state)
   const content = result?.content
-  return <Card><CardHeader><CardTitle>Resumo inteligente</CardTitle></CardHeader><CardContent>
-    <div className="space-y-4">
-      {error && <p role="alert" className="text-red-700">{error}</p>}
-      {error && <Button variant="outline" onClick={() => setRefresh(value => value + 1)}>Consultar novamente</Button>}
-      {!status && !error && <p>Consultando análise...</p>}
-      {status && !status.generation && <p>Ainda não gerada.</p>}
-      {status && !status.configured && <p>Geração indisponível neste ambiente.</p>}
-      {busy && <p role="status">{result ? 'Gerando novamente; a versão anterior continua disponível.' : 'Gerando resumo...'}</p>}
-      {state === 'failed' && <p role="alert" className="text-red-700">A geração falhou. Você pode tentar novamente.</p>}
-      {status && <Button onClick={generate} disabled={submitting || busy || !status.configured}>
-        {submitting ? 'Solicitando...' : result ? 'Gerar novamente' : state === 'failed' ? 'Tentar novamente' : 'Gerar resumo'}
-      </Button>}
-      {content && <div className="space-y-5">
-        <p className="text-sm text-gray-500">Versão {result.revision} · {result.provider} · {result.model}. Revise os itens com as evidências do transcript.</p>
-        <section><h3 className="font-semibold text-gray-900">Resumo</h3><p className="whitespace-pre-wrap mt-2">{content.summary}</p></section>
-        {[
-          ['Tópicos', content.topics], ['Decisões', content.decisions],
-          ['Tarefas', content.action_items], ['Pendências', content.open_questions],
-        ].map(([title, items]) => <section key={title}>
-          <h3 className="font-semibold text-gray-900">{title}</h3>
-          {items.length === 0 ? <p className="text-gray-500 mt-2">Nenhum item identificado.</p> : <ul className="space-y-3 mt-2">
-            {items.map((item, index) => <li key={index} className="p-3 bg-gray-50 rounded-lg">
-              <p>{item.description}</p>
-              {title === 'Tarefas' && <p className="text-sm text-gray-600 mt-1">Responsável: {item.assignee || 'Não identificado'} · Prazo: {item.due_date || 'Sem prazo explícito'}</p>}
-              <EvidenceLinks evidence={item.evidence} references={result.references} />
-            </li>)}
-          </ul>}
-        </section>)}
-      </div>}
-    </div>
-  </CardContent></Card>
+  const visibleSections = initialTab === 'all' ? ['summary', 'topics', 'decisions', 'actions', 'questions'] : [initialTab]
+  const sections = [
+    ['topics', 'Tópicos', content?.topics], ['decisions', 'Decisões', content?.decisions],
+    ['actions', 'Tarefas', content?.action_items], ['questions', 'Perguntas em aberto', content?.open_questions],
+  ]
+
+  return <section className="space-y-4">
+    {error && <p role="alert" className="text-red-700">{error}</p>}
+    {error && <Button variant="outline" onClick={() => setRefresh(value => value + 1)}>Consultar novamente</Button>}
+    {!status && !error && <p role="status" className="text-sm text-gray-500">Consultando análise...</p>}
+    {status && !status.generation && !result && <p className="text-sm text-gray-600">Ainda não há análise desta reunião.</p>}
+    {status && !status.configured && <p className="text-sm text-gray-600">Geração indisponível neste ambiente.</p>}
+    {busy && <p role="status" className="text-sm text-gray-600">{result ? 'Gerando novamente; a versão anterior continua disponível.' : 'Gerando resumo...'}</p>}
+    {state === 'failed' && <p role="alert" className="text-sm text-red-700">A geração falhou. Você pode tentar novamente.</p>}
+    {status && <Button onClick={generate} disabled={submitting || busy || !status.configured}>
+      {submitting ? 'Solicitando...' : result ? 'Gerar novamente' : state === 'failed' ? 'Tentar novamente' : 'Gerar resumo'}
+    </Button>}
+    {content && <div className="space-y-5">
+      <p className="text-xs text-gray-500">Versão {result.revision} · {result.provider} · {result.model}</p>
+      {visibleSections.includes('summary') && <section><h3 className="font-semibold text-gray-900">Resumo</h3><p className="mt-2 whitespace-pre-wrap leading-7">{content.summary}</p></section>}
+      {sections.filter(([key]) => visibleSections.includes(key)).map(([key, heading, items]) => <section key={key} className="space-y-2">
+        <h3 className="font-semibold text-gray-900">{heading}</h3>
+        {items?.length ? <ul className="space-y-3">{items.map((item, index) => <li key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <p>{item.description}</p>
+          {key === 'actions' && <p className="mt-1 text-sm text-gray-600">Responsável: {item.assignee || 'Não identificado'} · Prazo: {item.due_date || 'Sem prazo explícito'}</p>}
+          <EvidenceLinks evidence={item.evidence} references={result.references} />
+        </li>)}</ul> : <p className="text-sm text-gray-500">Nenhum item identificado.</p>}
+      </section>)}
+    </div>}
+  </section>
 }
