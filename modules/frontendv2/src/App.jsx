@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/Layout'
@@ -14,53 +14,51 @@ import Login from './pages/Login'
 import Guest from './pages/Guest'
 import Tasks from './pages/Tasks'
 import Card, { CardContent, CardHeader, CardTitle } from './components/Card'
-import { authService } from './services/authService'
+import { restoreSession } from './services/sessionService'
+import { firebaseAuth } from './services/firebaseAuth'
 import { useAuthStore } from './stores/authStore'
 
 function AccountRequired({ children }) {
   const authenticated = useAuthStore((state) => state.isAuthenticated)
+  const location = useLocation()
+  const context = `?returnTo=${encodeURIComponent(location.pathname + location.search)}`
   if (authenticated) return children
   return <Card><CardHeader><CardTitle>Salve e acompanhe suas reuniões</CardTitle></CardHeader>
     <CardContent><p className="text-gray-600 mb-4">Entre ou crie uma conta para usar este recurso. Sua transcrição temporária continua disponível nesta aba.</p>
-      <div className="flex gap-4 text-primary-700"><Link to="/login">Entrar</Link><Link to="/signup">Criar conta</Link><Link to="/new-transcription">Transcrever um arquivo</Link></div>
+      <div className="flex gap-4 text-primary-700"><Link to={`/login${context}`}>Entrar</Link><Link to={`/signup${context}`}>Criar conta</Link><Link to="/new-transcription">Transcrever um arquivo</Link></div>
     </CardContent></Card>
 }
 
 function App() {
   const {
     isAuthenticated,
-    setSession,
     logout,
   } = useAuthStore()
   const [bootstrapped, setBootstrapped] = useState(false)
 
   useEffect(() => {
+    let disposed = false
+    let unsubscribe
     const bootstrap = async () => {
-      let verified = false
       try {
-        const token = localStorage.getItem('token')
-        if (token) {
-          const me = await authService.me()
-          if (me.authenticated) {
-            setSession(me.user, token)
-            verified = true
-            setBootstrapped(true)
-            return
-          }
+        await restoreSession()
+        if (!disposed) {
+          unsubscribe = await firebaseAuth.observe((signedIn) => {
+            if (!signedIn && useAuthStore.getState().authProvider === 'firebase') logout()
+          })
+          if (disposed) unsubscribe()
         }
-
       } catch {
         // Fail closed: API unavailability never creates an anonymous session.
+        logout()
       } finally {
-        if (!verified) {
-          logout()
-        }
-        setBootstrapped(true)
+        if (!disposed) setBootstrapped(true)
       }
     }
 
     bootstrap()
-  }, [setSession, logout])
+    return () => { disposed = true; unsubscribe?.() }
+  }, [logout])
 
   if (!bootstrapped) {
     return <p role="status" className="p-6 text-gray-600">Verificando sessão...</p>
@@ -104,7 +102,7 @@ function App() {
           <Route path="meetings" element={<AccountRequired><Meetings /></AccountRequired>} />
           <Route path="meetings/:id" element={<AccountRequired><MeetingDetail /></AccountRequired>} />
           <Route path="tasks" element={<AccountRequired><Tasks /></AccountRequired>} />
-          <Route path="new-transcription" element={isAuthenticated ? <NewTranscription /> : <Guest />} />
+          <Route path="new-transcription" element={isAuthenticated ? <><Guest showUpload={false} /><NewTranscription /></> : <Guest />} />
           <Route path="meeting-minutes" element={<AccountRequired><MeetingMinutes /></AccountRequired>} />
           <Route path="settings" element={<AccountRequired><Settings /></AccountRequired>} />
           <Route path="*" element={<Navigate to="/" replace />} />

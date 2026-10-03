@@ -14,7 +14,7 @@ vi.mock('./services/guestService', () => ({ guestService: {
   policy: vi.fn(), session: vi.fn(), result: vi.fn(), createSession: vi.fn(),
   createJob: vi.fn(), claim: vi.fn(), delete: vi.fn(),
 } }))
-vi.mock('./services/authService', () => ({ authService: { signup: vi.fn(), login: vi.fn(), me: vi.fn() } }))
+vi.mock('./services/authService', () => ({ authService: { signup: vi.fn(), login: vi.fn(), me: vi.fn(), getConfig: vi.fn() } }))
 vi.mock('./services/audioService', () => ({ audioService: {
   getProviderSettings: vi.fn(), createTranscriptionJob: vi.fn(),
 } }))
@@ -28,7 +28,8 @@ beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
   window.history.replaceState({}, '', '/')
-  useAuthStore.setState({ user: null, token: null, isAuthenticated: false })
+  useAuthStore.setState({ user: null, token: null, authProvider: 'local', isAuthenticated: false })
+  authService.getConfig.mockResolvedValue({ firebase_enabled: false, local_signup_enabled: true })
   guestService.policy.mockResolvedValue(policy)
   audioService.getProviderSettings.mockResolvedValue({
     preferences: { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: true },
@@ -57,14 +58,14 @@ describe('Guest and account boundaries', () => {
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'test password long' } })
     if (signup) fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'visitor@example.test' } })
     fireEvent.click(screen.getByRole('button', { name: signup ? 'Criar conta' : 'Entrar' }))
-    expect(await screen.findByRole('heading', { name: 'Experiência autenticada' })).toBeTruthy()
-    expect(window.location.pathname).toBe('/')
+    expect(await screen.findByRole('heading', { name: 'Nova Transcrição' })).toBeTruthy()
+    expect(window.location.pathname).toBe('/new-transcription')
     expect(useAuthStore.getState().isAuthenticated).toBe(true)
     expect(await screen.findByRole('button', { name: 'Salvar na minha conta' })).toBeTruthy()
     expect(guestService.claim).not.toHaveBeenCalled()
     cleanup()
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Experiência autenticada' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Nova Transcrição' })).toBeTruthy()
     expect(sessionStorage.getItem('usagi-guest-session')).not.toBeNull()
   })
   it('shows server upload limits and keeps platform-only providers disabled for public accounts', async () => {
@@ -164,9 +165,9 @@ describe('Guest and account boundaries', () => {
     authService.signup.mockResolvedValue({ access_token: 'user-proof', user: { username: 'visitor', registration_source: 'public' } })
     render(<MemoryRouter initialEntries={['/signup?saveGuest=1']}><Routes>
       <Route path="/signup" element={<Login signup />} />
-      <Route path="/" element={<p>Experiência autenticada</p>} />
+      <Route path="/new-transcription" element={<p>Experiência autenticada</p>} />
     </Routes></MemoryRouter>)
-    fireEvent.change(screen.getByLabelText('Usuário'), { target: { value: 'visitor' } })
+    fireEvent.change(await screen.findByLabelText('Usuário'), { target: { value: 'visitor' } })
     fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'visitor@example.test' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'test password long' } })
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
