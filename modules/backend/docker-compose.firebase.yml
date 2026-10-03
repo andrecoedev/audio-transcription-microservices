@@ -1,0 +1,15 @@
+# Optional local Firebase homologation overlay. Keep the Admin service-account
+# JSON in the ignored .local-artifacts directory; only the API receives it.
+services:
+  api:
+    environment:
+      FIREBASE_AUTH_ENABLED: ${FIREBASE_AUTH_ENABLED:-true}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-adminsdk.json
+    volumes:
+      - type: bind
+        source: ./.local-artifacts/firebase-adminsdk.json
+        target: /run/secrets/firebase-adminsdk.json
+        read_only: true
+        bind:
+          create_host_path: false

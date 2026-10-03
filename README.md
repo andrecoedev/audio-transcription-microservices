@@ -52,6 +52,8 @@ Login usa identidade persistente e JWT. Providers são configurados somente no
 Worker; API recebe flags públicas *_CONFIGURED. Configure
 GEMINI_API_KEY_CONFIGURED separadamente da chave. Troca de credencial exige
 recriar apenas o serviço que a recebe.
+Firebase Google Sign-In é opcional e permanece desabilitado por padrão. Veja
+[configuração e homologação de autenticação](docs/authentication.md).
 
 A entrada pública compartilha a interface do app. Guest usa somente AssemblyAI,
 com falantes nativos, habilitação explícita e orçamento cumulativo; fica desligado
