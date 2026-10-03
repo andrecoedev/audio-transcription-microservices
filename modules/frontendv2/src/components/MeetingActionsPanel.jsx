@@ -10,34 +10,34 @@ function payload(values) {
   return { description: values.description.trim(), assignee: values.assignee.trim() || null, due_date: values.due_date || null }
 }
 
-function EvidenceLinks({ evidence = [], references = [] }) {
+function EvidenceLinks({ evidence = [], references = [], evidenceBaseUrl = '' }) {
   if (!evidence.length) return <p className="text-sm text-gray-500">Sem evidência vinculada.</p>
   return <div className="text-sm text-gray-600">Evidência: {evidence.map((item, index) => {
     const reference = references.find(ref => ref.segment_order === item.segment_order)
-    return <a key={`${item.segment_order}-${index}`} href={`#segment-${item.segment_order}`} title={item.quote || ''} className="text-primary-700 underline mr-3">
+    return <a key={`${item.segment_order}-${index}`} href={`${evidenceBaseUrl}#segment-${item.segment_order}`} title={item.quote || ''} className="text-primary-700 underline mr-3">
       {reference ? `${reference.start.toFixed(1)}s–${reference.end.toFixed(1)}s` : `Segmento ${item.segment_order + 1}`}
     </a>
   })}</div>
 }
 
 function ActionFields({ values, onChange, prefix }) {
-  return <div className="grid gap-3 md:grid-cols-3">
-    <label className="md:col-span-3">Descrição
+  return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <label className="flex min-w-0 flex-col gap-1 sm:col-span-2">Descrição
       <input aria-label={`${prefix} descrição`} required maxLength={4000} value={values.description}
-        onChange={event => onChange({ ...values, description: event.target.value })} className="block w-full border rounded-lg px-3 py-2" />
+        onChange={event => onChange({ ...values, description: event.target.value })} className="input h-10 min-w-0 mt-auto" />
     </label>
-    <label>Responsável (opcional)
+    <label className="flex min-w-0 flex-col gap-1">Responsável (opcional)
       <input aria-label={`${prefix} responsável`} maxLength={255} value={values.assignee}
-        onChange={event => onChange({ ...values, assignee: event.target.value })} className="block w-full border rounded-lg px-3 py-2" />
+        onChange={event => onChange({ ...values, assignee: event.target.value })} className="input h-10 min-w-0 mt-auto" />
     </label>
-    <label>Prazo (opcional)
+    <label className="flex min-w-0 flex-col gap-1">Prazo (opcional)
       <input aria-label={`${prefix} prazo`} type="date" value={values.due_date}
-        onChange={event => onChange({ ...values, due_date: event.target.value })} className="block w-full border rounded-lg px-3 py-2" />
+        onChange={event => onChange({ ...values, due_date: event.target.value })} className="input h-10 min-w-0 mt-auto" />
     </label>
   </div>
 }
 
-function ActionRow({ item, busy, change, remove, onViewOrigin }) {
+function ActionRow({ item, busy, change, remove, onViewOrigin, evidenceBaseUrl }) {
   const [editing, setEditing] = useState(false)
   const [values, setValues] = useState(emptyAction)
 
@@ -62,7 +62,7 @@ function ActionRow({ item, busy, change, remove, onViewOrigin }) {
       <p className="text-sm text-gray-600">Responsável: {item.assignee || 'Não definido'} · Prazo: {item.due_date || 'Sem prazo'}</p>
       {item.source === 'ai_reviewed' && <div className="space-y-1">
         <Button size="sm" variant="outline" disabled={busy} onClick={() => onViewOrigin(item)}>Ver sugestão original (revisão {item.source_revision})</Button>
-        <EvidenceLinks evidence={item.evidence || []} />
+        <EvidenceLinks evidence={item.evidence || []} evidenceBaseUrl={evidenceBaseUrl} />
       </div>}
       <div className="flex gap-2 flex-wrap">
         <Button size="sm" variant="outline" disabled={busy} onClick={edit}>Editar tarefa</Button>
@@ -75,7 +75,7 @@ function ActionRow({ item, busy, change, remove, onViewOrigin }) {
   </li>
 }
 
-function Suggestion({ item, revision, references, busy, accept, dismiss }) {
+function Suggestion({ item, revision, references, busy, accept, dismiss, evidenceBaseUrl }) {
   const [editing, setEditing] = useState(false)
   const [values, setValues] = useState({ description: item.description || '', assignee: item.assignee || '', due_date: '' })
   const [expanded, setExpanded] = useState(false)
@@ -85,7 +85,7 @@ function Suggestion({ item, revision, references, busy, accept, dismiss }) {
     if (await accept(revision, item.source_index, editing ? payload(values) : {})) setEditing(false)
   }
 
-  return <li className="p-4 border border-blue-100 bg-blue-50/50 rounded-lg space-y-3">
+  return <li className="p-4 border border-primary-100 bg-primary-50/50 rounded-lg space-y-3">
     <p className="text-xs uppercase tracking-wide text-gray-500">Sugestão da IA · revisão {revision}</p>
     {editing ? <form onSubmit={acceptSuggestion} className="space-y-3">
       <fieldset disabled={busy}><ActionFields values={values} onChange={setValues} prefix="Editar sugestão" /></fieldset>
@@ -94,22 +94,22 @@ function Suggestion({ item, revision, references, busy, accept, dismiss }) {
     </form> : <>
       <p className="whitespace-pre-wrap">{item.description}</p>
       <p className="text-sm text-gray-600">Responsável: {item.assignee || 'Não identificado'} · Prazo indicado: {item.due_date || 'Sem prazo explícito'}</p>
-      <EvidenceLinks evidence={item.evidence || []} references={references} />
+      <EvidenceLinks evidence={item.evidence || []} references={references} evidenceBaseUrl={evidenceBaseUrl} />
       <div className="flex gap-2 flex-wrap">
         <Button size="sm" disabled={busy} onClick={() => acceptSuggestion()}>Aceitar</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={() => setEditing(true)}>Editar e aceitar</Button>
         <Button size="sm" variant="ghost" disabled={busy} onClick={() => dismiss(revision, item.source_index)}>Descartar sugestão</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={() => setExpanded(value => !value)}>{expanded ? 'Ocultar origem' : 'Consultar revisão original'}</Button>
       </div>
-      {expanded && <div className="border-l-2 border-blue-200 pl-3 text-sm">
+      {expanded && <div className="border-l-2 border-primary-200 pl-3 text-sm">
         <p>Resultado original da IA, revisão {revision}. A aceitação não altera este registro.</p>
-        <EvidenceLinks evidence={item.evidence || []} references={references} />
+        <EvidenceLinks evidence={item.evidence || []} references={references} evidenceBaseUrl={evidenceBaseUrl} />
       </div>}
     </>}
   </li>
 }
 
-export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0, onActionsChanged }) {
+export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0, onActionsChanged, evidenceBaseUrl = '', embedded = false }) {
   const [items, setItems] = useState([])
   const [suggestionReviews, setSuggestionReviews] = useState([])
   const [suggestionResult, setSuggestionResult] = useState(null)
@@ -185,7 +185,7 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
     finally { setBusy(false) }
   }
 
-  return <Card><CardHeader><CardTitle>Ações da reunião</CardTitle></CardHeader><CardContent>
+  const panelContent = <><CardHeader><CardTitle>Ações da reunião</CardTitle></CardHeader><CardContent>
     <div className="space-y-5">
       <p className="text-sm text-gray-600">Sugestões de IA aguardam sua revisão. As tarefas abaixo são o estado operacional salvo para esta reunião.</p>
       {error && <p role="alert" className="text-red-700">{error}</p>}
@@ -196,19 +196,19 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
         {!suggestionResult && <p className="text-sm text-gray-500">Ainda não há análise da reunião.</p>}
         {suggestionResult && suggestions.length === 0 && <p className="text-sm text-gray-500">Nenhuma sugestão pendente nesta revisão.</p>}
         <ul className="space-y-3">{suggestions.map(item => <Suggestion key={`${suggestionResult.revision}-${item.source_index}`} item={item}
-          revision={suggestionResult.revision} references={suggestionResult.references || []} busy={busy} accept={accept} dismiss={dismiss} />)}</ul>
+          revision={suggestionResult.revision} references={suggestionResult.references || []} busy={busy} accept={accept} dismiss={dismiss} evidenceBaseUrl={evidenceBaseUrl} />)}</ul>
       </section>}
       {origin && <section className="p-4 border rounded-lg space-y-2" aria-label="Origem da tarefa">
         <div className="flex justify-between gap-3"><h3 className="font-semibold">Sugestão original · revisão {origin.item.source_revision}</h3>
           <Button size="sm" variant="ghost" onClick={() => setOrigin(null)}>Fechar origem</Button></div>
         <p>{origin.source?.description || origin.item.original_description}</p>
         <p className="text-sm text-gray-600">Responsável: {origin.source?.assignee || 'Não identificado'} · Prazo indicado: {origin.source?.due_date || 'Sem prazo explícito'}</p>
-        <EvidenceLinks evidence={origin.source?.evidence || origin.item.evidence || []} references={origin.result.references || []} />
+        <EvidenceLinks evidence={origin.source?.evidence || origin.item.evidence || []} references={origin.result.references || []} evidenceBaseUrl={evidenceBaseUrl} />
       </section>}
       <section aria-labelledby="operational-actions-heading" className="space-y-3">
         <h3 id="operational-actions-heading" className="font-semibold">Tarefas</h3>
         {!loading && !error && items.length === 0 && <p>Nenhuma tarefa criada.</p>}
-        <ul className="space-y-3">{items.map(item => <ActionRow key={item.id} item={item} busy={busy || loading} change={change} remove={remove} onViewOrigin={viewOrigin} />)}</ul>
+        <ul className="space-y-3">{items.map(item => <ActionRow key={item.id} item={item} busy={busy || loading} change={change} remove={remove} onViewOrigin={viewOrigin} evidenceBaseUrl={evidenceBaseUrl} />)}</ul>
       </section>
       <form onSubmit={create} className="space-y-3">
         <h3 className="font-semibold">Criar tarefa manual</h3>
@@ -216,5 +216,6 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
         <Button type="submit" disabled={busy || loading || !values.description.trim()}>{busy ? 'Salvando...' : 'Criar tarefa'}</Button>
       </form>
     </div>
-  </CardContent></Card>
+  </CardContent></>
+  return embedded ? <section className="space-y-4">{panelContent}</section> : <Card>{panelContent}</Card>
 }

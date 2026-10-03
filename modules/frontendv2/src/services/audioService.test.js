@@ -42,7 +42,7 @@ it('uses authenticated provider-preference and credential metadata contracts', a
   await audioService.saveProviderCredential('assemblyai', 'secret-value')
   await audioService.deleteProviderCredential('gemini')
   expect(api.get).toHaveBeenCalledWith('/settings/providers')
-  expect(api.patch).toHaveBeenCalledWith('/settings/providers', { preferences })
+  expect(api.patch).toHaveBeenCalledWith('/settings/providers', preferences)
   expect(api.post).toHaveBeenCalledWith('/settings/providers/assemblyai/credential', { secret: 'secret-value' })
   expect(api.delete).toHaveBeenCalledWith('/settings/providers/gemini/credential')
   expect(metadata.credentials.assemblyai).toEqual({ configured: true, updated_at: null })

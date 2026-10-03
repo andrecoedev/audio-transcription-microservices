@@ -55,7 +55,7 @@ describe('Guest and account boundaries', () => {
     render(<App />)
     fireEvent.change(await screen.findByLabelText('Usuário'), { target: { value: 'visitor' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'test password long' } })
-    if (signup) fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'visitor@example.test' } })
+    if (signup) fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'visitor@example.test' } })
     fireEvent.click(screen.getByRole('button', { name: signup ? 'Criar conta' : 'Entrar' }))
     expect(await screen.findByRole('heading', { name: 'Experiência autenticada' })).toBeTruthy()
     expect(window.location.pathname).toBe('/')
@@ -86,9 +86,22 @@ describe('Guest and account boundaries', () => {
   })
   it('App root is public without a session or auth bootstrap request', async () => {
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Nova Transcrição' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Início' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Iniciar Transcrição' })).toBeNull()
+    expect(document.querySelector('input[type="file"]')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Iniciar uma transcrição' }).getAttribute('href')).toBe('/new-transcription')
     expect(screen.getByRole('complementary')).toBeTruthy()
     expect(authService.me).not.toHaveBeenCalled()
+    expect(guestService.policy).not.toHaveBeenCalled()
+  })
+
+  it('navigates from the guest dashboard to the only upload route without creating a session', async () => {
+    render(<App />)
+    fireEvent.click(await screen.findByRole('link', { name: 'Iniciar uma transcrição' }))
+    expect(await screen.findByRole('heading', { name: 'Nova Transcrição' })).toBeTruthy()
+    expect(document.querySelector('input[type="file"]')).not.toBeNull()
+    expect(window.location.pathname).toBe('/new-transcription')
+    expect(guestService.createSession).not.toHaveBeenCalled()
   })
 
   it('App keeps protected history behind login', async () => {
@@ -154,7 +167,7 @@ describe('Guest and account boundaries', () => {
       <Route path="/" element={<p>Experiência autenticada</p>} />
     </Routes></MemoryRouter>)
     fireEvent.change(screen.getByLabelText('Usuário'), { target: { value: 'visitor' } })
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'visitor@example.test' } })
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'visitor@example.test' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'test password long' } })
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
     expect(await screen.findByText('Experiência autenticada')).toBeTruthy()

@@ -13,7 +13,7 @@ export const audioService = {
   },
 
   async updateProviderPreferences(preferences) {
-    const { data } = await api.patch('/settings/providers', { preferences })
+    const { data } = await api.patch('/settings/providers', preferences)
     return data
   },
 

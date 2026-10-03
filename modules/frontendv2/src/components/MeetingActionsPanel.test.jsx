@@ -72,6 +72,16 @@ it('shows a suggestion, accepts it explicitly, edits and retains it after reload
   expect(screen.queryByRole('button', { name: 'Aceitar' })).toBeNull()
 })
 
+it('keeps evidence links pointed at the meeting from task lists and reviewed origins', async () => {
+  render(<MeetingActionsPanel meetingId="42" evidenceBaseUrl="/meetings/42" />)
+  const suggestionEvidence = await screen.findByRole('link', { name: '0.0s–2.0s' })
+  expect(suggestionEvidence.getAttribute('href')).toBe('/meetings/42#segment-0')
+  fireEvent.click(screen.getByRole('button', { name: 'Aceitar' }))
+  fireEvent.click(await screen.findByRole('button', { name: /Ver sugestão original/ }))
+  const origin = await screen.findByRole('region', { name: 'Origem da tarefa' })
+  expect(within(origin).getByRole('link').getAttribute('href')).toBe('/meetings/42#segment-0')
+})
+
 it('edits before accepting and dismisses suggestions persistently', async () => {
   const view = render(<MeetingActionsPanel meetingId="42" />)
   await screen.findByText('Preparar relatório')
@@ -126,6 +136,24 @@ it('creates manual work without intelligence and retains it after reload', async
   render(<MeetingActionsPanel meetingId="42" />)
   expect(await screen.findByText('Enviar slides')).toBeTruthy()
   expect(screen.getByText(/Criada manualmente/)).toBeTruthy()
+})
+
+it('keeps action field labels stacked with aligned full-width inputs', async () => {
+  render(<MeetingActionsPanel meetingId="42" />)
+  const description = await screen.findByLabelText('Nova tarefa descrição')
+  const assignee = screen.getByLabelText('Nova tarefa responsável')
+  const dueDate = screen.getByLabelText('Nova tarefa prazo')
+  const fields = description.closest('label').parentElement
+
+  expect(fields.className).toContain('sm:grid-cols-2')
+  expect(description.closest('label').className).toContain('sm:col-span-2')
+  for (const input of [description, assignee, dueDate]) {
+    expect(input.closest('label').className).toContain('flex-col')
+    expect(input.className).toContain('min-w-0')
+    expect(input.className).toContain('input')
+    expect(input.className).toContain('h-10')
+    expect(input.className).toContain('mt-auto')
+  }
 })
 
 it('completes and reopens tasks, then honors explicit deletion', async () => {

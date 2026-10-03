@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import { Upload, FileAudio, X, Zap, Users } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
+import ProcessingStatus from '../components/ProcessingStatus'
 import Button from '../components/Button'
+import PageHeader from '../components/PageHeader'
 import { audioService } from '../services/audioService'
 import { MAX_FILE_SIZE } from '../utils/constants'
 import toast from 'react-hot-toast'
@@ -49,8 +51,8 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   const policyReady = !publicAccount || Boolean(publicLimits)
   const processingAllowed = !guestPolicy || guestPolicy.can_create_job === true
   const maxFileSize = limits ? limits.max_upload_mb * 1024 * 1024 : MAX_FILE_SIZE
-  const canUseAssemblyAI = !guestPolicy && providerSettings?.providers.assemblyai.allowed
-  const canUseWhisper = !user || providerSettings?.providers.whisper.allowed
+  const canUseAssemblyAI = !guestPolicy && providerSettings?.providers.assemblyai.available === true && providerSettings?.providers.assemblyai.allowed === true
+  const canUseWhisper = !user || (providerSettings?.providers.whisper.available === true && providerSettings?.providers.whisper.allowed === true)
   const providerReady = !user || Boolean(providerSettings)
   const [file, setFile] = useState(null)
   const [options, setOptions] = useState({
@@ -65,7 +67,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
     })
   }, [providerSettings])
   const selectedProviderAvailable = options.transcriptionModel === 'automatic'
-    || Boolean(providerSettings?.providers[options.transcriptionModel]?.allowed)
+    || (providerSettings?.providers[options.transcriptionModel]?.available === true && providerSettings?.providers[options.transcriptionModel]?.allowed === true)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
 
@@ -132,19 +134,21 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Nova Transcrição</h1>
-        <p className="text-gray-600 mt-1">Faça upload de um arquivo de áudio ou vídeo para transcrever</p>
+      <PageHeader title="Nova Transcrição" description="Envie um arquivo de áudio e obtenha uma transcrição para revisar e compartilhar.">
+        {user && <Link to="/transcriptions" className="rounded-lg border bg-white px-4 py-2 text-sm hover:bg-gray-50">Histórico</Link>}
+      </PageHeader>
         {guestPolicy && !processingAllowed && <p role="status" className="text-sm text-gray-600 mt-2">{guestPolicy.unavailable_reason}</p>}
-      </div>
+
+      {limits && <div className="flex flex-wrap gap-2 text-sm text-gray-700" aria-label="Limites desta conta">
+        <span className="rounded-full bg-primary-50 px-3 py-1.5">Máximo {limits.max_upload_mb} MB por arquivo</span>
+        {limits.max_audio_seconds && <span className="rounded-full bg-primary-50 px-3 py-1.5">Até {Math.floor(limits.max_audio_seconds / 60)} minutos de áudio</span>}
+        {guestPolicy && <span className="rounded-full bg-primary-50 px-3 py-1.5">{guestPolicy.jobs_per_session} transcrição temporária por sessão</span>}
+      </div>}
 
       {/* Upload Area */}
       <Card>
-        <CardHeader>
-          <CardTitle>📁 Upload de Arquivo</CardTitle>
-        </CardHeader>
         <CardContent>
           {!policyReady ? (
             <div role="status">
@@ -153,20 +157,23 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
           ) : !file ? (
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
+              aria-disabled={!policyReady || !processingAllowed}
+              className={`flex flex-col items-start justify-between gap-6 rounded-xl px-2 py-5 sm:flex-row sm:items-center transition-colors ${!processingAllowed ? 'cursor-not-allowed' : 'cursor-pointer'} ${
                 isDragActive
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-gray-300 hover:border-primary-400'
+                  ? 'border-primary-600 bg-primary-50'
+                  : 'border-gray-300 bg-gray-50 hover:border-primary-500 hover:bg-primary-50/40'
               }`}
             >
-              <input {...getInputProps()} />
-              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-lg font-medium text-gray-900 mb-2">
+              <input {...getInputProps()} disabled={!policyReady || !processingAllowed || uploading} />
+              <div className="min-w-0 flex-1">
+              <p className="text-xl font-semibold text-gray-900 mb-2">
                 {isDragActive ? 'Solte o arquivo aqui' : 'Arraste um arquivo ou clique para selecionar'}
               </p>
               <p className="text-sm text-gray-500">
                 Formatos suportados: MP3, WAV, MP4, M4A, FLAC, OGG, OPUS (máx. {(maxFileSize / (1024 * 1024)).toFixed(0)}MB)
               </p>
+              </div>
+              <span className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium ${processingAllowed ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}`}><Upload className="h-4 w-4" aria-hidden="true" />Escolher arquivo</span>
             </div>
           ) : (
             <div className="border border-gray-200 rounded-lg p-6">
@@ -175,8 +182,8 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                   <div className="p-3 bg-primary-100 rounded-lg">
                     <FileAudio className="w-6 h-6 text-primary-600" />
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{file.name}</p>
+                  <div className="min-w-0">
+                    <p className="break-all font-medium text-gray-900">{file.name}</p>
                     <p className="text-sm text-gray-500">
                       {(file.size / (1024 * 1024)).toFixed(2)} MB
                     </p>
@@ -193,40 +200,36 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                 </Button>
               </div>
 
-              {uploading && (
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-600">Processando...</span>
-                    <span className="font-medium text-primary-600">{progress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+              {uploading && <ProcessingStatus status="uploading" uploadProgress={progress} />}
             </div>
           )}
         </CardContent>
       </Card>
 
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Formatos aceitos</p><p className="mt-1 text-sm text-gray-800">MP3, WAV, M4A, FLAC, OGG, OPUS e MP4.</p></Card>
+        <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Limites de envio</p><p className="mt-1 text-sm text-gray-800">Máximo de {(maxFileSize / (1024 * 1024)).toFixed(0)} MB{limits?.max_audio_seconds ? ` e ${Math.floor(limits.max_audio_seconds / 60)} min por áudio` : ''}.</p></Card>
+        <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Exportação</p><p className="mt-1 text-sm text-gray-800">Transcrição disponível em TXT, SRT, VTT e JSON após a conclusão.</p></Card>
+      </div>
+
       {/* Opções */}
-      <Card>
+      <Card className="!p-4">
         <CardHeader>
-          <CardTitle>⚙️ Configurações</CardTitle>
+          <CardTitle>Preferências da transcrição</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Modelo de Transcrição */}
-          {guestPolicy ? <p className="text-sm text-gray-600">Transcrição com AssemblyAI</p> : user && !providerSettings ? <div role={providerError ? 'alert' : 'status'} className="space-y-2">
+          {guestPolicy ? <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+            <span>Transcrição com AssemblyAI</span>
+            {!processingAllowed && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">Indisponível</span>}
+          </div> : user && !providerSettings ? <div role={providerError ? 'alert' : 'status'} className="space-y-2">
             <p>{providerLoading ? 'Carregando preferências dos provedores...' : 'Não foi possível carregar as preferências dos provedores. O envio permanece bloqueado.'}</p>
             {providerError && <Button variant="outline" onClick={() => setProviderAttempt((value) => value + 1)}>Tentar novamente</Button>}
           </div> : <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Modelo de Transcrição
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               {user && <button
                 onClick={() => setOptions({ ...options, transcriptionModel: 'automatic' })}
                 aria-label="Automático"
@@ -260,7 +263,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
               {user && providerSettings && <button
                 onClick={() => setOptions({ ...options, transcriptionModel: 'assemblyai' })}
                 disabled={uploading || !canUseAssemblyAI}
-                className={`p-4 border-2 rounded-lg transition-all ${
+                className={`p-4 border-2 rounded-lg transition-all ${!canUseAssemblyAI ? 'border-gray-200 bg-gray-50 cursor-not-allowed' :
                   options.transcriptionModel === 'assemblyai'
                     ? 'border-primary-600 bg-primary-50'
                     : 'border-gray-200 hover:border-gray-300'
@@ -272,7 +275,8 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                   }`} />
                   <div className="text-left">
                     <p className="font-medium text-gray-900">AssemblyAI</p>
-                    <p className="text-xs text-gray-500">{canUseAssemblyAI ? 'Credencial pronta para esta conta' : 'Credencial necessária nas Configurações'}</p>
+                    {!canUseAssemblyAI && <span className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Indisponível</span>}
+                    <p className="mt-1 text-xs text-gray-500">{canUseAssemblyAI ? 'Habilitado para esta conta' : 'Verifique sua credencial e a disponibilidade em Configurações'}</p>
                   </div>
                 </div>
               </button>}
@@ -283,7 +287,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
           </div>}
 
           {/* Diarização */}
-          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+          <div className="flex items-center justify-between gap-3 p-3 border border-gray-200 rounded-lg">
             <div className="flex items-center gap-3">
               <Users className="w-5 h-5 text-gray-600" />
               <div>
@@ -303,7 +307,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>
           </div>
-          {!guestPolicy && user && providerSettings && !canUseAssemblyAI && options.transcriptionModel !== 'assemblyai' && <p className="text-sm text-gray-600">AssemblyAI está disponível após conectar uma credencial própria nas configurações.</p>}
+          {!guestPolicy && user && providerSettings && !canUseAssemblyAI && <Link to="/settings" className="inline-block text-sm text-primary-700 hover:underline">Ver serviços de IA em Configurações</Link>}
         </CardContent>
       </Card>
 

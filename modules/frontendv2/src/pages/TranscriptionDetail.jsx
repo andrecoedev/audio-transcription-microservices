@@ -12,7 +12,10 @@ import {
 } from 'lucide-react'
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import Button from '../components/Button'
+import ProcessingStatus from '../components/ProcessingStatus'
+import PageHeader from '../components/PageHeader'
 import { audioService } from '../services/audioService'
+import { formatDuration } from '../utils/format'
 import toast from 'react-hot-toast'
 
 export default function TranscriptionDetail() {
@@ -20,6 +23,7 @@ export default function TranscriptionDetail() {
   const navigate = useNavigate()
   const [transcription, setTranscription] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [copied, setCopied] = useState(false)
   const canExportTranscript = transcription?.status === 'completed' && Boolean(transcription?.segments?.length)
 
@@ -28,16 +32,16 @@ export default function TranscriptionDetail() {
       if (!silent) setLoading(true)
       const data = await audioService.getTranscription(id)
       setTranscription(data)
-    } catch (error) {
+      setLoadError(false)
+    } catch {
+      if (!silent) setLoadError(true)
       if (!silent) {
         toast.error('Erro ao carregar transcrição')
-        navigate('/transcriptions')
       }
-      console.error(error)
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [id, navigate])
+  }, [id])
 
   useEffect(() => {
     loadTranscription()
@@ -74,7 +78,6 @@ export default function TranscriptionDetail() {
     const text = transcription.segments
       .map(seg => `[${seg.speaker}] (${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s)\n${seg.text}`)
       .join('\n\n')
-    
     const blob = new Blob([text], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -94,29 +97,55 @@ export default function TranscriptionDetail() {
     URL.revokeObjectURL(url)
   }
 
-  const downloadAsSRT = () => {
-    let srt = ''
-    transcription.segments.forEach((seg, i) => {
-      const start = formatSRTTime(seg.start)
-      const end = formatSRTTime(seg.end)
-      srt += `${i + 1}\n${start} --> ${end}\n${seg.text}\n\n`
+  const downloadAsVTT = () => {
+    let vtt = 'WEBVTT\n\n'
+    transcription.segments.forEach((seg) => {
+      const start = formatVTTTime(seg.start)
+      const end = formatVTTTime(seg.end)
+      vtt += `${start} --> ${end}\n${seg.text}\n\n`
     })
     
-    const blob = new Blob([srt], { type: 'text/plain' })
+    const blob = new Blob([vtt], { type: 'text/vtt' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${transcription.filename}_legendas.srt`
+    a.download = `${transcription.filename}_legendas.vtt`
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  const formatSRTTime = (seconds) => {
+  const downloadAsSRT = () => {
+    let srt = ''
+    transcription.segments.forEach((seg, i) => {
+      srt += `${i + 1}\n${formatSubtitleTime(seg.start, ',')} --> ${formatSubtitleTime(seg.end, ',')}\n${seg.text}\n\n`
+    })
+    downloadTextFile(srt, `${transcription.filename}_legendas.srt`, 'text/plain')
+  }
+
+  const formatSubtitleTime = (seconds, decimalSeparator) => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const wholeSeconds = Math.floor(seconds % 60)
+    const milliseconds = Math.floor((seconds % 1) * 1000)
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(wholeSeconds).padStart(2, '0')}${decimalSeparator}${String(milliseconds).padStart(3, '0')}`
+  }
+
+  const downloadTextFile = (text, filename, type) => {
+    const blob = new Blob([text], { type })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const formatVTTTime = (seconds) => {
     const hours = Math.floor(seconds / 3600)
     const minutes = Math.floor((seconds % 3600) / 60)
     const secs = Math.floor(seconds % 60)
     const ms = Math.floor((seconds % 1) * 1000)
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(3, '0')}`
   }
 
   if (loading) {
@@ -132,8 +161,9 @@ export default function TranscriptionDetail() {
 
   if (!transcription) {
     return (
-      <div className="text-center py-12">
+      <div role={loadError ? 'alert' : undefined} className="text-center py-12">
         <p className="text-gray-600">Transcrição não encontrada</p>
+        {loadError && <Button variant="outline" className="mt-4" onClick={() => loadTranscription()}>Tentar novamente</Button>}
         <Link to="/transcriptions">
           <Button variant="primary" className="mt-4">Voltar para Transcrições</Button>
         </Link>
@@ -141,11 +171,21 @@ export default function TranscriptionDetail() {
     )
   }
 
+  if (['queued', 'processing'].includes(transcription.status)) {
+    return <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader title="Transcrevendo áudio" description={`${transcription.filename} · ${formatDuration(transcription.duration_seconds)}`} />
+      <ProcessingStatus status={transcription.status} />
+      <Link to="/transcriptions" className="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-900">
+        <ArrowLeft className="mr-2 h-4 w-4" />Voltar ao histórico
+      </Link>
+    </div>
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto min-w-0 max-w-6xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-1 items-start gap-4">
           <Button
             variant="ghost"
             size="sm"
@@ -154,16 +194,12 @@ export default function TranscriptionDetail() {
           >
             Voltar
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{transcription.filename}</h1>
+          <div className="min-w-0">
+            <h1 className="break-all text-3xl font-bold text-gray-900">{transcription.filename}</h1>
             <p className="text-gray-600 mt-1">
               Criado em {new Date(transcription.created_at).toLocaleString('pt-BR')}
             </p>
-            {['queued', 'processing'].includes(transcription.status) && (
-              <p className="text-sm text-amber-700 mt-2">
-                Status: {transcription.status === 'queued' ? 'na fila' : 'processando'}
-              </p>
-            )}
+            {['queued', 'processing'].includes(transcription.status) && <div className="mt-4 max-w-md"><ProcessingStatus status={transcription.status} /></div>}
             {transcription.status === 'completed' && (
               <Link className="text-primary-700 hover:underline" to={`/meetings/${transcription.id}`}>
                 Ver reunião estruturada
@@ -175,7 +211,7 @@ export default function TranscriptionDetail() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={copyToClipboard} disabled={!canExportTranscript}>
             {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             {copied ? 'Copiado!' : 'Copiar'}
@@ -188,6 +224,10 @@ export default function TranscriptionDetail() {
             <Download className="w-4 h-4" />
             JSON
           </Button>
+          <Button variant="outline" size="sm" onClick={downloadAsVTT} disabled={!canExportTranscript}>
+            <Download className="w-4 h-4" />
+            VTT
+          </Button>
           <Button variant="outline" size="sm" onClick={downloadAsSRT} disabled={!canExportTranscript}>
             <Download className="w-4 h-4" />
             SRT
@@ -196,7 +236,7 @@ export default function TranscriptionDetail() {
       </div>
 
       {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div aria-label="Informações da transcrição" className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={Clock}
           label="Duração"
@@ -222,7 +262,7 @@ export default function TranscriptionDetail() {
       {/* Transcrição */}
       <Card>
         <CardHeader>
-          <CardTitle>📝 Transcrição Completa</CardTitle>
+          <CardTitle>Transcrição completa</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -231,7 +271,7 @@ export default function TranscriptionDetail() {
                 key={index}
                 className="p-4 bg-gray-50 rounded-lg border border-gray-200"
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-700 text-sm font-medium">
                       {segment.speaker?.replace('SPEAKER_', '')}
@@ -244,7 +284,7 @@ export default function TranscriptionDetail() {
                     {segment.start?.toFixed(1)}s - {segment.end?.toFixed(1)}s
                   </span>
                 </div>
-                <p className="text-gray-800 leading-relaxed">{segment.text}</p>
+                <p className="break-words text-gray-800 leading-relaxed">{segment.text}</p>
               </div>
             ))}
           </div>
@@ -256,14 +296,14 @@ export default function TranscriptionDetail() {
 
 function StatCard({ icon: Icon, label, value }) {
   return (
-    <Card>
-      <div className="flex items-center gap-3">
-        <div className="p-3 rounded-lg bg-primary-100">
+    <Card className="min-w-0">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="shrink-0 p-3 rounded-lg bg-primary-100">
           <Icon className="w-5 h-5 text-primary-600" />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-sm text-gray-600">{label}</p>
-          <p className="text-xl font-bold text-gray-900">{value}</p>
+          <p className="break-words text-xl font-bold text-gray-900">{value}</p>
         </div>
       </div>
     </Card>

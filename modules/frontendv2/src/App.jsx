@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-ro
 import { useEffect, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
+import Home from './pages/Home'
 import Transcriptions from './pages/Transcriptions'
 import TranscriptionDetail from './pages/TranscriptionDetail'
 import Meetings from './pages/Meetings'
@@ -12,6 +12,7 @@ import MeetingMinutes from './pages/MeetingMinutes'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
 import Guest from './pages/Guest'
+import Tasks from './pages/Tasks'
 import Card, { CardContent, CardHeader, CardTitle } from './components/Card'
 import { authService } from './services/authService'
 import { useAuthStore } from './stores/authStore'
@@ -93,15 +94,16 @@ function App() {
       />
       
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Login signup />} />
-        <Route path="/guest" element={<Navigate to="/" replace />} />
+        <Route path="/guest" element={<Navigate to="/new-transcription" replace />} />
         <Route path="/" element={<Layout />}>
-          <Route index element={<>{isAuthenticated && <Dashboard />}<Guest /></>} />
+          <Route index element={<Home />} />
+          <Route path="login" element={<Login />} />
+          <Route path="signup" element={<Login signup />} />
           <Route path="transcriptions" element={<AccountRequired><Transcriptions /></AccountRequired>} />
           <Route path="transcriptions/:id" element={<AccountRequired><TranscriptionDetail /></AccountRequired>} />
           <Route path="meetings" element={<AccountRequired><Meetings /></AccountRequired>} />
           <Route path="meetings/:id" element={<AccountRequired><MeetingDetail /></AccountRequired>} />
+          <Route path="tasks" element={<AccountRequired><Tasks /></AccountRequired>} />
           <Route path="new-transcription" element={isAuthenticated ? <NewTranscription /> : <Guest />} />
           <Route path="meeting-minutes" element={<AccountRequired><MeetingMinutes /></AccountRequired>} />
           <Route path="settings" element={<AccountRequired><Settings /></AccountRequired>} />
