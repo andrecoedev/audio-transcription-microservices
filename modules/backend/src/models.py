@@ -268,6 +268,38 @@ class TranscriptionJob(Base):
         )
 
 
+class PlatformProviderBudget(Base):
+    """Cumulative spending ceiling; deletion/restart never replenishes it."""
+
+    __tablename__ = "platform_provider_budgets"
+    __table_args__ = (
+        CheckConstraint("limit_cents >= 0 AND reserved_cents >= 0 AND reserved_cents <= limit_cents",
+                        name="ck_platform_provider_budget_amounts"),
+    )
+    provider = Column(String(32), primary_key=True)
+    limit_cents = Column(Integer, nullable=False)
+    reserved_cents = Column(Integer, nullable=False, default=0, server_default="0")
+
+
+class PlatformProviderCall(Base):
+    """Immutable platform provenance and no-repeat guard, retained after deletion."""
+
+    __tablename__ = "platform_provider_calls"
+    __table_args__ = (
+        CheckConstraint("reserved_cents > 0", name="ck_platform_provider_call_amount"),
+        CheckConstraint("context IN ('guest', 'local')", name="ck_platform_provider_call_context"),
+        CheckConstraint("state IN ('reserved', 'attempted')", name="ck_platform_provider_call_state"),
+    )
+    id = Column(Integer, primary_key=True)
+    transcription_id = Column(Integer, ForeignKey("transcriptions.id", ondelete="SET NULL"), unique=True)
+    provider = Column(String(32), ForeignKey("platform_provider_budgets.provider", ondelete="RESTRICT"), nullable=False)
+    context = Column(String(16), nullable=False)
+    credential_source = Column(String(16), nullable=False, default="platform", server_default="platform")
+    reserved_cents = Column(Integer, nullable=False)
+    state = Column(String(16), nullable=False, default="reserved", server_default="reserved")
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class Meeting(Base):
     """Product metadata for a completed transcription; content stays in JSONB."""
 

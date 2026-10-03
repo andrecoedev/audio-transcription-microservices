@@ -96,6 +96,6 @@ def test_guest_migration_downgrade_preserves_existing_context(postgres_session_f
         monkeypatch.setattr(revision, "op", Operations(MigrationContext.configure(connection)))
         with pytest.raises(RuntimeError, match="preservation plan|Claim or explicitly erase"):
             revision.downgrade()
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar() == "20261002_0007"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar() == ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
         assert "guest_sessions" in inspect(connection).get_table_names()
         assert "registration_source" in {column["name"] for column in inspect(connection).get_columns("users")}

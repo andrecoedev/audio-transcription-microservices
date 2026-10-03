@@ -7,12 +7,19 @@ identities retain private contracts; public identities never inherit credentials
 from fastapi import HTTPException
 
 from ..security import TokenData
+from ..config import settings
 
 
 def require_guest_processing() -> None:
-    # No runtime opt-in until P4-04 validates native speakers, failures and
-    # atomic platform budget reservation. Availability is not permission.
-    raise HTTPException(503, "Visitor transcription is unavailable while AssemblyAI is being validated")
+    if not settings.AAI_GUEST_ENABLED:
+        raise HTTPException(503, "Visitor transcription is unavailable")
+    require_platform_processing()
+
+
+def require_platform_processing() -> None:
+    if not (settings.AAI_PLATFORM_ENABLED and settings.AAI_PLATFORM_BUDGET_CENTS > 0
+            and (settings.AAI_API_KEY_CONFIGURED or settings.AAI_API_KEY)):
+        raise HTTPException(503, "Platform transcription is unavailable")
 
 
 def require_provider_credential(user: TokenData, provider: str, *, credential_source: str = "platform") -> None:
@@ -22,3 +29,5 @@ def require_provider_credential(user: TokenData, provider: str, *, credential_so
         raise HTTPException(403, "User provider credentials are not supported yet")
     if user.registration_source != "local":
         raise HTTPException(403, "Connect your own provider credential when BYOK becomes available")
+    if provider == "assemblyai":
+        require_platform_processing()

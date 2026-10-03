@@ -12,6 +12,7 @@ from ..database import SessionLocal
 from ..models import Meeting, MeetingSpeaker, Transcription, TranscriptionJob, TranscriptionOwnership
 from ..services.processing_engines import initialize_processing_engines
 from ..services.audit import append_audit_event
+from ..services.platform_budget import begin_platform_call
 from ..services.meeting_projection import ordered_segments, speaker_ids
 from ..services.storage_lifecycle import delete_file_idempotently
 from ..services.transcription_processing_service import (
@@ -26,6 +27,7 @@ _processing_service: TranscriptionProcessingService | None = None
 
 def initialize_worker_engines(
     factories=None,
+    providers=None,
 ) -> dict[str, bool]:
     """Initialize engines inside a forked RQ work horse, never its parent."""
     global _processing_service
@@ -34,7 +36,7 @@ def initialize_worker_engines(
     if validation_errors:
         raise RuntimeError("Invalid worker configuration: " + "; ".join(validation_errors))
 
-    if factories is None:
+    if factories is None and (providers is None or {"whisper", "diarization"} & providers):
         from ..utils.gpu_utils import log_device_info, optimize_gpu_settings
 
         log_device_info()
@@ -45,6 +47,7 @@ def initialize_worker_engines(
         aai_api_key=settings.AAI_API_KEY,
         gemini_api_key=settings.GEMINI_API_KEY,
         factories=factories,
+        providers=providers,
     )
     if _processing_service is None:
         _processing_service = TranscriptionProcessingService()
@@ -57,6 +60,14 @@ def get_processing_service() -> TranscriptionProcessingService:
     if _processing_service is None:
         initialize_worker_engines()
     assert _processing_service is not None
+    return _processing_service
+
+
+def get_cloud_processing_service() -> TranscriptionProcessingService:
+    """Cloud jobs must not initialize Torch/CUDA/Whisper/Pyannote or Gemini."""
+    from .. import engine_registry
+    if _processing_service is None or engine_registry.assemblyai_engine is None:
+        initialize_worker_engines(providers={"assemblyai"})
     return _processing_service
 
 
@@ -306,14 +317,26 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
 
         claimed = True
         input_path = claim["input_path"]
-        if claim["guest_context"]:
+        if claim["guest_context"] and claim["transcription_model"] != "assemblyai":
             # Also protect previously queued/recovered Guest jobs. P4-04 must
             # validate provider admission and budget before any engine loading.
             raise TranscriptionProcessingError("Visitor AssemblyAI processing is not validated")
+        if claim["transcription_model"] == "assemblyai":
+            reservation_db = SessionLocal()
+            try:
+                context = begin_platform_call(reservation_db, transcription_id)
+                if context == "guest" and not settings.AAI_GUEST_ENABLED:
+                    raise TranscriptionProcessingError("Visitor processing is disabled")
+            finally:
+                reservation_db.close()
         logger.info("Transcription job %s started", transcription_id)
         started_at = time.monotonic()
 
-        result = get_processing_service().process_transcription(
+        service = get_cloud_processing_service() if claim["transcription_model"] == "assemblyai" else get_processing_service()
+        if claim["transcription_model"] == "assemblyai":
+            claim["max_duration_seconds"] = min(claim["max_duration_seconds"] or settings.AAI_MAX_AUDIO_SECONDS,
+                                                settings.AAI_MAX_AUDIO_SECONDS)
+        result = service.process_transcription(
             file_path=input_path,
             use_diarization=claim["use_diarization"],
             transcription_model=claim["transcription_model"],
@@ -351,6 +374,14 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
         }
     except Exception as exc:
         public_error = "Audio exceeds the public duration limit" if isinstance(exc, PublicAudioDurationError) else "Transcription processing failed"
+        if type(exc).__name__ == "AssemblyAIProcessingError":
+            public_error = {
+                "credential": "AssemblyAI credential unavailable or invalid",
+                "quota": "AssemblyAI quota exceeded",
+                "timeout": "AssemblyAI processing timed out",
+                "invalid_response": "AssemblyAI returned an invalid response",
+                "unavailable": "AssemblyAI is temporarily unavailable",
+            }.get(exc.code, public_error)
         if claimed:
             try:
                 _persist_failed_job(transcription_id, public_error)

@@ -164,6 +164,71 @@ def test_worker_lazy_initialization_occurs_once_after_job_start(monkeypatch):
         _reset_engines()
 
 
+def test_assemblyai_cloud_worker_initialization_stays_outside_local_ml_stack():
+    script = r'''
+import importlib.abc
+import sys
+
+blocked = {
+    "torch", "pyannote", "transformers", "faster_whisper",
+    "ctranslate2", "pydub"
+}
+baseline_modules = set(sys.modules)
+
+class BlockLocalMLImports(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        root = fullname.split(".", 1)[0]
+        if root in blocked or fullname.startswith("google.generativeai"):
+            raise RuntimeError(f"local ML import attempted: {fullname}")
+        return None
+
+sys.meta_path.insert(0, BlockLocalMLImports())
+from src import engine_registry
+from src.workers import transcription_worker
+
+first = transcription_worker.get_cloud_processing_service()
+second = transcription_worker.get_cloud_processing_service()
+assert first is second
+assert engine_registry.assemblyai_engine is not None
+assert engine_registry.whisper_engine is None
+assert engine_registry.diarization_engine is None
+assert engine_registry.meeting_minutes_generator is None
+
+loaded = {
+    name
+    for name in set(sys.modules) - baseline_modules
+    if name.split(".", 1)[0] in blocked
+    or name.startswith("google.generativeai")
+}
+assert not loaded, loaded
+'''
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "APP_ENV": "test",
+            "AUTH_MODE": "strict",
+            "SECRET_KEY": "test-secret-key-with-at-least-32-characters",
+            "DATABASE_URL": "sqlite:///:memory:",
+            "DEBUG": "false",
+            "HF_TOKEN": "hf-test",
+            "AAI_API_KEY": "aai-test",
+            "GEMINI_API_KEY": "gemini-test",
+        }
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=BACKEND_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 @pytest.mark.parametrize(
     "path",
     [

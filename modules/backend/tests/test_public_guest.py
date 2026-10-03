@@ -16,6 +16,7 @@ def simulated_guest_provider_admission(monkeypatch):
     # P4-04 admission is simulated only here; production remains fail-closed.
     from src.routers import transcriptions
     monkeypatch.setattr(transcriptions, "require_guest_processing", lambda: None)
+    monkeypatch.setattr(transcriptions, "reserve_platform_call", lambda *_args: None)
 
 
 def test_guest_processing_blocked_by_provider_recovery_without_local_fallback(db_context, monkeypatch, wav_bytes):
