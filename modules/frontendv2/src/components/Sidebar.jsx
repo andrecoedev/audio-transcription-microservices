@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { Home, FileAudio, Plus, Settings, Users, ListChecks, ChevronUp, LogOut } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { endSession } from '../services/sessionService'
+import toast from 'react-hot-toast'
 
 const navigation = [
   { name: 'Início', href: '/', icon: Home },
@@ -13,7 +15,7 @@ const navigation = [
 ]
 
 export default function Sidebar({ onNavigate }) {
-  const { user, isAuthenticated, logout } = useAuthStore()
+  const { user, isAuthenticated } = useAuthStore()
   const [accountOpen, setAccountOpen] = useState(false)
   return <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-gray-200 bg-white px-4 py-7">
     <Link to="/" onClick={onNavigate} className="mb-10 px-3">
@@ -29,7 +31,10 @@ export default function Sidebar({ onNavigate }) {
     <div className="relative mt-auto pt-8">
       {accountOpen && <div className="mb-2 space-y-1 rounded-xl border bg-white p-2 text-sm shadow-sm">
         {isAuthenticated ? <><Link to="/settings" onClick={() => { setAccountOpen(false); onNavigate?.() }} className="block rounded-lg p-2 hover:bg-gray-50">Minha conta</Link>
-          <button type="button" onClick={() => { logout(); setAccountOpen(false); onNavigate?.() }} className="flex w-full items-center gap-2 rounded-lg p-2 text-left hover:bg-gray-50"><LogOut className="h-4 w-4" />Sair</button></>
+          <button type="button" onClick={async () => {
+            try { await endSession(); setAccountOpen(false); onNavigate?.() }
+            catch { toast.error('Não foi possível encerrar a sessão Google. Tente novamente.') }
+          }} className="flex w-full items-center gap-2 rounded-lg p-2 text-left hover:bg-gray-50"><LogOut className="h-4 w-4" />Sair</button></>
           : <><Link to="/login" onClick={onNavigate} className="block rounded-lg p-2 hover:bg-gray-50">Entrar</Link><Link to="/signup" onClick={onNavigate} className="block rounded-lg p-2 hover:bg-gray-50">Criar conta</Link></>}
       </div>}
       <button type="button" aria-label="Área da conta" aria-expanded={accountOpen} onClick={() => setAccountOpen(!accountOpen)} className="flex w-full items-center gap-3 rounded-xl border p-3 text-left hover:bg-gray-50">
