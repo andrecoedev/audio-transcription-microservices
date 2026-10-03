@@ -1,6 +1,15 @@
 x-database-environment: &database-environment
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-transcription}:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/${POSTGRES_DB:-transcription_db}
 
+x-assemblyai-policy: &assemblyai-policy
+  AAI_PLATFORM_ENABLED: ${AAI_PLATFORM_ENABLED:-false}
+  AAI_GUEST_ENABLED: ${AAI_GUEST_ENABLED:-false}
+  AAI_PLATFORM_BUDGET_CENTS: ${AAI_PLATFORM_BUDGET_CENTS:-0}
+  AAI_MAX_AUDIO_SECONDS: ${AAI_MAX_AUDIO_SECONDS:-600}
+  AAI_TIMEOUT_SECONDS: ${AAI_TIMEOUT_SECONDS:-180}
+  AAI_HTTP_TIMEOUT_SECONDS: ${AAI_HTTP_TIMEOUT_SECONDS:-30}
+  AAI_POLL_INTERVAL_SECONDS: ${AAI_POLL_INTERVAL_SECONDS:-3}
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -48,7 +57,7 @@ services:
     ports:
       - "2020:2020"
     environment:
-      <<: *database-environment
+      <<: [*database-environment, *assemblyai-policy]
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-dev}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
@@ -122,7 +131,7 @@ services:
     command: ["python", "run_worker.py"]
     working_dir: /app/modules/backend
     environment:
-      <<: *database-environment
+      <<: [*database-environment, *assemblyai-policy]
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-dev}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}

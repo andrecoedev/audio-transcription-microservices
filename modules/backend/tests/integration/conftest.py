@@ -25,7 +25,7 @@ def postgres_session_factory(postgres_engine):
     with postgres_engine.begin() as connection:
         connection.execute(
             text(
-                "TRUNCATE audit_events, transcription_jobs, transcription_owners, "
+                "TRUNCATE platform_provider_calls, platform_provider_budgets, audit_events, transcription_jobs, transcription_owners, "
                 "transcriptions, users RESTART IDENTITY CASCADE"
             )
         )
@@ -34,7 +34,7 @@ def postgres_session_factory(postgres_engine):
     with postgres_engine.begin() as connection:
         connection.execute(
             text(
-                "TRUNCATE audit_events, transcription_jobs, transcription_owners, "
+                "TRUNCATE platform_provider_calls, platform_provider_budgets, audit_events, transcription_jobs, transcription_owners, "
                 "transcriptions, users RESTART IDENTITY CASCADE"
             )
         )

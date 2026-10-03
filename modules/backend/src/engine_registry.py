@@ -41,6 +41,15 @@ class TranscriptionEngineProtocol(Protocol):
 
 
 @runtime_checkable
+class CloudTranscriptionEngineProtocol(Protocol):
+    def transcribe_file(self, audio_path: str, duration_seconds: float, use_diarization: bool) -> dict:
+        ...
+
+    def get_device(self) -> str:
+        ...
+
+
+@runtime_checkable
 class DiarizationEngineProtocol(Protocol):
     """Contrato mínimo que qualquer engine de diarização deve satisfazer."""
 
@@ -74,5 +83,5 @@ class MeetingMinutesGeneratorProtocol(Protocol):
 
 diarization_engine: Optional[DiarizationEngineProtocol] = None
 whisper_engine: Optional[TranscriptionEngineProtocol] = None
-assemblyai_engine: Optional[TranscriptionEngineProtocol] = None
+assemblyai_engine: Optional[CloudTranscriptionEngineProtocol] = None
 meeting_minutes_generator: Optional[MeetingMinutesGeneratorProtocol] = None

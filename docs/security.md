@@ -23,13 +23,17 @@ continuam responsabilidades de implantação.
 
 Cadastro público não provisiona admin nem assume ownership legado por username.
 Sessões Guest têm prova/expiração server-side e rotas próprias; rotas privadas
-não foram desprotegidas. Guest AssemblyAI está bloqueado por P4-04, inclusive no
-Worker; não há fallback local ou uso de chave platform sem orçamento homologado.
+não foram desprotegidas. Guest AssemblyAI exige opt-in explícito, chave somente
+no Worker e reserva financeira cumulativa no PostgreSQL, desligados por padrão.
+Não há fallback local nem repetição automática de submissão em recovery.
 Quotas de Guest/contas públicas não equivalem a orçamento financeiro;
-nenhuma delas recebe as chaves externas da plataforma. BYOK completo
+contas públicas não recebem acesso à chave platform. BYOK completo
 é próximo trabalho, sem persistência de novas chaves nesta Task. Ver
 [políticas de Guest/contas](guest_and_accounts.md) para limites, cleanup e contexto
 de identidades locais provisionadas explicitamente pelo operador.
+Ver [AssemblyAI](assemblyai.md) para teto financeiro, resultados locais e gates
+de retenção/consentimento do provider antes de oferecer Guest público. Exclusão
+local não executa exclusão remota nem garante o TTL dos artefatos externos.
 
 Buckets atômicos de janela fixa: login IP 30 e conta 10 por 5 min; upload IP 300
 e criação de job por usuário 30 por hora. Configuráveis. IP compartilhado precisa

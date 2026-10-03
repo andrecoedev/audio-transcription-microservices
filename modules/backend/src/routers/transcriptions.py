@@ -16,6 +16,7 @@ from ..services.audit import append_audit_event
 from ..services.transcription_deletion import ActiveTranscriptionError, delete_transcription_data
 from ..services.rate_limit import enforce_rate_limit
 from ..services.provider_policy import require_provider_credential, require_guest_processing
+from ..services.platform_budget import reserve_platform_call
 from ..services.storage_lifecycle import delete_file_idempotently, upload_directory
 from ..utils.uploads import UploadValidationError, save_validated_upload
 from ..utils.http_limits import BodyLimitedRoute
@@ -232,6 +233,10 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
         if public:
             job.max_duration_seconds = settings.PUBLIC_MAX_AUDIO_SECONDS
             job.timeout_seconds = settings.PUBLIC_JOB_TIMEOUT_SECONDS
+        if transcription_model == "assemblyai":
+            job.max_duration_seconds = min(job.max_duration_seconds or settings.AAI_MAX_AUDIO_SECONDS,
+                                           settings.AAI_MAX_AUDIO_SECONDS)
+            reserve_platform_call(db, transcription.id, "guest" if guest_session else "local")
         if guest_session is not None:
             db.add(TranscriptionOwnership(transcription_id=transcription.id,
                    owner_sub=f"guest:{guest_session.id}", guest_session_id=guest_session.id))
@@ -300,6 +305,9 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
     except UploadValidationError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except HTTPException:
+        db.rollback()
+        if saved_upload:
+            delete_file_idempotently(saved_upload.path)
         raise
     except Exception as exc:
         db.rollback()

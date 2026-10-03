@@ -13,6 +13,7 @@ from ..models import GuestSession, Transcription, TranscriptionOwnership
 from ..security import create_access_token, get_authenticated_user
 from ..services.guest_sessions import claim_guest_results, get_guest_session, utc
 from ..services.rate_limit import enforce_rate_limit
+from ..services.provider_policy import require_guest_processing
 from ..services.transcription_deletion import ActiveTranscriptionError, delete_transcription_data
 from .transcriptions import UploadLimitedRoute, enqueue_transcription
 
@@ -20,12 +21,17 @@ router = APIRouter(prefix="/guest", tags=["guest"], route_class=UploadLimitedRou
 
 
 def guest_policy():
+    try:
+        require_guest_processing()
+        available = True
+    except HTTPException:
+        available = False
     return {"max_upload_mb": settings.PUBLIC_MAX_UPLOAD_MB,
             "max_audio_seconds": settings.PUBLIC_MAX_AUDIO_SECONDS,
             "jobs_per_session": settings.GUEST_JOBS_PER_SESSION,
             "retention_hours": settings.GUEST_RETENTION_HOURS,
             "provider": "assemblyai", "diarization": True,
-            "can_create_job": False, "blocked_by": "P4-04",
+            "can_create_job": available, "blocked_by": None if available else "P4-04",
             "unavailable_reason": "A transcrição para visitantes está temporariamente indisponível enquanto validamos o serviço."}
 
 
