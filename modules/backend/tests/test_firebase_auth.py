@@ -161,7 +161,12 @@ def test_firebase_bearer_auth_uses_bound_internal_user(db_context, monkeypatch):
     assert response.json()["user"]["google_connected"] is True
 
 
-def test_matching_email_does_not_automatically_link_google_identity(db_context, monkeypatch):
+@pytest.mark.parametrize('stored_email', ['alice@example.test', 'Alice@Example.Test'])
+def test_matching_email_does_not_automatically_link_google_identity(db_context, monkeypatch, stored_email):
+    db = db_context['session_factory']()
+    db.get(User, 1).email = stored_email
+    db.commit()
+    db.close()
     monkeypatch.setattr(auth, "verify_firebase_token", lambda _token: _identity(email="alice@example.test"))
 
     response = db_context["client"].post(
@@ -172,7 +177,7 @@ def test_matching_email_does_not_automatically_link_google_identity(db_context, 
     assert "existing USAGI account" in response.json()["detail"]
     db = db_context["session_factory"]()
     try:
-        assert db.get(User, 1).email == "alice@example.test"
+        assert db.get(User, 1).email == stored_email
         assert db.query(FirebaseIdentity).count() == 0
         assert db.query(User).count() == 2
     finally:

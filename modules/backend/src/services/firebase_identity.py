@@ -6,6 +6,7 @@ from threading import Lock
 from uuid import uuid4
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -93,7 +94,7 @@ def resolve_firebase_user(db: Session, identity: VerifiedFirebaseIdentity) -> tu
     user = find_firebase_user(db, identity)
     if user:
         return user, False
-    if (db.query(User.id).filter(User.email == identity.email).first()
+    if (db.query(User.id).filter(func.lower(User.email) == identity.email).first()
             or identity.email == settings.AUTH_ADMIN_EMAIL.strip().lower()):
         # A concurrent first login may have committed after the initial lookup.
         user = find_firebase_user(db, identity)
