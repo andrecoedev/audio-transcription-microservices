@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from .config import sanitize_settings_snapshot, settings
 from .logging_config import configure_logging
-from .routers import api_keys, auth, guests, health, meeting_actions, meeting_intelligence, meeting_minutes, meetings, reviewed_meeting_minutes, transcriptions
+from .routers import api_keys, auth, guests, health, meeting_actions, meeting_intelligence, meeting_minutes, meetings, provider_preferences, reviewed_meeting_minutes, transcriptions
 
 
 configure_logging()
@@ -50,6 +50,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(provider_preferences.router)
 app.include_router(guests.router)
 app.include_router(transcriptions.router)
 app.include_router(meetings.router)
@@ -76,7 +77,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    if request.url.path.startswith(("/auth", "/guest", "/transcriptions", "/meetings", "/meeting-minutes")):
+    if request.url.path.startswith(("/auth", "/guest", "/settings", "/transcriptions", "/meetings", "/meeting-minutes")):
         response.headers["Cache-Control"] = "no-store"
     return response
 

@@ -13,6 +13,7 @@ from ..models import Meeting, MeetingSpeaker, Transcription, TranscriptionJob, T
 from ..services.processing_engines import initialize_processing_engines
 from ..services.audit import append_audit_event
 from ..services.platform_budget import begin_platform_call
+from ..services.provider_credentials import decrypt_credential
 from ..services.meeting_projection import ordered_segments, speaker_ids
 from ..services.storage_lifecycle import delete_file_idempotently
 from ..services.transcription_processing_service import (
@@ -189,6 +190,9 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
             "use_diarization": job.use_diarization,
             "transcription_model": job.transcription_model,
             "max_duration_seconds": job.max_duration_seconds,
+            "credential_source": job.credential_source,
+            "credential_id": job.credential_id,
+            "credential_user_id": job.credential_user_id,
             "guest_context": db.query(TranscriptionOwnership.id).filter(
                 TranscriptionOwnership.transcription_id == transcription_id,
                 TranscriptionOwnership.guest_session_id.isnot(None),
@@ -321,7 +325,24 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             # Also protect previously queued/recovered Guest jobs. P4-04 must
             # validate provider admission and budget before any engine loading.
             raise TranscriptionProcessingError("Visitor AssemblyAI processing is not validated")
-        if claim["transcription_model"] == "assemblyai":
+        byok_secret = None
+        if claim["transcription_model"] == "assemblyai" and claim["credential_source"] == "user":
+            if claim["guest_context"]:
+                raise TranscriptionProcessingError("Visitor credentials are not supported")
+            credential_db = SessionLocal()
+            try:
+                byok_secret = decrypt_credential(credential_db, claim["credential_id"],
+                                                 claim["credential_user_id"], "assemblyai")
+                attempted = credential_db.query(TranscriptionJob).filter(
+                    TranscriptionJob.transcription_id == transcription_id,
+                    TranscriptionJob.provider_attempted_at.is_(None),
+                ).update({TranscriptionJob.provider_attempted_at: datetime.now(timezone.utc)}, synchronize_session=False)
+                if attempted != 1:
+                    raise TranscriptionProcessingError("User provider call cannot be repeated automatically")
+                credential_db.commit()
+            finally:
+                credential_db.close()
+        elif claim["transcription_model"] == "assemblyai" and claim["credential_source"] == "platform":
             reservation_db = SessionLocal()
             try:
                 context = begin_platform_call(reservation_db, transcription_id)
@@ -329,10 +350,19 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
                     raise TranscriptionProcessingError("Visitor processing is disabled")
             finally:
                 reservation_db.close()
+        elif claim["transcription_model"] == "assemblyai":
+            raise TranscriptionProcessingError("Invalid provider credential source")
         logger.info("Transcription job %s started", transcription_id)
         started_at = time.monotonic()
 
-        service = get_cloud_processing_service() if claim["transcription_model"] == "assemblyai" else get_processing_service()
+        if byok_secret:
+            from ..services.assemblyai_engine import AssemblyAIEngine
+            service = TranscriptionProcessingService(cloud_engine=AssemblyAIEngine(byok_secret,
+                http_timeout=settings.AAI_HTTP_TIMEOUT_SECONDS, timeout_seconds=settings.AAI_TIMEOUT_SECONDS,
+                poll_interval=settings.AAI_POLL_INTERVAL_SECONDS))
+            byok_secret = None
+        else:
+            service = get_cloud_processing_service() if claim["transcription_model"] == "assemblyai" else get_processing_service()
         if claim["transcription_model"] == "assemblyai":
             claim["max_duration_seconds"] = min(claim["max_duration_seconds"] or settings.AAI_MAX_AUDIO_SECONDS,
                                                 settings.AAI_MAX_AUDIO_SECONDS)

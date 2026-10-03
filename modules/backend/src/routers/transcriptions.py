@@ -15,8 +15,9 @@ from ..security import TokenData, require_scope_when
 from ..services.audit import append_audit_event
 from ..services.transcription_deletion import ActiveTranscriptionError, delete_transcription_data
 from ..services.rate_limit import enforce_rate_limit
-from ..services.provider_policy import require_provider_credential, require_guest_processing
+from ..services.provider_policy import require_guest_processing
 from ..services.platform_budget import reserve_platform_call
+from ..services.provider_credentials import preferences_for, resolve_transcription
 from ..services.storage_lifecycle import delete_file_idempotently, upload_directory
 from ..utils.uploads import UploadValidationError, save_validated_upload
 from ..utils.http_limits import BodyLimitedRoute
@@ -155,14 +156,16 @@ async def get_statistics(
 async def create_transcription_job(
     request: Request,
     file: UploadFile = File(...),
-    use_diarization: bool = Form(False),
-    transcription_model: str = Form("whisper"),
+    use_diarization: bool | None = Form(None),
+    transcription_model: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user: Optional[TokenData] = Depends(
         require_scope_when("transcribe", settings.AUTH_PROTECT_PROCESSING)
     ),
 ):
     """Valida o upload, persiste o job e o enfileira no RQ."""
+    if use_diarization is None:
+        use_diarization = preferences_for(db, current_user.user_id)["use_diarization"]
     return await enqueue_transcription(request, file, use_diarization, transcription_model, db, current_user)
 
 
@@ -173,15 +176,17 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
     enforce_rate_limit(request, "job-user", str(current_user.user_id if current_user else "anonymous"))
     if public and guest_session is None:
         enforce_rate_limit(request, "public-job")
-    if transcription_model not in {"whisper", "assemblyai"}:
+    if transcription_model not in {None, "automatic", "whisper", "assemblyai"}:
         await file.close()
         raise HTTPException(status_code=400, detail="Invalid transcription model")
     if guest_session is not None:
         if transcription_model != "assemblyai":
             raise HTTPException(403, "Visitor processing supports only AssemblyAI; no local fallback")
         require_guest_processing()
+        selection = {"credential_source": "platform", "credential_id": None, "credential_user_id": None}
     else:
-        require_provider_credential(current_user, transcription_model)
+        selection = resolve_transcription(db, current_user, transcription_model)
+        transcription_model = selection["provider"]
 
     try:
         queue = get_transcription_queue()
@@ -230,13 +235,16 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
             status="queued",
         )
         db.add(job)
+        for name in ("credential_source", "credential_id", "credential_user_id"):
+            setattr(job, name, selection[name])
         if public:
             job.max_duration_seconds = settings.PUBLIC_MAX_AUDIO_SECONDS
             job.timeout_seconds = settings.PUBLIC_JOB_TIMEOUT_SECONDS
         if transcription_model == "assemblyai":
             job.max_duration_seconds = min(job.max_duration_seconds or settings.AAI_MAX_AUDIO_SECONDS,
                                            settings.AAI_MAX_AUDIO_SECONDS)
-            reserve_platform_call(db, transcription.id, "guest" if guest_session else "local")
+            if selection["credential_source"] == "platform":
+                reserve_platform_call(db, transcription.id, "guest" if guest_session else "local")
         if guest_session is not None:
             db.add(TranscriptionOwnership(transcription_id=transcription.id,
                    owner_sub=f"guest:{guest_session.id}", guest_session_id=guest_session.id))

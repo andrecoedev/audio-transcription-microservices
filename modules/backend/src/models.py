@@ -165,6 +165,32 @@ class User(Base):
         return f"<User(id={self.id}, username={self.username})>"
 
 
+class UserProviderPreferences(Base):
+    __tablename__ = "user_provider_preferences"
+    __table_args__ = (
+        CheckConstraint("transcription_provider IN ('automatic', 'whisper', 'assemblyai')", name="ck_preferences_transcription"),
+        CheckConstraint("intelligence_provider IN ('automatic', 'gemini')", name="ck_preferences_intelligence"),
+    )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    transcription_provider = Column(String(32), nullable=False, default="automatic", server_default="automatic")
+    intelligence_provider = Column(String(32), nullable=False, default="automatic", server_default="automatic")
+    use_diarization = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+
+
+class UserProviderCredential(Base):
+    """Authenticated ciphertext only; replacement creates a new immutable ID."""
+    __tablename__ = "user_provider_credentials"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", name="uq_user_provider_credential"),
+        CheckConstraint("provider IN ('assemblyai', 'gemini')", name="ck_user_provider_credential_provider"),
+    )
+    id = Column(String(36), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider = Column(String(32), nullable=False)
+    ciphertext = Column(Text, nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class GuestSession(Base):
     """Expiring server-side identity, not an account or a provider credential."""
     __tablename__ = "guest_sessions"
@@ -242,6 +268,10 @@ class TranscriptionJob(Base):
     input_path = Column(String(500), nullable=False)
     max_duration_seconds = Column(Integer, nullable=True)
     timeout_seconds = Column(Integer, nullable=True)
+    credential_source = Column(String(16), nullable=False, default="platform", server_default="platform")
+    credential_id = Column(String(36), ForeignKey("user_provider_credentials.id", ondelete="SET NULL"), nullable=True)
+    credential_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    provider_attempted_at = Column(DateTime(timezone=True), nullable=True)
     use_diarization = Column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
@@ -434,6 +464,9 @@ class MeetingIntelligence(Base):
     schema_version = Column(String(16), nullable=False, default="1")
     provider = Column(String(50), nullable=False)
     model = Column(String(100), nullable=False)
+    credential_source = Column(String(16), nullable=False, default="platform", server_default="platform")
+    credential_id = Column(String(36), ForeignKey("user_provider_credentials.id", ondelete="SET NULL"), nullable=True)
+    credential_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     status = Column(String(20), nullable=False, default="pending")
     result = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
     source_metadata = Column(JSON().with_variant(JSONB, "postgresql"), nullable=False)

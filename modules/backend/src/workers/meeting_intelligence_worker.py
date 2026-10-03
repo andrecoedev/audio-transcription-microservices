@@ -14,6 +14,7 @@ from ..services.audit import append_audit_event
 from ..services.intelligence_provider import get_provider
 from ..services.meeting_intelligence import fingerprint
 from ..services.meeting_projection import ordered_segments
+from ..services.provider_credentials import decrypt_credential
 
 logger = logging.getLogger(__name__)
 PUBLIC_FAILURE = "Meeting analysis failed; a new attempt can be requested"
@@ -50,10 +51,12 @@ def _claim(intelligence_id):
             raise ValueError("Source transcript changed")
         if row.model != settings.GEMINI_MODEL:
             raise ValueError("Provider model configuration mismatch")
+        execution = {"credential_source": row.credential_source, "credential_id": row.credential_id,
+                     "credential_user_id": row.credential_user_id, "provider": row.provider}
         row.status = "processing"
         row.started_at = datetime.now(timezone.utc)
         db.commit()
-        return context
+        return {"context": context, "execution": execution}
     except Exception:
         db.rollback()
         raise
@@ -85,11 +88,27 @@ def _complete(intelligence_id, content):
 
 def process_intelligence_job(intelligence_id: int) -> dict:
     try:
-        context = _claim(intelligence_id)
-        if context is None:
+        claim = _claim(intelligence_id)
+        if claim is None:
             return {"id": intelligence_id, "status": "already_claimed_or_deleted"}
         logger.info("Intelligence processing started id=%s", intelligence_id)
-        raw = get_provider().generate(context)
+        context, execution = claim["context"], claim["execution"]
+        if execution["provider"] != "gemini":
+            raise RuntimeError("Unsupported intelligence provider")
+        if execution["credential_source"] == "user":
+            credential_db = SessionLocal()
+            try:
+                secret = decrypt_credential(credential_db, execution["credential_id"],
+                                            execution["credential_user_id"], execution["provider"])
+            finally:
+                credential_db.close()
+            provider = get_provider(api_key=secret)
+            secret = None
+        elif execution["credential_source"] == "platform":
+            provider = get_provider()
+        else:
+            raise RuntimeError("Invalid intelligence credential source")
+        raw = provider.generate(context)
         if not isinstance(raw, str) or len(raw) > 1000000:
             raise ValueError("Invalid provider response size/type")
         validated = IntelligenceResult.model_validate_json(raw)
