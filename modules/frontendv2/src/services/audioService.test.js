@@ -28,6 +28,26 @@ it('uses durable meeting endpoints for metadata, transcript and edits', async ()
   expect(api.delete).toHaveBeenCalledWith('/meetings/42')
 })
 
+it('uses authenticated provider-preference and credential metadata contracts', async () => {
+  const metadata = { preferences: { transcription_provider: 'automatic' }, credentials: {
+    assemblyai: { configured: true, updated_at: null }, gemini: { configured: false, updated_at: null },
+  } }
+  api.get.mockResolvedValue({ data: metadata })
+  api.patch.mockResolvedValue({ data: metadata })
+  api.post.mockResolvedValue({ data: metadata })
+  api.delete.mockResolvedValue({ data: metadata })
+  const preferences = { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: true }
+  await expect(audioService.getProviderSettings()).resolves.toEqual(metadata)
+  await audioService.updateProviderPreferences(preferences)
+  await audioService.saveProviderCredential('assemblyai', 'secret-value')
+  await audioService.deleteProviderCredential('gemini')
+  expect(api.get).toHaveBeenCalledWith('/settings/providers')
+  expect(api.patch).toHaveBeenCalledWith('/settings/providers', { preferences })
+  expect(api.post).toHaveBeenCalledWith('/settings/providers/assemblyai/credential', { secret: 'secret-value' })
+  expect(api.delete).toHaveBeenCalledWith('/settings/providers/gemini/credential')
+  expect(metadata.credentials.assemblyai).toEqual({ configured: true, updated_at: null })
+})
+
 it('uses only the official upload, status and result contract', async () => {
   api.post.mockResolvedValue({ data: { id: 42 } })
   api.get.mockResolvedValue({ data: { status: 'completed' } })

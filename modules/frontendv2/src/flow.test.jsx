@@ -20,6 +20,10 @@ vi.mock('./services/authService', () => ({
 vi.mock('./services/audioService', () => ({
   audioService: {
     checkHealth: vi.fn(),
+    getProviderSettings: vi.fn(),
+    updateProviderPreferences: vi.fn(),
+    saveProviderCredential: vi.fn(),
+    deleteProviderCredential: vi.fn(),
     getStats: vi.fn(),
     listTranscriptions: vi.fn(),
     createTranscriptionJob: vi.fn(),
@@ -46,6 +50,16 @@ beforeEach(() => {
   localStorage.clear()
   useAuthStore.setState({ user: null, token: null, isAuthenticated: false })
   authService.getConfig.mockResolvedValue({ strict: true })
+  audioService.getProviderSettings.mockResolvedValue({
+    preferences: { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: false },
+    credential_storage_available: true,
+    providers: {
+      whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
+      assemblyai: { available: true, allowed: false, configured: false, credential_source: null },
+      gemini: { available: true, allowed: false, configured: false, credential_source: null },
+    },
+    credentials: { assemblyai: { configured: false, updated_at: null }, gemini: { configured: false, updated_at: null } },
+  })
   audioService.checkHealth.mockResolvedValue({ models: {} })
   audioService.getStats.mockResolvedValue({ total_transcriptions: 0 })
   audioService.listTranscriptions.mockResolvedValue({ transcriptions: [] })
@@ -140,6 +154,53 @@ describe('public React flow', () => {
     expect(await screen.findByText('Resultado aberto')).toBeTruthy()
     expect(audioService.createTranscriptionJob).toHaveBeenCalledOnce()
     expect(audioService.createTranscriptionJob.mock.calls[0][0].name).toBe('meeting.wav')
+  })
+
+  it('sends automatic account provider selection and stored diarization preference', async () => {
+    useAuthStore.setState({ user: { id: 21, registration_source: 'local' }, token: 'user-token', isAuthenticated: true })
+    audioService.getProviderSettings.mockResolvedValueOnce({
+      preferences: { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: true },
+      credential_storage_available: true,
+      providers: {
+        whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
+        assemblyai: { available: true, allowed: true, configured: true, credential_source: 'user' },
+        gemini: { available: true, allowed: true, configured: true, credential_source: 'user' },
+      },
+      credentials: { assemblyai: { configured: true, updated_at: null }, gemini: { configured: true, updated_at: null } },
+    })
+    audioService.createTranscriptionJob.mockResolvedValue({ id: 43 })
+    render(<MemoryRouter><NewTranscription /></MemoryRouter>)
+    const upload = document.querySelector('input[type="file"]')
+    await userEvent.upload(upload, new File(['RIFFdataWAVE'], 'account.wav', { type: 'audio/wav' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Iniciar Transcrição' }))
+    await waitFor(() => expect(audioService.createTranscriptionJob).toHaveBeenCalledOnce())
+    expect(audioService.createTranscriptionJob.mock.calls[0][1]).toMatchObject({
+      transcriptionModel: 'automatic', useDiarization: true,
+    })
+  })
+
+  it('keeps an unavailable explicit preference and blocks upload until the user changes it', async () => {
+    useAuthStore.setState({ user: { id: 21, registration_source: 'local' }, token: 'user-token', isAuthenticated: true })
+    audioService.getProviderSettings.mockResolvedValueOnce({
+      preferences: { transcription_provider: 'assemblyai', intelligence_provider: 'automatic', use_diarization: false },
+      credential_storage_available: true,
+      providers: {
+        whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
+        assemblyai: { available: true, allowed: false, configured: false, credential_source: null },
+        gemini: { available: true, allowed: false, configured: false, credential_source: null },
+      },
+      credentials: { assemblyai: { configured: false, updated_at: null }, gemini: { configured: false, updated_at: null } },
+    })
+    render(<MemoryRouter><NewTranscription /></MemoryRouter>)
+    await screen.findByRole('alert')
+    expect(screen.getByRole('button', { name: /AssemblyAI/ }).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
+    await userEvent.upload(document.querySelector('input[type="file"]'), new File(['RIFFdataWAVE'], 'blocked.wav', { type: 'audio/wav' }))
+    expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Automático' }))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(false)
+    expect(audioService.createTranscriptionJob).not.toHaveBeenCalled()
   })
 
   it('shows upload failures without navigating away', async () => {

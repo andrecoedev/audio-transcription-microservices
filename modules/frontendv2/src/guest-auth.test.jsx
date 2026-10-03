@@ -8,12 +8,16 @@ import NewTranscription from './pages/NewTranscription'
 import { guestService } from './services/guestService'
 import { authService } from './services/authService'
 import { useAuthStore } from './stores/authStore'
+import { audioService } from './services/audioService'
 
 vi.mock('./services/guestService', () => ({ guestService: {
   policy: vi.fn(), session: vi.fn(), result: vi.fn(), createSession: vi.fn(),
   createJob: vi.fn(), claim: vi.fn(), delete: vi.fn(),
 } }))
 vi.mock('./services/authService', () => ({ authService: { signup: vi.fn(), login: vi.fn(), me: vi.fn() } }))
+vi.mock('./services/audioService', () => ({ audioService: {
+  getProviderSettings: vi.fn(), createTranscriptionJob: vi.fn(),
+} }))
 vi.mock('./pages/Dashboard', () => ({ default: () => <h1>Experiência autenticada</h1> }))
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() }, Toaster: () => null }))
 
@@ -26,6 +30,16 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/')
   useAuthStore.setState({ user: null, token: null, isAuthenticated: false })
   guestService.policy.mockResolvedValue(policy)
+  audioService.getProviderSettings.mockResolvedValue({
+    preferences: { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: true },
+    credential_storage_available: true,
+    providers: {
+      whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
+      assemblyai: { available: true, allowed: false, configured: false, credential_source: null },
+      gemini: { available: true, allowed: false, configured: false, credential_source: null },
+    },
+    credentials: { assemblyai: { configured: false, updated_at: null }, gemini: { configured: false, updated_at: null } },
+  })
 })
 afterEach(cleanup)
 
@@ -53,11 +67,11 @@ describe('Guest and account boundaries', () => {
     expect(await screen.findByRole('heading', { name: 'Experiência autenticada' })).toBeTruthy()
     expect(sessionStorage.getItem('usagi-guest-session')).not.toBeNull()
   })
-  it('shows server upload limits for public accounts without exposing platform providers', async () => {
+  it('shows server upload limits and keeps platform-only providers disabled for public accounts', async () => {
     useAuthStore.setState({ user: { registration_source: 'public' }, token: 'test-user-proof', isAuthenticated: true })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
     expect(await screen.findByText(/m[aá]x\. 100MB/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /AssemblyAI/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /AssemblyAI/ }).disabled).toBe(true)
     expect(screen.getByLabelText('Detecção de falantes')).toBeTruthy()
   })
 
@@ -94,6 +108,7 @@ describe('Guest and account boundaries', () => {
     expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
     expect(guestService.createSession).not.toHaveBeenCalled()
     expect(guestService.createJob).not.toHaveBeenCalled()
+    expect(audioService.getProviderSettings).not.toHaveBeenCalled()
   })
 
   it('restores result using the guest proof and transfers it only with explicit authenticated action', async () => {
@@ -147,11 +162,28 @@ describe('Guest and account boundaries', () => {
     expect(useAuthStore.getState().user.registration_source).toBe('public')
   })
 
-  it('does not offer platform AssemblyAI to a newly registered account', () => {
+  it('keeps platform AssemblyAI unavailable to a newly registered account', async () => {
     useAuthStore.setState({ user: { registration_source: 'public' }, isAuthenticated: true })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-    expect(screen.queryByRole('button', { name: /AssemblyAI/ })).toBeNull()
+    expect((await screen.findByRole('button', { name: /AssemblyAI/ })).disabled).toBe(true)
     expect(screen.getByLabelText('Detecção de falantes')).toBeTruthy()
+  })
+
+  it('offers account-owned AssemblyAI when server settings allow it', async () => {
+    useAuthStore.setState({ user: { registration_source: 'public' }, token: 'test-user-proof', isAuthenticated: true })
+    audioService.getProviderSettings.mockResolvedValueOnce({
+      preferences: { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: true },
+      credential_storage_available: true,
+      providers: {
+        whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
+        assemblyai: { available: true, allowed: true, configured: true, credential_source: 'user' },
+        gemini: { available: true, allowed: true, configured: true, credential_source: 'user' },
+      },
+      credentials: { assemblyai: { configured: true, updated_at: null }, gemini: { configured: true, updated_at: null } },
+    })
+    render(<MemoryRouter><NewTranscription /></MemoryRouter>)
+    expect(await screen.findByRole('button', { name: /AssemblyAI/ })).toBeTruthy()
+    expect(screen.getByLabelText('Detecção de falantes').checked).toBe(true)
   })
 
   it('preserves failed conversion proof so the user can retry', async () => {
