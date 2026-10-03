@@ -8,6 +8,7 @@ import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import PageHeader from '../components/PageHeader'
 import ProviderConnectionCard from '../components/ProviderConnectionCard'
 import ProviderPreferences from '../components/ProviderPreferences'
+import GoogleAccountLink from '../components/GoogleAccountLink'
 import { audioService } from '../services/audioService'
 import { useAuthStore } from '../stores/authStore'
 
@@ -173,6 +174,7 @@ export default function Settings() {
             </label>
             <Button onClick={saveProfileLocally} icon={Save}>Salvar preferências locais</Button>
             <p className="text-sm text-gray-500">Nome e e-mail são preferências deste navegador e não alteram os dados de acesso da conta.</p>
+            <GoogleAccountLink />
           </CardContent>
         </Card>}
 
