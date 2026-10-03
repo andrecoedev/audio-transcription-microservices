@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
@@ -27,6 +27,9 @@ export default function MeetingDetail() {
   const [error, setError] = useState(false)
   const [query, setQuery] = useState('')
   const [activeTab, setActiveTab] = useState('summary')
+  const transcriptScrollRef = useRef(null)
+  const initialHashMeeting = useRef(null)
+  const loadedMeetingRef = useRef(null)
   const [intelligenceVersion, setIntelligenceVersion] = useState(0)
   const refreshActions = useCallback(() => setIntelligenceVersion(value => value + 1), [])
   const [minutesVersion, setMinutesVersion] = useState(0)
@@ -35,6 +38,7 @@ export default function MeetingDetail() {
   const load = useCallback(async () => {
     try {
       const [item, result] = await Promise.all([audioService.getMeeting(id), audioService.getMeetingTranscript(id)])
+      loadedMeetingRef.current = id
       setMeeting(item)
       setTitle(item.title)
       setSpeakerNames(Object.fromEntries(item.speakers.map(speaker => [speaker.id, speaker.display_name || ''])))
@@ -83,6 +87,23 @@ export default function MeetingDetail() {
       `${segment.text} ${segment.speaker_display_name || segment.speaker || ''}`.toLocaleLowerCase('pt-BR').includes(normalizedQuery))
   }, [query, transcript])
 
+  const scrollToSegment = useCallback(segmentId => {
+    const container = transcriptScrollRef.current
+    const target = document.getElementById(segmentId)
+    if (!container || !target) return
+    const offset = target.getBoundingClientRect().top - container.getBoundingClientRect().top
+    const top = container.scrollTop + offset - (container.clientHeight - target.offsetHeight) / 2
+    container.scrollTo?.({ top: Math.max(0, top), behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    if (!transcript || loadedMeetingRef.current !== id || initialHashMeeting.current === id) return
+    initialHashMeeting.current = id
+    const order = window.location.hash.match(/^#segment-(\d+)$/)?.[1]
+    if (order == null) return
+    requestAnimationFrame(() => scrollToSegment(`segment-${order}`))
+  }, [id, transcript, scrollToSegment])
+
   if (error) return <p role="alert">Reunião indisponível. <Link to="/meetings">Voltar</Link></p>
   if (!meeting || !transcript) return <p role="status">Carregando reunião...</p>
 
@@ -94,7 +115,7 @@ export default function MeetingDetail() {
       <div className="min-w-0 flex-1">
         <Link className="text-sm text-gray-500 hover:text-gray-900" to="/meetings">← Reuniões</Link>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">{meeting.title}</h1>
+          <h1 className="min-w-0 break-words text-3xl font-semibold tracking-tight text-gray-900">{meeting.title}</h1>
           {!editingTitle && <Button type="button" variant="outline" size="sm" onClick={() => setEditingTitle(true)}>Editar título</Button>}
         </div>
         {editingTitle && <form onSubmit={saveTitle} className="mt-2 flex flex-wrap items-center gap-2">
@@ -138,7 +159,7 @@ export default function MeetingDetail() {
           </div>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-5 py-4" aria-label="Segmentos da transcrição">
+          <div ref={transcriptScrollRef} className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-5 py-4" aria-label="Segmentos da transcrição">
             {segments.map(segment => <article id={`segment-${segment.order}`} key={segment.order} className="rounded-lg px-3 py-3 hover:bg-gray-50">
               <div className="mb-1 flex items-center gap-2 text-sm">
                 <span className="rounded-full bg-primary-50 px-2.5 py-1 font-medium text-primary-700">{segment.speaker_display_name || segment.speaker || 'Falante'}</span>
@@ -171,12 +192,12 @@ export default function MeetingDetail() {
             event.preventDefault()
             const segmentId = link.getAttribute('href').slice(1)
             setQuery('')
-            requestAnimationFrame(() => document.getElementById(segmentId)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }))
+            requestAnimationFrame(() => scrollToSegment(segmentId))
           }}>
           <div hidden={activeTab === 'actions'}>
             <MeetingIntelligencePanel key={id} meetingId={id} onResultChange={refreshActions} initialTab={activeTab} />
           </div>
-          {activeTab === 'actions' && <MeetingActionsPanel key={id} meetingId={id} intelligenceVersion={intelligenceVersion} onActionsChanged={refreshMinutes} />}
+          {activeTab === 'actions' && <MeetingActionsPanel key={id} meetingId={id} intelligenceVersion={intelligenceVersion} onActionsChanged={refreshMinutes} embedded />}
         </div>
       </Card>
     </div>

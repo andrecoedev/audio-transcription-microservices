@@ -63,10 +63,10 @@ export default function Tasks() {
 
     {selectedId && <section aria-label="Tarefas da reunião selecionada" className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xl font-semibold">{meetings.find(item => String(item.id) === selectedId)?.title}</h2>
+        <h2 className="min-w-0 break-words text-xl font-semibold">{meetings.find(item => String(item.id) === selectedId)?.title}</h2>
         <Link className="text-sm text-[#31594b] underline" to={`/meetings/${selectedId}`}>Abrir reunião completa</Link>
       </div>
-      <MeetingActionsPanel key={selectedId} meetingId={selectedId} />
+      <MeetingActionsPanel key={selectedId} meetingId={selectedId} evidenceBaseUrl={`/meetings/${selectedId}`} />
     </section>}
   </div>
 }

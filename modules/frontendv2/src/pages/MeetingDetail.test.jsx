@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import MeetingDetail from './MeetingDetail'
 import { audioService } from '../services/audioService'
@@ -21,7 +21,13 @@ beforeEach(() => {
     { order: 1, speaker: 'SPEAKER_01', speaker_display_name: 'Rui', start: 4, end: 6, text: 'Revisar métricas.' },
   ] })
 })
-afterEach(cleanup)
+const scrollToDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTo')
+afterEach(() => {
+  cleanup()
+  window.history.replaceState({}, '', '/')
+  if (scrollToDescriptor) Object.defineProperty(HTMLElement.prototype, 'scrollTo', scrollToDescriptor)
+  else delete HTMLElement.prototype.scrollTo
+})
 
 function renderMeeting() {
   return render(<MemoryRouter initialEntries={['/meetings/7']}><Routes>
@@ -52,6 +58,23 @@ it('keeps a long transcript in a bounded scroll region', async () => {
   expect(transcript.className).toContain('overscroll-contain')
   expect(transcript.closest('.card').parentElement.className).toContain('xl:h-[min(72vh,52rem)]')
   expect(transcript.closest('.card').className).toContain('h-[65vh]')
+})
+
+it('scrolls to an evidence segment after opening the meeting from its hash', async () => {
+  const scrollTo = vi.fn()
+  Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo })
+  window.history.replaceState({}, '', '/meetings/7#segment-1')
+  renderMeeting()
+  expect(await screen.findByText('Revisar métricas.')).toBeTruthy()
+  await waitFor(() => expect(scrollTo).toHaveBeenCalledOnce())
+})
+
+it('allows maximum-length unbroken meeting titles to wrap', async () => {
+  const longTitle = 'm'.repeat(255)
+  audioService.getMeeting.mockResolvedValueOnce({ id: 7, title: longTitle, created_at: '2026-10-01T12:00:00Z', speakers: [] })
+  renderMeeting()
+  const heading = await screen.findByRole('heading', { name: longTitle, level: 1 })
+  expect(heading.className).toContain('break-words')
 })
 
 it('keeps title and speaker rename controls connected to the existing APIs', async () => {

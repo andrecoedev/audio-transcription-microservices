@@ -72,6 +72,16 @@ it('shows a suggestion, accepts it explicitly, edits and retains it after reload
   expect(screen.queryByRole('button', { name: 'Aceitar' })).toBeNull()
 })
 
+it('keeps evidence links pointed at the meeting from task lists and reviewed origins', async () => {
+  render(<MeetingActionsPanel meetingId="42" evidenceBaseUrl="/meetings/42" />)
+  const suggestionEvidence = await screen.findByRole('link', { name: '0.0s–2.0s' })
+  expect(suggestionEvidence.getAttribute('href')).toBe('/meetings/42#segment-0')
+  fireEvent.click(screen.getByRole('button', { name: 'Aceitar' }))
+  fireEvent.click(await screen.findByRole('button', { name: /Ver sugestão original/ }))
+  const origin = await screen.findByRole('region', { name: 'Origem da tarefa' })
+  expect(within(origin).getByRole('link').getAttribute('href')).toBe('/meetings/42#segment-0')
+})
+
 it('edits before accepting and dismisses suggestions persistently', async () => {
   const view = render(<MeetingActionsPanel meetingId="42" />)
   await screen.findByText('Preparar relatório')
