@@ -149,8 +149,10 @@ it('keeps action field labels stacked with aligned full-width inputs', async () 
   expect(description.closest('label').className).toContain('sm:col-span-2')
   for (const input of [description, assignee, dueDate]) {
     expect(input.closest('label').className).toContain('flex-col')
-    expect(input.className).toContain('w-full')
     expect(input.className).toContain('min-w-0')
+    expect(input.className).toContain('input')
+    expect(input.className).toContain('h-10')
+    expect(input.className).toContain('mt-auto')
   }
 })
 

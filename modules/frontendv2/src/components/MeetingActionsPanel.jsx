@@ -24,15 +24,15 @@ function ActionFields({ values, onChange, prefix }) {
   return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
     <label className="flex min-w-0 flex-col gap-1 sm:col-span-2">Descrição
       <input aria-label={`${prefix} descrição`} required maxLength={4000} value={values.description}
-        onChange={event => onChange({ ...values, description: event.target.value })} className="block w-full min-w-0 border rounded-lg px-3 py-2" />
+        onChange={event => onChange({ ...values, description: event.target.value })} className="input h-10 min-w-0 mt-auto" />
     </label>
     <label className="flex min-w-0 flex-col gap-1">Responsável (opcional)
       <input aria-label={`${prefix} responsável`} maxLength={255} value={values.assignee}
-        onChange={event => onChange({ ...values, assignee: event.target.value })} className="block w-full min-w-0 border rounded-lg px-3 py-2" />
+        onChange={event => onChange({ ...values, assignee: event.target.value })} className="input h-10 min-w-0 mt-auto" />
     </label>
     <label className="flex min-w-0 flex-col gap-1">Prazo (opcional)
       <input aria-label={`${prefix} prazo`} type="date" value={values.due_date}
-        onChange={event => onChange({ ...values, due_date: event.target.value })} className="block w-full min-w-0 border rounded-lg px-3 py-2" />
+        onChange={event => onChange({ ...values, due_date: event.target.value })} className="input h-10 min-w-0 mt-auto" />
     </label>
   </div>
 }
