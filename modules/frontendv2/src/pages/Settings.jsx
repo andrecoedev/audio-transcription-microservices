@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import Button from '../components/Button'
 import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import PageHeader from '../components/PageHeader'
+import ProviderConnectionCard from '../components/ProviderConnectionCard'
 import { audioService } from '../services/audioService'
 import { useAuthStore } from '../stores/authStore'
 
@@ -27,6 +28,7 @@ export default function Settings() {
   const [providerError, setProviderError] = useState(false)
   const [providerLoading, setProviderLoading] = useState(true)
   const [providerSaving, setProviderSaving] = useState(false)
+  const [credentialOperation, setCredentialOperation] = useState(null)
   const [credentials, setCredentials] = useState({ assemblyai: '', gemini: '' })
   const [profile, setProfile] = useState({ name: user?.name || '', email: user?.email || '' })
   const [errorMessage, setErrorMessage] = useState('')
@@ -85,33 +87,50 @@ export default function Settings() {
 
   const saveCredential = async (provider) => {
     const secret = credentials[provider]
-    if (!secret) return
+    if (!secret) return false
+    if (secret.length < 8 || secret.length > 4096 || /[^\x21-\x7e]/.test(secret)) {
+      setCredentials((current) => ({ ...current, [provider]: '' }))
+      setErrorMessage('Formato da chave inválido. Copie a chave de API do serviço, sem espaços, e tente novamente.')
+      return false
+    }
     setProviderSaving(true)
+    setCredentialOperation(provider)
+    setCredentials((current) => ({ ...current, [provider]: '' }))
     setErrorMessage('')
     try {
       setProviderSettings(await audioService.saveProviderCredential(provider, secret))
-      toast.success('Credencial salva')
-    } catch {
-      setErrorMessage('Não foi possível salvar a credencial. Confira os dados e tente novamente.')
+      toast.success('Chave salva com segurança')
+      return true
+    } catch (error) {
+      setErrorMessage(error.status === 422
+        ? 'Formato da chave inválido. Copie a chave de API do serviço, sem espaços, e tente novamente.'
+        : error.status === 429 ? 'Muitas alterações em pouco tempo. Aguarde antes de tentar novamente.'
+          : 'Não foi possível salvar a credencial. Tente novamente; se continuar, procure o suporte da USAGI.')
       toast.error('Não foi possível salvar a credencial')
+      return false
     } finally {
       setCredentials((current) => ({ ...current, [provider]: '' }))
       setProviderSaving(false)
+      setCredentialOperation(null)
     }
   }
 
   const removeCredential = async (provider) => {
     setProviderSaving(true)
+    setCredentialOperation(provider)
     setErrorMessage('')
     try {
       setProviderSettings(await audioService.deleteProviderCredential(provider))
       toast.success('Credencial removida')
+      return true
     } catch {
       setErrorMessage('Não foi possível remover a credencial. Tente novamente.')
       toast.error('Não foi possível remover a credencial')
+      return false
     } finally {
       setCredentials((current) => ({ ...current, [provider]: '' }))
       setProviderSaving(false)
+      setCredentialOperation(null)
     }
   }
 
@@ -123,12 +142,12 @@ export default function Settings() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title="Configurações" description="Gerencie preferências, serviços de IA e credenciais da sua conta.">
-        <Button variant="outline" size="sm" onClick={refreshStatus} loading={statusLoading} disabled={statusLoading} icon={RefreshCw}>Atualizar</Button>
+        <Button variant="outline" size="sm" onClick={() => { refreshStatus(); refreshProviderSettings() }} loading={statusLoading || providerLoading} disabled={statusLoading || providerLoading || providerSaving} icon={RefreshCw}>Atualizar</Button>
       </PageHeader>
 
       <div role="tablist" aria-label="Seções das configurações" className="flex flex-wrap gap-2">
         {tabs.map((tab) => <button key={tab.id} id={`settings-tab-${tab.id}`} type="button" role="tab"
-          aria-selected={activeTab === tab.id} aria-controls={`settings-panel-${tab.id}`}
+          aria-selected={activeTab === tab.id} aria-controls={`settings-panel-${tab.id}`} disabled={providerSaving}
           onClick={() => {
             setCredentials({ assemblyai: '', gemini: '' })
             setActiveTab(tab.id)
@@ -172,11 +191,11 @@ export default function Settings() {
             {errorMessage && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>}
             <div className="grid gap-4 lg:grid-cols-2">
               <ProviderCard title="Transcrição de áudio" provider="assemblyai" configuredProvider={providerSettings.providers.assemblyai}
-                credential={providerSettings.credentials.assemblyai} settings={providerSettings} saving={providerSaving}
+                credential={providerSettings.credentials.assemblyai} settings={providerSettings} saving={providerSaving} operation={credentialOperation}
                 value={credentials.assemblyai} onChange={(value) => setCredentials({ ...credentials, assemblyai: value })}
                 onSave={() => saveCredential('assemblyai')} onRemove={() => removeCredential('assemblyai')} />
               <ProviderCard title="Resumos inteligentes" provider="gemini" configuredProvider={providerSettings.providers.gemini}
-                credential={providerSettings.credentials.gemini} settings={providerSettings} saving={providerSaving}
+                credential={providerSettings.credentials.gemini} settings={providerSettings} saving={providerSaving} operation={credentialOperation}
                 value={credentials.gemini} onChange={(value) => setCredentials({ ...credentials, gemini: value })}
                 onSave={() => saveCredential('gemini')} onRemove={() => removeCredential('gemini')} />
             </div>
@@ -256,49 +275,10 @@ function PreferencesForm({ settings, updatePreference, savePreferences, provider
   </form>
 }
 
-function ProviderCard({ title, provider, configuredProvider, credential, settings, saving, value, onChange, onSave, onRemove }) {
-  const source = configuredProvider.credential_source
-  const usesWhisper = provider === 'assemblyai'
-    && settings.providers.whisper.allowed
-    && ['automatic', 'whisper'].includes(settings.preferences.transcription_provider)
-  const providerName = provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'
-  const current = source === 'user' ? `${providerName} · Sua própria conta`
-    : source === 'platform' ? `${providerName} · Fornecido pela USAGI`
-      : provider === 'assemblyai' && usesWhisper ? 'Faster-Whisper' : 'Não conectado'
-  const allowed = configuredProvider.allowed
-  const statusLabel = allowed ? 'Disponível nesta conta'
-    : provider === 'assemblyai' && usesWhisper ? 'Faster-Whisper disponível' : 'Indisponível'
-  return <Card className="space-y-4">
-    <CardHeader><div className="flex flex-wrap items-center gap-3"><CardTitle>{title}</CardTitle>
-      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${allowed || usesWhisper ? 'bg-primary-50 text-primary-800' : 'bg-amber-100 text-amber-950'}`}>{statusLabel}</span>
-    </div></CardHeader>
-    <CardContent className="space-y-4">
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <div className="flex items-center justify-between gap-2 text-sm text-gray-500"><span>Estado atual</span><span>{allowed ? 'Disponível' : 'Indisponível'}</span></div>
-        <p className="mt-1 font-semibold text-gray-900">{current}</p>
-        <p className="mt-1 text-sm text-gray-600">{provider === 'assemblyai'
-          ? usesWhisper ? 'Faster-Whisper está disponível para a preferência atual desta conta. Você pode conectar sua conta AssemblyAI abaixo.'
-            : allowed ? 'AssemblyAI está permitido para esta conta. Conecte sua própria credencial abaixo, se necessário.'
-              : 'Nenhum provedor de transcrição está disponível para a preferência atual desta conta.'
-          : 'O Gemini gera resumos, tópicos, decisões, tarefas e perguntas quando uma credencial permitida está conectada.'}</p>
-      </div>
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <p className="text-sm font-medium text-gray-700">{credential.configured ? 'Credencial própria salva' : 'Conectar sua conta'}</p>
-        {configuredProvider.credential_source === 'platform' && <p className="mt-1 text-sm text-gray-600">A credencial em uso é fornecida pela USAGI.</p>}
-        {!settings.credential_storage_available && <p className="mt-2 text-sm text-amber-800">O armazenamento seguro de credenciais não está disponível no momento.</p>}
-        {settings.credential_storage_available && <div className="mt-3 space-y-2">
-          <label className="sr-only" htmlFor={`credential-${provider}`}>Credencial {provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}</label>
-          <input id={`credential-${provider}`} aria-label={`Credencial ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}`} type="password" autoComplete="off"
-            className="input" value={value} onChange={(event) => onChange(event.target.value)} placeholder={credential.configured ? 'Inserir nova credencial para substituir' : 'Inserir credencial'} />
-          <div className="flex flex-wrap gap-2">
-            <Button disabled={!value || saving} loading={saving} onClick={onSave}>{credential.configured ? 'Substituir credencial' : 'Salvar credencial'}</Button>
-            {credential.configured && <Button variant="outline" disabled={saving} onClick={onRemove}>Remover credencial {provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}</Button>}
-          </div>
-        </div>}
-        <p className="mt-2 text-xs text-gray-500">Configurada indica que foi salva, mas não valida a chave ou a conta no serviço externo.</p>
-      </div>
-    </CardContent>
-  </Card>
+function ProviderCard({ provider, configuredProvider, credential, settings, saving, operation, value, onChange, onSave, onRemove }) {
+  return <ProviderConnectionCard provider={provider} details={configuredProvider} credential={credential}
+    storageAvailable={settings.credential_storage_available} busy={saving} saving={saving && operation === provider}
+    value={value} onChange={onChange} onSave={onSave} onRemove={onRemove} />
 }
 
 function LoadingState({ loading, error, retry }) {

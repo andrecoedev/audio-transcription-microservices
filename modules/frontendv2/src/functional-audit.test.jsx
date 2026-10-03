@@ -153,6 +153,8 @@ describe('functional frontend contracts', () => {
     const selector = await screen.findByLabelText(label)
     expect(selector.value).toBe(provider)
     fireEvent.click(screen.getByRole('button', { name: `Remover credencial ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}` }))
+    expect(audioService.deleteProviderCredential).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: `Confirmar remoção ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}` }))
     await waitFor(() => expect(audioService.deleteProviderCredential).toHaveBeenCalledWith(provider))
     expect(selector.value).toBe(provider)
     expect(selector.selectedOptions[0].disabled).toBe(true)

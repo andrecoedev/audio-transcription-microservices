@@ -118,4 +118,47 @@ describe('Settings', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Serviços de IA' }))
     expect(screen.getByLabelText('Credencial AssemblyAI').value).toBe('')
   })
+
+  it('replaces a saved key only after explicit editing and never redisplays it', async () => {
+    const saved = settings({ credentials: { assemblyai: { configured: false }, gemini: { configured: true, updated_at: '2026-10-03T12:00:00Z' } } })
+    audioService.getProviderSettings.mockResolvedValue(saved)
+    audioService.saveProviderCredential.mockResolvedValue(saved)
+    renderSettings()
+    await screen.findByText('Credencial própria salva')
+    expect(screen.queryByLabelText('Credencial Gemini')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Substituir chave Gemini' }))
+    fireEvent.change(screen.getByLabelText('Credencial Gemini'), { target: { value: 'synthetic-replacement' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar nova chave' }))
+    await waitFor(() => expect(audioService.saveProviderCredential).toHaveBeenCalledWith('gemini', 'synthetic-replacement'))
+    await waitFor(() => expect(screen.queryByLabelText('Credencial Gemini')).toBeNull())
+    expect(screen.queryByText('synthetic-replacement')).toBeNull()
+  })
+
+  it('cancels removal without issuing a request', async () => {
+    audioService.getProviderSettings.mockResolvedValue(settings({ credentials: { assemblyai: { configured: false }, gemini: { configured: true } } }))
+    renderSettings()
+    fireEvent.click(await screen.findByRole('button', { name: 'Remover credencial Gemini' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar remoção' }))
+    expect(audioService.deleteProviderCredential).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Confirmar remoção Gemini' })).toBeNull()
+  })
+
+  it('rejects malformed input without requesting external validation or exposing the key', async () => {
+    renderSettings()
+    fireEvent.change(await screen.findByLabelText('Credencial Gemini'), { target: { value: 'not a valid key' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[1])
+    expect(await screen.findByText(/Formato da chave inválido/)).toBeTruthy()
+    expect(screen.getByLabelText('Credencial Gemini').value).toBe('')
+    expect(audioService.saveProviderCredential).not.toHaveBeenCalled()
+  })
+
+  it('shows safe format rejection from the API and clears rejected input', async () => {
+    audioService.saveProviderCredential.mockRejectedValue(Object.assign(new Error('sensitive provider response'), { status: 422 }))
+    renderSettings()
+    fireEvent.change(await screen.findByLabelText('Credencial Gemini'), { target: { value: 'synthetic-rejected' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[1])
+    expect(await screen.findByText(/Formato da chave inválido/)).toBeTruthy()
+    expect(screen.getByLabelText('Credencial Gemini').value).toBe('')
+    expect(screen.queryByText('sensitive provider response')).toBeNull()
+  })
 })
