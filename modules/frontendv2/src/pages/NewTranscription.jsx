@@ -157,13 +157,14 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
           ) : !file ? (
             <div
               {...getRootProps()}
-              className={`flex flex-wrap items-center justify-between gap-6 rounded-xl px-2 py-5 cursor-pointer transition-colors ${
+              aria-disabled={!policyReady || !processingAllowed}
+              className={`flex flex-col items-start justify-between gap-6 rounded-xl px-2 py-5 sm:flex-row sm:items-center transition-colors ${!processingAllowed ? 'cursor-not-allowed' : 'cursor-pointer'} ${
                 isDragActive
                   ? 'border-primary-600 bg-primary-50'
                   : 'border-gray-300 bg-gray-50 hover:border-primary-500 hover:bg-primary-50/40'
               }`}
             >
-              <input {...getInputProps()} />
+              <input {...getInputProps()} disabled={!policyReady || !processingAllowed || uploading} />
               <div className="min-w-0 flex-1">
               <p className="text-xl font-semibold text-gray-900 mb-2">
                 {isDragActive ? 'Solte o arquivo aqui' : 'Arraste um arquivo ou clique para selecionar'}
@@ -172,7 +173,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                 Formatos suportados: MP3, WAV, MP4, M4A, FLAC, OGG, OPUS (máx. {(maxFileSize / (1024 * 1024)).toFixed(0)}MB)
               </p>
               </div>
-              <span className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-medium text-white"><Upload className="h-4 w-4" aria-hidden="true" />Escolher arquivo</span>
+              <span className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium ${processingAllowed ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}`}><Upload className="h-4 w-4" aria-hidden="true" />Escolher arquivo</span>
             </div>
           ) : (
             <div className="border border-gray-200 rounded-lg p-6">

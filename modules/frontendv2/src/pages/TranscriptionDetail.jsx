@@ -182,10 +182,10 @@ export default function TranscriptionDetail() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto min-w-0 max-w-6xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-1 items-start gap-4">
           <Button
             variant="ghost"
             size="sm"
@@ -194,8 +194,8 @@ export default function TranscriptionDetail() {
           >
             Voltar
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{transcription.filename}</h1>
+          <div className="min-w-0">
+            <h1 className="break-all text-3xl font-bold text-gray-900">{transcription.filename}</h1>
             <p className="text-gray-600 mt-1">
               Criado em {new Date(transcription.created_at).toLocaleString('pt-BR')}
             </p>
@@ -211,7 +211,7 @@ export default function TranscriptionDetail() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={copyToClipboard} disabled={!canExportTranscript}>
             {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             {copied ? 'Copiado!' : 'Copiar'}
@@ -236,7 +236,7 @@ export default function TranscriptionDetail() {
       </div>
 
       {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div aria-label="Informações da transcrição" className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={Clock}
           label="Duração"
@@ -271,7 +271,7 @@ export default function TranscriptionDetail() {
                 key={index}
                 className="p-4 bg-gray-50 rounded-lg border border-gray-200"
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-700 text-sm font-medium">
                       {segment.speaker?.replace('SPEAKER_', '')}
@@ -284,7 +284,7 @@ export default function TranscriptionDetail() {
                     {segment.start?.toFixed(1)}s - {segment.end?.toFixed(1)}s
                   </span>
                 </div>
-                <p className="text-gray-800 leading-relaxed">{segment.text}</p>
+                <p className="break-words text-gray-800 leading-relaxed">{segment.text}</p>
               </div>
             ))}
           </div>
@@ -296,14 +296,14 @@ export default function TranscriptionDetail() {
 
 function StatCard({ icon: Icon, label, value }) {
   return (
-    <Card>
-      <div className="flex items-center gap-3">
-        <div className="p-3 rounded-lg bg-primary-100">
+    <Card className="min-w-0">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="shrink-0 p-3 rounded-lg bg-primary-100">
           <Icon className="w-5 h-5 text-primary-600" />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-sm text-gray-600">{label}</p>
-          <p className="text-xl font-bold text-gray-900">{value}</p>
+          <p className="break-words text-xl font-bold text-gray-900">{value}</p>
         </div>
       </div>
     </Card>

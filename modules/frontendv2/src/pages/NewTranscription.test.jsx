@@ -40,5 +40,6 @@ it('shows Guest AssemblyAI as unavailable directly from guest policy', () => {
   expect(screen.getByText('Indisponível')).toBeTruthy()
   expect(screen.getByText('Serviço temporariamente bloqueado.')).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
+  expect(document.querySelector('input[type="file"]').disabled).toBe(true)
   expect(audioService.getProviderSettings).not.toHaveBeenCalled()
 })

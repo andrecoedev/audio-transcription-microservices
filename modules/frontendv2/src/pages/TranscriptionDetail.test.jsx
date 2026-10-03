@@ -11,6 +11,19 @@ beforeEach(() => vi.resetAllMocks())
 afterEach(cleanup)
 
 describe('TranscriptionDetail loading', () => {
+  it('keeps long filenames and the statistics grid in the shared page container', async () => {
+    const filename = `${'reuniao_de_planejamento_'.repeat(6)}.wav`
+    audioService.getTranscription.mockResolvedValue({ id: 8, filename, status: 'completed', created_at: '2026-10-02T10:00:00Z', segments: [] })
+    render(<MemoryRouter initialEntries={['/transcriptions/8']}><Routes><Route path="/transcriptions/:id" element={<TranscriptionDetail />} /></Routes></MemoryRouter>)
+    const heading = await screen.findByRole('heading', { name: filename })
+    const grid = screen.getByLabelText('Informações da transcrição')
+    expect(grid.parentElement.className).toContain('max-w-6xl')
+    expect(heading.className).toContain('break-all')
+    expect(grid.className).toContain('sm:grid-cols-2')
+    expect(grid.className).toContain('xl:grid-cols-4')
+    expect(grid.parentElement.contains(heading)).toBe(true)
+  })
+
   it('keeps the page available and retries after a request failure', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     audioService.getTranscription.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({
