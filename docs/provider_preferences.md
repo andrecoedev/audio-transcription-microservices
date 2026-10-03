@@ -2,7 +2,7 @@
 
 ## Contrato por conta
 
-Configurações → Provedores salva preferências no PostgreSQL, não no JWT nem em
+Configurações → Serviços de IA / Transcrição salva preferências no PostgreSQL, não no JWT nem em
 localStorage. Transcrição: `automatic`, `whisper`, `assemblyai`. Resumo inteligente:
 `automatic`, `gemini`. Detecção de falantes tem default por conta e override por job.
 Guest não acessa este contrato: continua AssemblyAI platform com política/orçamento
@@ -92,3 +92,48 @@ Retenção/consentimento/eliminação remotos continuam gates de implantação d
 em [AssemblyAI](assemblyai.md). Não há OpenAI/Anthropic, billing ou novas IAs.
 
 Referência: [Fernet — documentação oficial](https://cryptography.io/en/latest/fernet/).
+
+## Experiência de configuração
+
+A tela separa **como processar** (preferência) de **quem fornece/paga** (origem
+resolvida pelo servidor). O painel de serviço selecionado usa preferências salvas;
+editar os selects não muda o estado ativo antes de salvar. Atualizar recarrega
+capabilities da conta, além do diagnóstico. Opções explícitas são oferecidas
+somente quando `available`, `allowed` e `configured` permitem: `available` sozinho
+significa suporte, não autorização nem disponibilidade de rede. Uma preferência
+salva que ficou indisponível permanece visível/desabilitada, com orientação para
+conectar a chave ou escolher outra opção; não é substituída silenciosamente.
+
+| Opção | Processamento / consumo |
+|---|---|
+| Local (quando permitido) | Faster-Whisper, sem conta externa; não é Guest |
+| AssemblyAI próprio | Consumo cobrado diretamente na conta AssemblyAI do usuário |
+| Fornecido pela USAGI (quando permitido) | Usa a franquia/créditos da plataforma, conforme política já existente |
+| Gemini próprio | Resumos inteligentes consumidos na conta Gemini do usuário |
+| Automático | AssemblyAI próprio salvo ou local; para resumos, Gemini; sem retry em outro serviço após erro |
+
+Conectar/substituir envia a chave somente no corpo POST autenticado. O campo
+password é temporário em memória e limpo ao enviar/falhar/cancelar/trocar de aba;
+nenhuma chave vai para stores persistentes, URL, analytics ou mensagens. Após
+salvar, **Conectado** significa chave armazenada, com aviso explícito de que não
+foi testada no serviço. Só metadata segura (`configured`, `updated_at`) é exibida.
+Remover exige confirmação com aviso sobre trabalhos aguardando a chave e sobre
+a ausência de revogação remota. Armazenamento BYOK indisponível é comunicado mesmo
+quando o processamento fornecido pela USAGI ainda está permitido.
+
+Limites deliberados da UX: não existe preflight/teste externo de chave, consulta
+de saldo ou cota, nem seletor independente para usar a chave plataforma enquanto
+há chave própria salva. Formato inválido recebe feedback seguro; rejeição real,
+quota e falha do serviço só podem ser conhecidas durante a execução e seguem os
+erros seguros já existentes. Não há OpenAI/Anthropic ou nova API nesta entrega.
+
+Validação local P5-02: regressões de Automatic/indisponibilidade/origem, rascunho,
+troca/remoção confirmada e erro seguro; suíte backend completa com PostgreSQL/RQ
+em banco descartável e Alembic check; navegador Chromium com API PostgreSQL
+isolada confirmou salvar, refresh, logout/login, duas contas, adicionar/substituir/
+remover chaves sintéticas, resposta inválida controlada e ausência de segredo no
+DOM/storage/metadata. Screenshots desktop (1480 px) e mobile (390 px) inspecionadas,
+sem overflow ou page errors. Um erro HTTP 422 deliberadamente simulado aparece
+no console; nenhum erro inesperado. Nenhuma chamada paga ou nova homologação de
+providers/produção; o navegador integrado estava indisponível e foi usado o
+Playwright local já aceito. Pyannote 4 permanece não promovido.
