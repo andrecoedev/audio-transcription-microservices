@@ -11,6 +11,8 @@ React → FastAPI → PostgreSQL/Redis → RQ Worker supervisionado → PostgreS
 
 A API não inicializa ML/CUDA. Cada filho do Worker carrega engines depois do fork.
 PostgreSQL contém resultados duráveis; RQ contém estado de execução efêmero.
+Áudio usa a interface de Object Storage com adapter local privado; exclusões têm
+retry durável no PostgreSQL. Veja o [mapa de dados e lifecycle](docs/cloud_data_architecture.md).
 O frontend oficial é React; Streamlit permanece como interface legada alternativa.
 
 ## Iniciar desenvolvimento

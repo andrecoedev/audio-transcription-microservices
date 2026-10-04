@@ -63,5 +63,54 @@ TLS, gestão de secrets, lifecycle do bucket, backup/restore PostgreSQL, schedul
 de manutenção e homologação real de falhas. Não declarar SaaS/produção homologado
 com base no backend local ou em mocks. Não tornar objetos públicos por conveniência.
 
-Status deste documento: auditoria e decisões pré-implementação; os resultados e
-detalhes efetivamente implementados devem ser consolidados antes do PR.
+## Implementação da P5-04
+
+`ObjectStorage` define put/open/delete/exists/metadata/materialize. O adapter
+local publica atomicamente objetos sob UUID + extensão validada, rejeita traversal,
+não sobrescreve objetos e não lê/materializa symlinks. Upload passa diretamente
+pelo adapter, com validação de assinatura e contagem real dos bytes; não cria uma
+segunda cópia persistente. Spool HTTP e WAV do pipeline continuam efêmeros.
+
+Configuração: `OBJECT_STORAGE_BACKEND=local` e `AUDIO_UPLOAD_DIRECTORY` igual entre
+API, Worker e manutenção. Só local está implementado; valor não suportado é erro,
+não fallback. O Compose conserva `processing_data`. Não há SDK cloud novo, URLs
+públicas, download de áudio ou endpoints novos de produto.
+
+Migration aditiva `20261004_0011` preserva `input_path` dos jobs antigos, acrescenta
+`input_object_key` nullable e `object_deletions`. Novos jobs usam key e caminho
+legado vazio; não há backfill automático. Downgrade recusa chaves ou intenções
+existentes: arquive/migre explicitamente antes de retirar essas colunas/tabela.
+
+Cleanup é outbox transacional, sem FK para o agregado removido. É registrado no
+commit terminal do Worker ou no commit que exclui dados. Falha de storage mantém
+intenção/tentativas; crash após apagar e antes do commit é seguro porque delete é
+idempotente. Falha de persistência terminal preserva input ativo para recovery.
+Maintenance faz retry sem Redis. Consulte [operação](operations.md#retenção-e-reconciliação).
+
+DELETE de reunião/transcrição remove o agregado e seus derivados estruturados
+por cascade. Jobs queued/processing bloqueiam exclusão; erasure interna de usuário
+também os bloqueia. RQ terminal pode expirar sem afetar resultados. Jobs de
+intelligence sem agregado não produzem novos resultados; não são fonte de verdade.
+Exports atuais são respostas/downloads, não objetos persistidos a apagar. Artefatos
+temporários seguem `finally`; nenhum catálogo novo de exports foi criado.
+
+Cloud continua pendente: adapter remoto privado, materialização efêmera segura,
+permissões mínimas/IAM, TLS, provisionamento, lifecycle remoto e testes de falha
+reais. A abstração prepara esse caminho, mas o volume local não resolve múltiplos
+hosts. Esta Task não homologa infraestrutura de produção nem altera providers/ML.
+
+## Validação local e pendências (2026-10-04)
+
+Python 3.12 descartável com dependências HTTP fixadas: 293 testes passaram,
+1 skip (symlink exige privilégio Windows) e 3 avisos de depreciação. Essa execução
+excluiu explicitamente `tests/integration` e `test_diarization_filter.py`, que
+precisa da stack ML. Incluiu testes de API isolation e mocks do Worker, não
+inferência real. Frontend sem alteração funcional: 156 testes passaram, lint e
+build passaram. Compilação Python, `git diff --check` e Compose config passaram.
+
+O engine Docker Linux não estava acessível. Permanecem pendentes: suíte completa
+Linux (incluindo symlink/ML), PostgreSQL/Redis/RQ reais, Alembic upgrade/downgrade/
+check isolados, builds Docker e secret scanner/Security Gate final antes do PR.
+Nenhuma migration foi aplicada ao banco de desenvolvimento real nesta execução;
+nenhum banco/volume existente foi apagado. Esses resultados não autorizam promoção
+para produção nem substituem a homologação pendente.
