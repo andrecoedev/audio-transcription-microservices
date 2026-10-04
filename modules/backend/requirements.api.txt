@@ -11,6 +11,7 @@ psycopg[binary]==3.2.9
 PyJWT==2.14.0
 bcrypt==4.0.1
 cryptography==50.0.2
+firebase-admin==7.7.0
 python-multipart==0.0.31
 
 pydantic==2.10.6

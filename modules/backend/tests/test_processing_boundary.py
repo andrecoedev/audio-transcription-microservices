@@ -31,7 +31,7 @@ import importlib.abc
 import sys
 
 blocked = {
-    "assemblyai", "ctranslate2", "faster_whisper", "librosa",
+    "assemblyai", "ctranslate2", "faster_whisper", "firebase_admin", "librosa",
     "pydub", "pyannote", "torch", "transformers"
 }
 baseline_modules = set(sys.modules)
@@ -69,6 +69,8 @@ assert 'google.generativeai' not in sys.modules
             "HF_TOKEN": "",
             "AAI_API_KEY": "",
             "GEMINI_API_KEY": "",
+            "FIREBASE_AUTH_ENABLED": "true",
+            "FIREBASE_PROJECT_ID": "synthetic-project-123",
         }
     )
 

@@ -19,4 +19,14 @@ export const authService = {
     const { data } = await api.get('/auth/me', { timeout: 10000 })
     return data
   },
+  async firebaseLogin(idToken) {
+    const { data } = await api.post('/auth/firebase', null, {
+      headers: { Authorization: `Bearer ${idToken}` }, timeout: 15000,
+    })
+    return data
+  },
+  async linkGoogle(idToken, password) {
+    const { data } = await api.post('/auth/firebase/link', { id_token: idToken, password }, { timeout: 15000 })
+    return data
+  },
 }

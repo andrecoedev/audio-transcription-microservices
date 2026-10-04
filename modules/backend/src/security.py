@@ -10,6 +10,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from .config import settings
 from .database import get_db
@@ -34,9 +35,13 @@ class TokenData(BaseModel):
     scopes: list[str] = Field(default_factory=list)
     legacy_subject: bool = False
     registration_source: str = "local"
+    auth_provider: str = "local"
+    display_name: Optional[str] = None
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_password(plain_password: str, hashed_password: str | None) -> bool:
+    if not hashed_password:
+        return False
     try:
         return bcrypt.checkpw(
             plain_password.encode("utf-8"),
@@ -126,9 +131,13 @@ async def get_optional_user(
         return None
     token_data = decode_access_token(token)
     if token_data is None:
-        raise _invalid_credentials()
-
-    if token_data.user_id is not None:
+        if not settings.FIREBASE_AUTH_ENABLED:
+            raise _invalid_credentials()
+        from .services.firebase_identity import verify_firebase_token, find_firebase_user
+        identity = await run_in_threadpool(verify_firebase_token, token)
+        user = find_firebase_user(db, identity)
+        token_data = TokenData(auth_provider='firebase', display_name=identity.display_name)
+    elif token_data.user_id is not None:
         user = db.get(User, token_data.user_id)
     else:
         # Compatibility for short-lived pre-P2-B tokens: only an exact stored
@@ -142,6 +151,9 @@ async def get_optional_user(
     token_data.email = user.email
     token_data.registration_source = user.registration_source
     token_data.roles = ["admin"] if user.is_superuser else ["user"]
+    if token_data.auth_provider == 'firebase':
+        from .services.identity import principal_for_user
+        token_data.scopes = principal_for_user(user)['scopes']
     return token_data
 
 

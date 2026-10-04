@@ -1,15 +1,18 @@
 """Persistent local authentication endpoints."""
 
 from datetime import timedelta
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
-from ..security import TokenData, create_access_token, get_authenticated_user
+from ..security import TokenData, create_access_token, get_authenticated_user, oauth2_scheme, verify_password
+from ..models import FirebaseIdentity, User
+from ..services.firebase_identity import verify_firebase_token, resolve_firebase_user
 from ..services.audit import append_audit_event
 from ..services.identity import authenticate_local_user, principal_for_user, register_public_user
 from ..services.rate_limit import enforce_rate_limit
@@ -36,6 +39,8 @@ class SignupRequest(LoginRequest):
 
 @router.post("/signup", response_model=LoginResponse, status_code=201)
 async def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_db)):
+    if settings.FIREBASE_AUTH_ENABLED:
+        raise HTTPException(409, 'Use Google sign-in to create your account')
     enforce_rate_limit(request, "signup", payload.username)
     try:
         user = register_public_user(db, payload.username, payload.email, payload.password)
@@ -99,7 +104,7 @@ async def login(payload: LoginRequest, request: Request, db: Session = Depends(g
 
 
 @router.get("/me")
-async def me(current_user: TokenData = Depends(get_authenticated_user)):
+async def me(current_user: TokenData = Depends(get_authenticated_user), db: Session = Depends(get_db)):
     return {
         "authenticated": True,
         "user": {
@@ -109,6 +114,9 @@ async def me(current_user: TokenData = Depends(get_authenticated_user)):
             "roles": current_user.roles,
             "scopes": current_user.scopes,
             "registration_source": current_user.registration_source,
+            "auth_provider": current_user.auth_provider,
+            "display_name": current_user.display_name,
+            "google_connected": db.query(FirebaseIdentity).filter_by(user_id=current_user.user_id).first() is not None,
         },
     }
 
@@ -116,4 +124,65 @@ async def me(current_user: TokenData = Depends(get_authenticated_user)):
 @router.get("/config")
 async def auth_config():
     # Public bootstrap metadata contains no credential/configuration details.
-    return {"mode": "strict", "strict": True, "demo_login": False}
+    return {"mode": "strict", "strict": True, "demo_login": False,
+            "firebase_enabled": settings.FIREBASE_AUTH_ENABLED,
+            "firebase_project_id": settings.FIREBASE_PROJECT_ID if settings.FIREBASE_AUTH_ENABLED else None,
+            "local_signup_enabled": not settings.FIREBASE_AUTH_ENABLED}
+
+
+def _firebase_response(user: User, display_name: str | None) -> dict:
+    principal = principal_for_user(user)
+    return {'authenticated': True, 'user': {
+        'id': user.id, 'username': user.username, 'email': user.email,
+        'roles': principal['roles'], 'scopes': principal['scopes'],
+        'registration_source': user.registration_source,
+        'auth_provider': 'firebase', 'display_name': display_name, 'google_connected': True,
+    }}
+
+
+@router.post('/firebase')
+def firebase_login(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    enforce_rate_limit(request, 'firebase-login')
+    identity = verify_firebase_token(token)
+    enforce_rate_limit(request, 'firebase-account', identity.project_id + ':' + identity.uid)
+    user, created = resolve_firebase_user(db, identity)
+    append_audit_event(db, event='user.registered' if created else 'user.login',
+                       actor_user_id=user.id, resource_type='user', resource_id=user.id)
+    db.commit()
+    return _firebase_response(user, identity.display_name)
+
+
+class FirebaseLinkRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    id_token: SecretStr = Field(min_length=1, max_length=16384)
+    password: SecretStr = Field(min_length=1, max_length=256)
+
+
+@router.post('/firebase/link')
+def link_firebase(payload: FirebaseLinkRequest, request: Request,
+                  current: TokenData = Depends(get_authenticated_user), db: Session = Depends(get_db)):
+    if current.auth_provider != 'local':
+        raise HTTPException(403, 'Sign in with your existing USAGI password to link Google')
+    enforce_rate_limit(request, 'firebase-link', str(current.user_id))
+    user = db.query(User).filter_by(id=current.user_id).with_for_update().one()
+    if not verify_password(payload.password.get_secret_value(), user.hashed_password):
+        raise HTTPException(401, 'Unable to link Google; confirm your existing password')
+    identity = verify_firebase_token(payload.id_token.get_secret_value())
+    if not 0 <= time.time() - identity.auth_time <= 300:
+        raise HTTPException(401, 'Authenticate with Google again to link your account')
+    binding = db.get(FirebaseIdentity, (identity.project_id, identity.uid))
+    existing = db.query(FirebaseIdentity).filter_by(user_id=user.id).first()
+    if ((binding is not None and binding.user_id != user.id)
+            or (existing is not None and existing != binding)):
+        raise HTTPException(409, 'This Google identity or USAGI account is already linked')
+    if binding is None:
+        try:
+            with db.begin_nested():
+                db.add(FirebaseIdentity(project_id=identity.project_id, uid=identity.uid, user_id=user.id))
+                db.flush()
+        except IntegrityError:
+            raise HTTPException(409, 'Unable to link Google; account is already linked') from None
+        append_audit_event(db, event='user.identity_linked', actor_user_id=user.id,
+                           resource_type='user', resource_id=user.id)
+    db.commit()
+    return _firebase_response(user, identity.display_name)

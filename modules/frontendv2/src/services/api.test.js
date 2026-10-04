@@ -1,13 +1,33 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import api from './api'
 import { useAuthStore } from '../stores/authStore'
+import { firebaseAuth } from './firebaseAuth'
+vi.mock('./firebaseAuth', () => ({ firebaseAuth: { getToken: vi.fn(), signOut: vi.fn() } }))
 
 beforeEach(() => {
   localStorage.clear()
-  useAuthStore.setState({ token: null, user: null, isAuthenticated: false })
+  vi.resetAllMocks()
+  useAuthStore.setState({ token: null, user: null, isAuthenticated: false, authProvider: 'local' })
 })
 
 describe('HTTP credential boundaries', () => {
+  it('gets refreshed SDK tokens at request time without persisting them', async () => {
+    useAuthStore.getState().setFirebaseSession({ id: 7 })
+    firebaseAuth.getToken.mockResolvedValue('synthetic-refreshed-proof')
+    await api.get('/transcriptions', { adapter: async (config) => {
+      expect(config.headers.Authorization).toBe('Bearer synthetic-refreshed-proof')
+      return { data: {}, status: 200, headers: {}, config }
+    } })
+    expect(localStorage.getItem('token')).toBeNull()
+  })
+  it('never replaces explicit Guest proof with a Firebase token', async () => {
+    useAuthStore.getState().setFirebaseSession({ id: 7 })
+    await api.get('/guest/session', { headers: { Authorization: 'Bearer synthetic-guest-proof' }, adapter: async (config) => {
+      expect(config.headers.Authorization).toBe('Bearer synthetic-guest-proof')
+      return { data: {}, status: 200, headers: {}, config }
+    } })
+    expect(firebaseAuth.getToken).not.toHaveBeenCalled()
+  })
   it('preserves an explicit Guest proof instead of replacing it with the account JWT', async () => {
     localStorage.setItem('token', 'synthetic-account-proof')
     let authorization
