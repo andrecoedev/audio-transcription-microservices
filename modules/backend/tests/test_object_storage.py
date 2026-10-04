@@ -1,12 +1,13 @@
 from datetime import timezone
 from io import BytesIO
+from uuid import uuid4
 
 import pytest
 
 from src.services.object_storage import LocalObjectStorage, ObjectNotFound, StorageError
 
 
-KEY = "0123456789abcdef0123456789abcdef.wav"
+KEY = uuid4().hex + ".wav"
 
 
 def test_put_open_metadata_materialize_and_delete(tmp_path):

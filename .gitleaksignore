@@ -1,0 +1,4 @@
+# Historical false positive: a synthetic UUID-shaped .wav object name in a
+# local storage test, never an authentication/provider credential. The fixture
+# now generates its opaque filename at runtime. Keep the existing commit intact.
+dcbc9d88149889235ecc4094bdfc75177ec2bdd9:modules/backend/tests/test_object_storage.py:generic-api-key:9
