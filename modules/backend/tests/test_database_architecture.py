@@ -1,11 +1,13 @@
 from pathlib import Path
 
 import pytest
-from sqlalchemy import CheckConstraint, ForeignKeyConstraint
+from sqlalchemy import CheckConstraint, ForeignKeyConstraint, create_engine
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from src import database
 from src.config import Settings
-from src.models import Meeting, MeetingSpeaker, Transcription, TranscriptionJob, TranscriptionOwnership
+from src.models import Base, Meeting, MeetingSpeaker, ObjectDeletion, Transcription, TranscriptionJob, TranscriptionOwnership
 
 
 def test_production_database_module_does_not_create_schema():
@@ -53,6 +55,37 @@ def test_status_constraints_exist():
             if isinstance(constraint, CheckConstraint)
         }
         assert any(name and name.endswith("_status") for name in names)
+
+
+def test_object_deletion_defaults_and_constraints():
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    try:
+        with Session(engine) as db:
+            row = ObjectDeletion(reference="objects/transcription/opaque-key")
+            db.add(row)
+            db.commit()
+            assert row.attempts == 0
+            assert row.created_at is not None
+            assert row.last_attempt_at is None
+
+            db.add(ObjectDeletion(reference=row.reference))
+            with pytest.raises(IntegrityError):
+                db.commit()
+            db.rollback()
+
+            db.add(ObjectDeletion(reference="legacy/audio.wav", attempts=-1))
+            with pytest.raises(IntegrityError):
+                db.commit()
+            db.rollback()
+    finally:
+        Base.metadata.drop_all(engine)
+
+
+def test_transcription_job_input_object_key_is_nullable_and_bounded():
+    column = TranscriptionJob.__table__.c.input_object_key
+    assert column.nullable
+    assert column.type.length == 128
 
 
 def test_get_db_rolls_back_and_closes_on_error(monkeypatch):
