@@ -99,18 +99,30 @@ permissões mínimas/IAM, TLS, provisionamento, lifecycle remoto e testes de fal
 reais. A abstração prepara esse caminho, mas o volume local não resolve múltiplos
 hosts. Esta Task não homologa infraestrutura de produção nem altera providers/ML.
 
-## Validação local e pendências (2026-10-04)
+## Validação local e isolada (2026-10-04)
 
-Python 3.12 descartável com dependências HTTP fixadas: 293 testes passaram,
-1 skip (symlink exige privilégio Windows) e 3 avisos de depreciação. Essa execução
-excluiu explicitamente `tests/integration` e `test_diarization_filter.py`, que
-precisa da stack ML. Incluiu testes de API isolation e mocks do Worker, não
-inferência real. Frontend sem alteração funcional: 156 testes passaram, lint e
-build passaram. Compilação Python, `git diff --check` e Compose config passaram.
+Após disponibilizar Docker, a suíte completa na imagem Worker construída passou:
+324 testes, 1 skip (módulo Firebase SDK não instalado na imagem ML), 13 avisos de
+depreciação. Firebase SDK e autenticação passaram separadamente na imagem API:
+28 testes, incluindo os 6 testes SDK que não estavam disponíveis no Worker.
+O teste de symlink passou no Linux. PostgreSQL/Redis/RQ reais foram utilizados em
+bancos descartáveis; inferência ficou determinística/simulada, sem chamadas pagas.
+O teste RQ cobre tanto caminho legado quanto chave opaca, verifica materialização,
+cleanup e resultado persistido depois de remover o registro efêmero RQ.
 
-O engine Docker Linux não estava acessível. Permanecem pendentes: suíte completa
-Linux (incluindo symlink/ML), PostgreSQL/Redis/RQ reais, Alembic upgrade/downgrade/
-check isolados, builds Docker e secret scanner/Security Gate final antes do PR.
-Nenhuma migration foi aplicada ao banco de desenvolvimento real nesta execução;
-nenhum banco/volume existente foi apagado. Esses resultados não autorizam promoção
-para produção nem substituem a homologação pendente.
+Alembic: upgrade head → downgrade 0010 → upgrade head → check passaram em banco
+vazio descartável; testes também verificam que downgrade recusa referências ou
+cleanup pendentes. Nenhuma migration foi aplicada ao banco de desenvolvimento
+real nesta execução; nenhum banco/volume existente foi apagado. Apenas os bancos
+descartáveis criados pelo harness foram removidos após os testes.
+
+Frontend sem alteração funcional: 156 testes, lint e build passaram. Builds Docker
+API/Worker/frontend, pip check das imagens, compilação Python, Compose config e
+diff-check passaram. API import/startup funcionou sem GPU, ADC ou inicialização
+ML, inclusive com Firebase habilitado em configuração sintética.
+
+O scanner de commits identificou um falso positivo em nome sintético `.wav` de
+teste, não uma credencial. A fixture agora gera UUID em runtime; `.gitleaksignore`
+documenta só o fingerprint histórico exato, preservando commits e todas as regras.
+Não há nova dependência nem alteração de credenciais reais. Produção, adapter
+cloud e inferência real não são homologados por esses testes locais/isolados.
