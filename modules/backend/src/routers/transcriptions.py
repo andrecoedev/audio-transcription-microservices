@@ -18,8 +18,10 @@ from ..services.rate_limit import enforce_rate_limit
 from ..services.provider_policy import require_guest_processing
 from ..services.platform_budget import reserve_platform_call
 from ..services.provider_credentials import preferences_for, resolve_transcription
-from ..services.storage_lifecycle import delete_file_idempotently, upload_directory
-from ..utils.uploads import UploadValidationError, save_validated_upload
+from ..services.storage_lifecycle import upload_directory
+from ..services.audio_storage import get_audio_storage, schedule_audio_cleanup, cleanup_after_commit
+from ..services.object_storage import StorageError
+from ..utils.uploads import UploadValidationError, store_validated_upload
 from ..utils.http_limits import BodyLimitedRoute
 from ..workers.config import get_transcription_queue, is_redis_available
 
@@ -205,17 +207,19 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
     saved_upload = None
     transcription = None
     job = None
+    storage = None
 
     try:
-        saved_upload = await save_validated_upload(
+        storage = get_audio_storage(_UPLOAD_DIRECTORY)
+        saved_upload = await store_validated_upload(
             file,
-            destination=_UPLOAD_DIRECTORY,
+            storage=storage,
             allowed_extensions=settings.allowed_extensions_list,
             max_size_bytes=min(settings.max_upload_size_bytes, settings.PUBLIC_MAX_UPLOAD_MB * 1024 * 1024) if public else settings.max_upload_size_bytes,
         )
 
         transcription = Transcription(
-            filename=saved_upload.path.name,
+            filename=saved_upload.key,
             original_filename=saved_upload.original_filename,
             file_size_mb=saved_upload.size_bytes / (1024 * 1024),
             duration_seconds=0.0,
@@ -229,7 +233,8 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
 
         job = TranscriptionJob(
             transcription_id=transcription.id,
-            input_path=str(saved_upload.path),
+            input_path="",
+            input_object_key=saved_upload.key,
             use_diarization=use_diarization,
             transcription_model=transcription_model,
             status="queued",
@@ -295,8 +300,9 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
                 resource_id=transcription.id,
                 metadata={"stage": "enqueue"},
             )
+            schedule_audio_cleanup(db, "object:" + saved_upload.key)
             db.commit()
-            delete_file_idempotently(saved_upload.path)
+            cleanup_after_commit(db, ["object:" + saved_upload.key], storage=storage)
             raise HTTPException(
                 status_code=503,
                 detail="Job queue is temporarily unavailable",
@@ -315,19 +321,29 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
     except HTTPException:
         db.rollback()
         if saved_upload:
-            delete_file_idempotently(saved_upload.path)
+            schedule_audio_cleanup(db, "object:" + saved_upload.key)
+            db.commit()
+            cleanup_after_commit(db, ["object:" + saved_upload.key], storage=storage)
         raise
     except Exception as exc:
         db.rollback()
         if saved_upload:
-            delete_file_idempotently(saved_upload.path)
+            # On a DB outage, an unreferenced upload is caught by age-based
+            # reconciliation. Never leak the storage exception to HTTP/RQ.
+            try:
+                schedule_audio_cleanup(db, "object:" + saved_upload.key)
+                db.commit()
+                cleanup_after_commit(db, ["object:" + saved_upload.key], storage=storage)
+            except Exception:
+                db.rollback()
+                logger.warning("Upload cleanup deferred to reconciliation")
         logger.error(
             "Unexpected error while creating transcription job (%s)",
             type(exc).__name__,
         )
         raise HTTPException(
-            status_code=500,
-            detail="Unable to create transcription job",
+            status_code=503 if isinstance(exc, StorageError) else 500,
+            detail="Audio storage is temporarily unavailable" if isinstance(exc, StorageError) else "Unable to create transcription job",
         )
     finally:
         await file.close()

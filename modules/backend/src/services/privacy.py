@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from ..models import AuditEvent, MeetingActionSuggestionReview, Transcription, TranscriptionOwnership, User
 from ..authorization import ownership_filter
 from .audit import append_audit_event
-from .storage_lifecycle import delete_file_idempotently
+from .audio_storage import input_reference, schedule_audio_cleanup, cleanup_after_commit
+from .transcription_deletion import ActiveTranscriptionError
 
 
 @dataclass(frozen=True)
@@ -131,7 +132,10 @@ def erase_user_data(db: Session, user: User) -> ErasureResult:
     """Delete DB data transactionally, then attempt idempotent file cleanup."""
     user_id = user.id
     transcriptions = _owned_transcriptions_query(db, user).all()
-    paths = [row.job.input_path for row in transcriptions if row.job and row.job.input_path]
+    if any(row.status in {"queued", "processing"} or
+           (row.job and row.job.status in {"queued", "processing"}) for row in transcriptions):
+        raise ActiveTranscriptionError("Active transcription jobs prevent user erasure")
+    paths = [input_reference(row.job) for row in transcriptions if row.job]
 
     append_audit_event(
         db,
@@ -142,11 +146,13 @@ def erase_user_data(db: Session, user: User) -> ErasureResult:
         metadata={"transcription_count": len(transcriptions)},
     )
     for transcription in transcriptions:
+        if transcription.job:
+            schedule_audio_cleanup(db, input_reference(transcription.job))
         db.delete(transcription)
     db.delete(user)
     db.commit()
 
-    files_cleaned = sum(delete_file_idempotently(path) for path in paths)
+    files_cleaned = cleanup_after_commit(db, paths)["deleted"]
     return ErasureResult(
         user_id=user_id,
         transcriptions_deleted=len(transcriptions),

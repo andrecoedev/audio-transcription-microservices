@@ -483,6 +483,8 @@ def test_api_worker_status_flow_uses_same_postgresql_records(
     app.dependency_overrides[get_db] = override_get_db
     monkeypatch.setattr(transcriptions_router, "get_transcription_queue", lambda: queue)
     monkeypatch.setattr(transcriptions_router, "_UPLOAD_DIRECTORY", tmp_path / "uploads")
+    from src.config import settings
+    monkeypatch.setattr(settings, "AUDIO_UPLOAD_DIRECTORY", str(tmp_path / "uploads"))
     monkeypatch.setattr(transcription_worker, "SessionLocal", postgres_session_factory)
 
     class SuccessfulService:

@@ -2,6 +2,7 @@
 
 import logging
 import time
+from contextlib import ExitStack
 from datetime import datetime, timezone
 
 from rq.exceptions import NoSuchJobError
@@ -15,7 +16,7 @@ from ..services.audit import append_audit_event
 from ..services.platform_budget import begin_platform_call
 from ..services.provider_credentials import decrypt_credential
 from ..services.meeting_projection import ordered_segments, speaker_ids
-from ..services.storage_lifecycle import delete_file_idempotently
+from ..services.audio_storage import input_reference, materialize_input, schedule_audio_cleanup, retry_audio_cleanup
 from ..services.transcription_processing_service import (
     TranscriptionProcessingService,
     PublicAudioDurationError,
@@ -187,6 +188,7 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
         return {
             "claim_status": "claimed",
             "input_path": job.input_path,
+            "input_object_key": job.input_object_key,
             "use_diarization": job.use_diarization,
             "transcription_model": job.transcription_model,
             "max_duration_seconds": job.max_duration_seconds,
@@ -244,6 +246,7 @@ def _persist_completed_job(transcription_id: int, result, processing_time: float
         job.error_message = None
         job.completed_at = datetime.now(timezone.utc)
         job.failed_at = None
+        schedule_audio_cleanup(db, input_reference(job))
         append_audit_event(
             db,
             event="transcription.completed",
@@ -285,6 +288,7 @@ def _persist_failed_job(transcription_id: int, public_error: str) -> None:
             job.error_message = public_error
             job.failed_at = datetime.now(timezone.utc)
             job.completed_at = None
+            schedule_audio_cleanup(db, input_reference(job))
         append_audit_event(
             db,
             event="transcription.failed",
@@ -307,8 +311,9 @@ def _persist_failed_job(transcription_id: int, public_error: str) -> None:
 
 def process_transcription_job_sync(transcription_id: int) -> dict:
     """Run ML without an open DB transaction, then persist the result atomically."""
-    input_path: str | None = None
+    reference: str | None = None
     claimed = False
+    storage_context = ExitStack()
 
     try:
         claim = _claim_transcription_job(transcription_id)
@@ -320,7 +325,9 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             return {"status": "already_processing"}
 
         claimed = True
-        input_path = claim["input_path"]
+        reference = ("object:" + claim["input_object_key"]) if claim.get("input_object_key") else claim["input_path"]
+        # Resolve the object before model loading or irreversible paid admission.
+        audio_path = storage_context.enter_context(materialize_input(claim))
         if claim["guest_context"] and claim["transcription_model"] != "assemblyai":
             # Also protect previously queued/recovered Guest jobs. P4-04 must
             # validate provider admission and budget before any engine loading.
@@ -367,7 +374,7 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             claim["max_duration_seconds"] = min(claim["max_duration_seconds"] or settings.AAI_MAX_AUDIO_SECONDS,
                                                 settings.AAI_MAX_AUDIO_SECONDS)
         result = service.process_transcription(
-            file_path=input_path,
+            file_path=str(audio_path),
             use_diarization=claim["use_diarization"],
             transcription_model=claim["transcription_model"],
             **({"max_duration_seconds": claim["max_duration_seconds"]} if claim["max_duration_seconds"] else {}),
@@ -424,6 +431,19 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
         # its repr/traceback could contain credentials or transcript fragments.
         raise RuntimeError(public_error) from None
     finally:
-        if claimed and input_path:
-            if not delete_file_idempotently(input_path):
-                logger.warning("Input cleanup incomplete for transcription %s", transcription_id)
+        try:
+            storage_context.close()
+        except Exception as cleanup_error:
+            logger.warning("Materialized audio cleanup failed (%s)", type(cleanup_error).__name__)
+        if claimed and reference:
+            cleanup_db = SessionLocal()
+            try:
+                # Only committed terminal-state intents can release the input.
+                # A DB outage leaves processing audio available for recovery.
+                retry_audio_cleanup(cleanup_db, reference=reference, apply=True)
+            except Exception as cleanup_error:
+                cleanup_db.rollback()
+                logger.warning("Input cleanup deferred job_id=%s (%s)", transcription_id,
+                               type(cleanup_error).__name__)
+            finally:
+                cleanup_db.close()

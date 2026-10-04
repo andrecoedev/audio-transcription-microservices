@@ -121,6 +121,8 @@ def db_context(tmp_path, monkeypatch):
     monkeypatch.setattr(transcriptions, "get_transcription_queue", lambda: queue)
     monkeypatch.setattr(meeting_intelligence, "get_transcription_queue", lambda: queue)
     monkeypatch.setattr(transcriptions, "_UPLOAD_DIRECTORY", tmp_path / "uploads")
+    from src.config import settings
+    monkeypatch.setattr(settings, "AUDIO_UPLOAD_DIRECTORY", str(tmp_path / "uploads"))
 
     with TestClient(app) as client:
         yield {

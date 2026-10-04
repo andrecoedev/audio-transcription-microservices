@@ -119,7 +119,10 @@ def test_job_creation_persists_and_enqueues(db_context, auth_headers, wav_bytes)
         ).one()
         assert transcription.status == "queued"
         assert transcription.original_filename == "unsafe_.wav"
-        assert Path(job.input_path).parent == db_context["tmp_path"] / "uploads"
+        assert job.input_path == ""
+        assert job.input_object_key == transcription.filename
+        assert (db_context["tmp_path"] / "uploads" / job.input_object_key).read_bytes() == wav_bytes
+        assert str(db_context["tmp_path"]) not in str(response.json())
         assert db_context["queue"].enqueued[0][1] == transcription_id
         assert db_context["queue"].enqueued[0][2]["job_id"] == (
             f"transcription_{transcription_id}"
