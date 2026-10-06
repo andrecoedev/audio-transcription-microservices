@@ -282,6 +282,7 @@ class TranscriptionJob(Base):
         nullable=False,
     )
     input_path = Column(String(500), nullable=False)
+    input_object_key = Column(String(128), nullable=True)
     max_duration_seconds = Column(Integer, nullable=True)
     timeout_seconds = Column(Integer, nullable=True)
     credential_source = Column(String(16), nullable=False, default="platform", server_default="platform")
@@ -312,6 +313,22 @@ class TranscriptionJob(Base):
             f"<TranscriptionJob(transcription_id={self.transcription_id}, "
             f"status={self.status})>"
         )
+
+
+class ObjectDeletion(Base):
+    """Durable retry record for deleting an object or trusted legacy file."""
+
+    __tablename__ = "object_deletions"
+    __table_args__ = (
+        CheckConstraint("attempts >= 0", name="ck_object_deletions_attempts_nonnegative"),
+        UniqueConstraint("reference", name="uq_object_deletions_reference"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    reference = Column(String(2048), nullable=False)
+    attempts = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_attempt_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class PlatformProviderBudget(Base):

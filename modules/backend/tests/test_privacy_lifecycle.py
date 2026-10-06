@@ -180,18 +180,19 @@ def test_retention_and_reconciliation_repeat_safely(db_context, tmp_path, monkey
     old_timestamp = (datetime.now(timezone.utc) - timedelta(hours=48)).timestamp()
     os.utime(old_file, (old_timestamp, old_timestamp))
     db = db_context["session_factory"]()
-    original = delete_file_idempotently
-    monkeypatch.setattr(
-        "src.services.storage_lifecycle.delete_file_idempotently", lambda _path: False
-    )
+    from pathlib import Path
+    original = Path.unlink
+    def fail_delete(path, *args, **kwargs):
+        if path == old_file:
+            raise OSError("Synthetic deletion failure")
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "unlink", fail_delete)
     failed = reconcile_orphaned_uploads(
         db, directory=tmp_path, older_than_hours=24, apply=True
     )
     assert failed["failed"] == 1
     assert old_file.exists()
-    monkeypatch.setattr(
-        "src.services.storage_lifecycle.delete_file_idempotently", original
-    )
+    monkeypatch.setattr(Path, "unlink", original)
     assert reconcile_orphaned_uploads(
         db, directory=tmp_path, older_than_hours=24, apply=True
     )["deleted"] == 1

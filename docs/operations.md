@@ -120,10 +120,19 @@ Os testes PostgreSQL complementam com schema head, migrations e cascades.
 
 ## Retenção e reconciliação
 
-Originais são apagados no finally do Worker depois de completed/failed; WAV
-normalizado também é removido. Em queued/processing, input deve permanecer
-disponível para recovery. Falha de filesystem é registrada sem path e retentada
-pela reconciliação. Exclusão HTTP de job ativo retorna 409.
+Originais têm referência opaca no PostgreSQL (`input_object_key`). O Worker
+materializa o objeto pelo adapter e registra uma intenção de exclusão no mesmo
+commit de completed/failed. Só então tenta remover o original. Falha de banco
+que mantém processing não remove o áudio necessário ao recovery. WAV normalizado
+continua efêmero e removido pelo pipeline. Exclusão HTTP de job ativo retorna 409.
+
+DELETE, retenção e erasure registram cleanup no PostgreSQL antes de remover o
+agregado. `object_deletions` sobrevive ao cascade e ao Redis; falhas incrementam
+`attempts`/`last_attempt_at`, sem guardar mensagens sensíveis. Missing é sucesso.
+O comando de reconciliação também drena até 100 intenções por execução, com locks
+PostgreSQL e proteção de inputs ativos. Execute periodicamente até zerar o backlog;
+em dry-run, mostra candidatos/pending e não altera arquivos nem tentativas.
+Não remova manualmente uma intenção para esconder falha de storage.
 
 Padrões: uploads órfãos após 24h; retenção de transcrições/audit = 0 (indefinida).
 Preview primeiro, verifique counts e só então use --apply:

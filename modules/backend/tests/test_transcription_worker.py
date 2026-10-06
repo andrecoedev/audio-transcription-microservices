@@ -128,6 +128,7 @@ def test_worker_persists_queued_processing_completed(
         ("queued", "queued"),
         ("processing", "processing"),
         ("completed", "completed"),
+        ("completed", "completed"),  # Independent durable cleanup transaction.
     ]
     db = db_context["session_factory"]()
     try:
@@ -177,6 +178,7 @@ def test_worker_persists_queued_processing_failed(
         ("queued", "queued"),
         ("processing", "processing"),
         ("failed", "failed"),
+        ("failed", "failed"),  # Independent durable cleanup transaction.
     ]
     db = db_context["session_factory"]()
     try:

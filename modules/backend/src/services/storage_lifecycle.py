@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..models import AuditEvent, Transcription, TranscriptionJob
 from .audit import append_audit_event
+from .audio_storage import input_reference, schedule_audio_cleanup, cleanup_after_commit
 
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,13 @@ def reconcile_orphaned_uploads(
             .filter(TranscriptionJob.status.in_(["queued", "processing"]))
             .all()
         )
+        if value
     }
+    active_paths.update(
+        str(root / key) for (key,) in db.query(TranscriptionJob.input_object_key)
+        .filter(TranscriptionJob.status.in_(["queued", "processing"]),
+                TranscriptionJob.input_object_key.isnot(None)).all()
+    )
     cutoff = (now or datetime.now(timezone.utc)) - timedelta(hours=ttl_hours)
     scanned = candidates = deleted = failed = 0
 
@@ -74,10 +81,13 @@ def reconcile_orphaned_uploads(
             continue
         candidates += 1
         if apply:
-            if delete_file_idempotently(candidate):
-                deleted += 1
-            elif candidate.exists():
-                failed += 1
+            # Exact legacy reference also handles abandoned staging files.
+            reference = str(candidate.resolve())
+            schedule_audio_cleanup(db, reference)
+            db.commit()
+            attempt = cleanup_after_commit(db, [reference])
+            deleted += attempt["deleted"]
+            failed += attempt["failed"]
 
     return {
         "scanned": scanned,
@@ -134,8 +144,10 @@ def apply_database_retention(
     if not apply:
         return result
 
-    paths = [row.job.input_path for row in transcriptions if row.job and row.job.input_path]
+    paths = [input_reference(row.job) for row in transcriptions if row.job]
     for transcription in transcriptions:
+        if transcription.job:
+            schedule_audio_cleanup(db, input_reference(transcription.job))
         append_audit_event(
             db,
             event="transcription.deleted",
@@ -151,9 +163,7 @@ def apply_database_retention(
         ).delete(synchronize_session=False)
     db.commit()
     result["transcriptions_deleted"] = len(transcriptions)
-    for path in paths:
-        if delete_file_idempotently(path):
-            result["files_cleaned"] += 1
-        elif Path(path).exists():
-            result["files_failed"] += 1
+    cleanup = cleanup_after_commit(db, paths)
+    result["files_cleaned"] = cleanup["deleted"]
+    result["files_failed"] = cleanup["failed"]
     return result

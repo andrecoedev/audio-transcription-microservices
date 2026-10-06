@@ -274,7 +274,7 @@ def test_deletion_does_not_report_missing_input_as_cleanup_failure(db_context, w
     row = db.get(Transcription, tid)
     row.status = row.job.status = "failed"
     from pathlib import Path
-    Path(row.job.input_path).unlink()
+    (db_context["tmp_path"] / "uploads" / row.job.input_object_key).unlink()
     db.commit()
     assert client.delete(f"/guest/transcriptions/{tid}", headers=guest).status_code == 200
     assert "Input cleanup incomplete" not in caplog.text
@@ -299,7 +299,7 @@ def test_claimed_result_survives_guest_retention_and_preserves_job_limits(db_con
 
 
 def test_guest_retention_reports_partial_file_failure(db_context, monkeypatch, wav_bytes):
-    from src.services import guest_retention
+    from src.services.object_storage import LocalObjectStorage, StorageError
     client = db_context["client"]
     guest = guest_headers(client)
     tid = client.post("/guest/transcriptions/jobs", headers=guest, files={"file": ("test.wav", wav_bytes)}).json()["id"]
@@ -308,7 +308,9 @@ def test_guest_retention_reports_partial_file_failure(db_context, monkeypatch, w
     row = db.get(Transcription, tid)
     row.status = row.job.status = "failed"
     db.commit()
-    monkeypatch.setattr(guest_retention, "delete_file_idempotently", lambda _path: False)
+    def fail_delete(_self, _key):
+        raise StorageError("Synthetic deletion failure")
+    monkeypatch.setattr(LocalObjectStorage, "delete", fail_delete)
     report = apply_guest_retention(db, apply=True)
     assert report["transcriptions_deleted"] == report["files_failed"] == 1
     assert apply_guest_retention(db, apply=True)["candidates"] == 0

@@ -1,13 +1,12 @@
 """One deletion rule for the transcription and its 1:1 meeting."""
 
 import logging
-from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from ..models import Transcription, TranscriptionJob
 from .audit import append_audit_event
-from .storage_lifecycle import delete_file_idempotently
+from .audio_storage import input_reference, schedule_audio_cleanup, cleanup_after_commit
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ def delete_transcription_data(
     ):
         raise ActiveTranscriptionError("Active transcription jobs cannot be deleted")
 
-    input_path = Path(job.input_path) if job else None
+    reference = input_reference(job) if job else None
     try:
         if transcription.meeting is not None:
             append_audit_event(
@@ -47,11 +46,12 @@ def delete_transcription_data(
             resource_type="transcription",
             resource_id=transcription.id,
         )
+        schedule_audio_cleanup(db, reference)
         db.delete(transcription)
         db.commit()
     except Exception:
         db.rollback()
         raise
 
-    if input_path and not delete_file_idempotently(input_path) and input_path.exists():
+    if cleanup_after_commit(db, [reference])["failed"]:
         logger.warning("Input cleanup incomplete for transcription %s", transcription.id)

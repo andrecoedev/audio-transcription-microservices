@@ -98,6 +98,9 @@ class Settings(BaseSettings):
     )
     
     # File Upload
+    OBJECT_STORAGE_BACKEND: Literal["local"] = Field(
+        default="local", description="Object storage adapter; cloud adapters require separate deployment validation"
+    )
     MAX_UPLOAD_SIZE_MB: int = Field(
         default=5120,
         description="Maximum upload size in MB"

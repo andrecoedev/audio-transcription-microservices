@@ -1,10 +1,9 @@
 """Dry-run-first guest cleanup, serialized with conversion and upload."""
 from datetime import datetime, timezone
-from pathlib import Path
 
 from ..models import GuestSession, Transcription, TranscriptionOwnership
 from .audit import append_audit_event
-from .storage_lifecycle import delete_file_idempotently
+from .audio_storage import input_reference, schedule_audio_cleanup, cleanup_after_commit
 
 
 def apply_guest_retention(db, *, apply=False, now=None):
@@ -31,7 +30,9 @@ def apply_guest_retention(db, *, apply=False, now=None):
             result["candidates"] += 1
             if apply:
                 if row.job:
-                    paths.append(row.job.input_path)
+                    reference = input_reference(row.job)
+                    paths.append(reference)
+                    schedule_audio_cleanup(db, reference)
                 append_audit_event(db, event="transcription.deleted", actor_type="system",
                     resource_type="transcription", resource_id=row.id, metadata={"reason": "guest_retention"})
                 db.delete(row)
@@ -42,7 +43,5 @@ def apply_guest_retention(db, *, apply=False, now=None):
             result["sessions_deleted"] += 1
     if apply:
         db.commit()
-        for path in paths:
-            if not delete_file_idempotently(path) and Path(path).exists():
-                result["files_failed"] += 1
+        result["files_failed"] = cleanup_after_commit(db, paths)["failed"]
     return result

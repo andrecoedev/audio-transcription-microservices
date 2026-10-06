@@ -289,8 +289,9 @@ def test_recovery_requeues_only_orphan_processing_job(
         db.close()
 
 
+@pytest.mark.parametrize("storage_kind", ["legacy", "object"])
 def test_real_rq_worker_persists_result_in_postgresql(
-    postgres_session_factory, monkeypatch, tmp_path
+    postgres_session_factory, monkeypatch, tmp_path, storage_kind
 ):
     import os
 
@@ -303,10 +304,27 @@ def test_real_rq_worker_persists_result_in_postgresql(
     transcription_id = _seed_job(
         postgres_session_factory, input_path=str(input_path)
     )
+    if storage_kind == "object":
+        from io import BytesIO
+        from uuid import uuid4
+        from src.config import settings
+        from src.services.audio_storage import get_audio_storage
+        monkeypatch.setattr(settings, "AUDIO_UPLOAD_DIRECTORY", str(tmp_path / "objects"))
+        storage = get_audio_storage()
+        object_key = uuid4().hex + ".wav"
+        storage.put(object_key, BytesIO(b"audio"))
+        db = postgres_session_factory()
+        job = db.get(Transcription, transcription_id).job
+        job.input_path = ""
+        job.input_object_key = object_key
+        db.commit()
+        db.close()
     monkeypatch.setattr(transcription_worker, "SessionLocal", postgres_session_factory)
 
     class SuccessfulService:
         def process_transcription(self, **_kwargs):
+            from pathlib import Path
+            assert Path(_kwargs["file_path"]).read_bytes() == b"audio"
             return ProcessingResult(
                 segments=[{"speaker": "SPEAKER_00", "text": "via RQ", "start": 0, "end": 2}],
                 duration_seconds=2,
@@ -329,12 +347,20 @@ def test_real_rq_worker_persists_result_in_postgresql(
     assert worker.work(burst=True, logging_level="WARNING") is True
     rq_job.refresh()
     assert rq_job.get_status() == "finished"
+    rq_job.delete()  # PostgreSQL results must not depend on the RQ record.
 
     db = postgres_session_factory()
     try:
         transcription = db.get(Transcription, transcription_id)
         assert transcription.status == transcription.job.status == "completed"
         assert transcription.segments[0]["text"] == "via RQ"
+        assert db.get(Meeting, transcription_id) is not None
+        from src.models import ObjectDeletion
+        assert db.query(ObjectDeletion).count() == 0
+        if storage_kind == "object":
+            assert not storage.exists(object_key)
+        else:
+            assert not input_path.exists()
     finally:
         db.close()
 
@@ -483,6 +509,8 @@ def test_api_worker_status_flow_uses_same_postgresql_records(
     app.dependency_overrides[get_db] = override_get_db
     monkeypatch.setattr(transcriptions_router, "get_transcription_queue", lambda: queue)
     monkeypatch.setattr(transcriptions_router, "_UPLOAD_DIRECTORY", tmp_path / "uploads")
+    from src.config import settings
+    monkeypatch.setattr(settings, "AUDIO_UPLOAD_DIRECTORY", str(tmp_path / "uploads"))
     monkeypatch.setattr(transcription_worker, "SessionLocal", postgres_session_factory)
 
     class SuccessfulService:
