@@ -94,6 +94,10 @@ Não são configuração suportada nem fixtures da suíte permanente.
 
 ## Validação
 
+O [baseline de CI](docs/ci.md) valida PRs para `dev` com backend leve,
+PostgreSQL/Redis isolados e frontend oficial. A documentação distingue esse
+baseline da suíte Worker e da homologação real de modelos/providers.
+
 A suíte completa deve rodar na imagem Worker estável com modelos/providers mockados
 e PostgreSQL/Redis/RQ sintéticos isolados. A imagem leve de teste valida API/
 persistência/integração, mas não instala dependências dos testes ML.
