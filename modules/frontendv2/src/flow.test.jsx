@@ -93,7 +93,7 @@ describe('public React flow', () => {
   it('redirects protected routes and clears an unverified persisted session', async () => {
     localStorage.setItem('token', 'stale')
     useAuthStore.setState({ user: { name: 'Alice' }, isAuthenticated: true })
-    authService.me.mockRejectedValue(new Error('expired'))
+    authService.me.mockRejectedValue(Object.assign(new Error('expired'), { status: 401 }))
     window.history.pushState({}, '', '/transcriptions')
     render(<App />)
     expect(await screen.findByText('Salve e acompanhe suas reuniões')).toBeTruthy()
