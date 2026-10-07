@@ -205,7 +205,7 @@ describe('public React flow', () => {
   })
 
   it('shows upload failures without navigating away', async () => {
-    audioService.createTranscriptionJob.mockRejectedValue(new Error('Too many requests'))
+    audioService.createTranscriptionJob.mockRejectedValue(new Error('A franquia de transcrição da USAGI está esgotada no momento.'))
     render(
       <MemoryRouter>
         <NewTranscription />
@@ -216,14 +216,14 @@ describe('public React flow', () => {
       new File(['RIFFdataWAVE'], 'meeting.wav', { type: 'audio/wav' })
     )
     fireEvent.click(screen.getByText('Iniciar Transcrição'))
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Too many requests'))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('A franquia de transcrição da USAGI está esgotada no momento.'))
     expect(screen.getByText('Iniciar Transcrição')).toBeTruthy()
   })
 
   it('shows a rate-limit rejection without losing the selected file', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     audioService.createTranscriptionJob.mockRejectedValue(
-      new Error('Too many requests; please retry later')
+      new Error('Muitas solicitações em pouco tempo. Aguarde um pouco antes de tentar novamente.')
     )
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
     await userEvent.upload(
@@ -232,7 +232,7 @@ describe('public React flow', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: /Iniciar/ }))
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
-      'Too many requests; please retry later'
+      'Muitas solicitações em pouco tempo. Aguarde um pouco antes de tentar novamente.'
     ))
     expect(screen.getByText('meeting.wav')).toBeTruthy()
   })

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Card, { CardContent, CardHeader, CardTitle } from './Card'
 import Button from './Button'
 import { audioService } from '../services/audioService'
+import { formatSeconds } from '../utils/format'
 
 const emptyAction = { description: '', assignee: '', due_date: '' }
 const statusLabels = { open: 'Aberta', done: 'Concluída', dismissed: 'Descartada' }
@@ -15,7 +16,7 @@ function EvidenceLinks({ evidence = [], references = [], evidenceBaseUrl = '' })
   return <div className="text-sm text-gray-600">Evidência: {evidence.map((item, index) => {
     const reference = references.find(ref => ref.segment_order === item.segment_order)
     return <a key={`${item.segment_order}-${index}`} href={`${evidenceBaseUrl}#segment-${item.segment_order}`} title={item.quote || ''} className="text-primary-700 underline mr-3">
-      {reference ? `${reference.start.toFixed(1)}s–${reference.end.toFixed(1)}s` : `Segmento ${item.segment_order + 1}`}
+      {reference ? `${formatSeconds(reference.start)}–${formatSeconds(reference.end)}` : `Trecho ${item.segment_order + 1}`}
     </a>
   })}</div>
 }
@@ -187,7 +188,7 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
 
   const panelContent = <><CardHeader><CardTitle>Ações da reunião</CardTitle></CardHeader><CardContent>
     <div className="space-y-5">
-      <p className="text-sm text-gray-600">Sugestões de IA aguardam sua revisão. As tarefas abaixo são o estado operacional salvo para esta reunião.</p>
+      <p className="text-sm text-gray-600">Revise as sugestões da IA. As tarefas abaixo já foram confirmadas para esta reunião.</p>
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {loading && <p role="status">Carregando tarefas e sugestões...</p>}
       <Button variant="outline" disabled={loading || busy} onClick={() => setRefresh(value => value + 1)}>Atualizar tarefas</Button>

@@ -83,7 +83,7 @@ export default function Settings() {
       toast.success('Preferências salvas')
     } catch {
       setErrorMessage('Não foi possível salvar as preferências. Tente novamente.')
-      toast.error('Não foi possível salvar as preferências de provedores')
+      toast.error('Não foi possível salvar as preferências de serviços')
     } finally {
       setProviderSaving(false)
     }
@@ -218,13 +218,13 @@ export default function Settings() {
                 </div>
                 {statusError && <p role="alert" className="mb-2 text-sm text-red-700">Não foi possível consultar o sistema. Tente novamente.</p>}
                 <div className="space-y-2 text-sm">
-                  <StatusRow label="Banco" value={health?.database || 'não verificado'} />
-                  <StatusRow label="Fila de processamento" value={health?.processing?.redis || 'não verificado'} />
+                  <StatusRow label="Banco de dados" value={healthStatus(health?.database)} />
+                  <StatusRow label="Fila de processamento" value={healthStatus(health?.processing?.redis)} />
                   <StatusRow label="Processamento de áudio" value={health?.processing
                     ? health.processing.worker_available ? 'disponível' : 'indisponível' : 'não verificado'} />
                   {[
-                    ['Faster-Whisper local', 'whisper'], ['Pyannote local', 'diarization'],
-                    ['AssemblyAI externo', 'assemblyai'], ['Gemini externo', 'gemini'],
+                    ['Transcrição local', 'whisper'], ['Detecção de falantes', 'diarization'],
+                    ['Transcrição via AssemblyAI', 'assemblyai'], ['Resumos via Gemini', 'gemini'],
                   ].map(([label, provider]) => <StatusRow key={provider} label={label} value={
                     health?.models?.[provider] ? health.models[provider].configured ? 'configurado' : 'não configurado' : 'não verificado'
                   } />)}
@@ -258,8 +258,8 @@ function ProviderCard({ provider, configuredProvider, credential, settings, savi
 }
 
 function LoadingState({ loading, error, retry }) {
-  if (loading) return <p role="status">Carregando preferências dos provedores…</p>
-  if (error) return <div role="alert" className="space-y-2"><p>Não foi possível carregar as preferências dos provedores.</p><Button variant="outline" onClick={retry}>Tentar novamente</Button></div>
+  if (loading) return <p role="status">Carregando preferências dos serviços…</p>
+  if (error) return <div role="alert" className="space-y-2"><p>Não foi possível carregar as preferências dos serviços.</p><Button variant="outline" onClick={retry}>Tentar novamente</Button></div>
   return null
 }
 
@@ -268,4 +268,10 @@ function StatusRow({ label, value }) {
     <span className="text-gray-600">{label}</span>
     <span className="font-medium text-gray-900">{value}</span>
   </div>
+}
+
+function healthStatus(value) {
+  if (value === 'connected') return 'Disponível'
+  if (value === 'unavailable') return 'Indisponível'
+  return 'Não verificado'
 }

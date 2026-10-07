@@ -50,7 +50,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks() })
 it('shows a suggestion, accepts it explicitly, edits and retains it after reload', async () => {
   const view = render(<MeetingActionsPanel meetingId="42" />)
   expect(await screen.findByText('Preparar relatório')).toBeTruthy()
-  expect(screen.getByRole('link', { name: '0.0s–2.0s' }).getAttribute('href')).toBe('#segment-0')
+  expect(screen.getByRole('link', { name: '0,0 s–2,0 s' }).getAttribute('href')).toBe('#segment-0')
   fireEvent.click(screen.getByRole('button', { name: 'Aceitar' }))
   expect(await screen.findByText(/IA → revisada/)).toBeTruthy()
   expect(audioService.acceptMeetingActionSuggestion).toHaveBeenCalledWith('42', 1, 0, {})
@@ -74,7 +74,7 @@ it('shows a suggestion, accepts it explicitly, edits and retains it after reload
 
 it('keeps evidence links pointed at the meeting from task lists and reviewed origins', async () => {
   render(<MeetingActionsPanel meetingId="42" evidenceBaseUrl="/meetings/42" />)
-  const suggestionEvidence = await screen.findByRole('link', { name: '0.0s–2.0s' })
+  const suggestionEvidence = await screen.findByRole('link', { name: '0,0 s–2,0 s' })
   expect(suggestionEvidence.getAttribute('href')).toBe('/meetings/42#segment-0')
   fireEvent.click(screen.getByRole('button', { name: 'Aceitar' }))
   fireEvent.click(await screen.findByRole('button', { name: /Ver sugestão original/ }))

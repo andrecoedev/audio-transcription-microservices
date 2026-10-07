@@ -49,7 +49,7 @@ describe('Settings', () => {
 
   it('keeps operational health diagnostics available but collapsed by default', async () => {
     renderSettings()
-    await screen.findByText('Gemini externo')
+    await screen.findByText('Resumos via Gemini')
     expect(screen.getByText('Processamento de áudio').parentElement.textContent).toContain('disponível')
     const diagnostics = screen.getByText('Diagnóstico do sistema').closest('details')
     expect(diagnostics.open).toBe(false)

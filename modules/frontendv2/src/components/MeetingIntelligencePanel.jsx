@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import Button from './Button'
 import { audioService } from '../services/audioService'
+import { formatSeconds } from '../utils/format'
 
 function EvidenceLinks({ evidence = [], references = [] }) {
   return <div className="mt-1 text-sm text-gray-500">{evidence.map((item, index) => {
     const reference = references.find(ref => ref.segment_order === item.segment_order)
     return <a key={index} href={`#segment-${item.segment_order}`} title={item.quote} className="mr-3 text-primary-700 underline">
-      {reference ? `${reference.start.toFixed(1)}s–${reference.end.toFixed(1)}s` : `Segmento ${item.segment_order + 1}`}
+      {reference ? `${formatSeconds(reference.start)}–${formatSeconds(reference.end)}` : `Trecho ${item.segment_order + 1}`}
     </a>
   })}</div>
 }
@@ -50,7 +51,7 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange, in
       await audioService.requestMeetingIntelligence(meetingId, Boolean(result))
       setRefresh(value => value + 1)
     } catch (failure) {
-      setError(failure.message || 'Não foi possível solicitar a análise.')
+      setError(failure.message || 'Não foi possível gerar o resumo. Tente novamente.')
     } finally { setSubmitting(false) }
   }
 
@@ -68,7 +69,7 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange, in
     {error && <Button variant="outline" onClick={() => setRefresh(value => value + 1)}>Consultar novamente</Button>}
     {!status && !error && <p role="status" className="text-sm text-gray-500">Consultando análise...</p>}
     {status && !status.generation && !result && <p className="text-sm text-gray-600">Ainda não há análise desta reunião.</p>}
-    {status && !status.configured && <p className="text-sm text-gray-600">Geração indisponível neste ambiente.</p>}
+    {status && !status.configured && <p className="text-sm text-gray-600">A análise com IA está indisponível no momento.</p>}
     {busy && <p role="status" className="text-sm text-gray-600">{result ? 'Gerando novamente; a versão anterior continua disponível.' : 'Gerando resumo...'}</p>}
     {state === 'failed' && <p role="alert" className="text-sm text-red-700">A geração falhou. Você pode tentar novamente.</p>}
     {status && <Button onClick={generate} disabled={submitting || busy || !status.configured}>

@@ -71,7 +71,7 @@ describe('Guest and account boundaries', () => {
   it('shows server upload limits and keeps platform-only providers disabled for public accounts', async () => {
     useAuthStore.setState({ user: { registration_source: 'public' }, token: 'test-user-proof', isAuthenticated: true })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-    expect(await screen.findByText(/m[aá]x\. 100MB/)).toBeTruthy()
+    expect(await screen.findByText((_, element) => element.textContent === 'Máximo de 100 MB por arquivo')).toBeTruthy()
     expect(screen.getByRole('button', { name: /AssemblyAI/ }).disabled).toBe(true)
     expect(screen.getByLabelText('Detecção de falantes')).toBeTruthy()
   })
@@ -83,7 +83,7 @@ describe('Guest and account boundaries', () => {
     expect(await screen.findByText('Não foi possível consultar os limites de upload.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
-    expect(await screen.findByText(/m[aá]x\. 100MB/)).toBeTruthy()
+    expect(await screen.findByText((_, element) => element.textContent === 'Máximo de 100 MB por arquivo')).toBeTruthy()
   })
   it('App root is public without a session or auth bootstrap request', async () => {
     render(<App />)

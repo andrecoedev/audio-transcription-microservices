@@ -20,7 +20,7 @@ it('requests first generation and displays a sanitized failure', async () => {
   audioService.requestMeetingIntelligence.mockRejectedValue(new Error('Serviço indisponível'))
   render(<MeetingIntelligencePanel meetingId="42" />)
   fireEvent.click(await screen.findByRole('button', { name: 'Gerar resumo' }))
-  expect(await screen.findByRole('alert')).toBeTruthy()
+  expect((await screen.findByRole('alert')).textContent).toContain('Serviço indisponível')
   expect(audioService.requestMeetingIntelligence).toHaveBeenCalledWith('42', false)
 })
 
@@ -32,7 +32,7 @@ it('shows null assignee/deadline and retains completed result while regenerating
   expect(await screen.findByText('Resumo da reunião')).toBeTruthy()
   expect(screen.getByText(/Não identificado/)).toBeTruthy()
   expect(screen.getByText(/Sem prazo explícito/)).toBeTruthy()
-  expect(screen.getByRole('link', { name: '0.0s–2.0s' }).getAttribute('href')).toBe('#segment-0')
+  expect(screen.getByRole('link', { name: '0,0 s–2,0 s' }).getAttribute('href')).toBe('#segment-0')
   fireEvent.click(screen.getByRole('button', { name: 'Gerar novamente' }))
   await waitFor(() => expect(audioService.requestMeetingIntelligence).toHaveBeenCalledWith('42', true))
   expect(await screen.findByRole('status')).toBeTruthy()

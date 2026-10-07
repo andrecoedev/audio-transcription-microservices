@@ -64,7 +64,7 @@ describe('functional frontend contracts', () => {
   it('shows provider configuration for non-admins without requesting secrets/status admin APIs', async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>)
     await screen.findByText('disponível')
-    const provider = screen.getByText('Gemini externo').parentElement
+    const provider = screen.getByText('Resumos via Gemini').parentElement
     expect(provider.textContent).toContain('configurado')
     expect(provider.textContent).not.toContain('não configurado')
     expect(audioService.getApiKeysStatus).not.toHaveBeenCalled()
@@ -232,10 +232,12 @@ describe('functional frontend contracts', () => {
   })
 
   it('does not send users to Settings to enter a Gemini secret', async () => {
+    useAuthStore.setState({ user: { registration_source: 'public' } })
     render(<MemoryRouter><MeetingMinutes /></MemoryRouter>)
     await waitFor(() => expect(audioService.getMeetingMinutesStatus).toHaveBeenCalled())
     expect(screen.queryByText(/na página de Configurações para usar/)).toBeNull()
-    expect(screen.getByText(/administrador.*worker/i)).toBeTruthy()
+    expect(screen.getByText(/Geração de atas ainda não aceita uma conta Gemini conectada/i)).toBeTruthy()
+    expect(screen.queryByText(/worker/i)).toBeNull()
   })
 
   it('refreshes reviewed minutes when a new Intelligence revision completes', async () => {

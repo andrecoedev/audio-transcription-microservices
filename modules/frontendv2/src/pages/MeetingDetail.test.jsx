@@ -42,7 +42,7 @@ it('searches existing transcript segments and switches the intelligence tab', as
   fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar no áudio' }), { target: { value: 'métricas' } })
   expect(screen.queryByText('Decidir o lançamento.')).toBeNull()
   expect(screen.getByText('Revisar métricas.')).toBeTruthy()
-  expect(screen.getByText('1 segmento de 2 segmentos')).toBeTruthy()
+  expect(screen.getByText('1 trecho de 2 trechos')).toBeTruthy()
   fireEvent.click(screen.getByRole('tab', { name: 'Decisões' }))
   expect(screen.getByTestId('intelligence-panel').textContent).toBe('decisions')
 })
@@ -53,7 +53,7 @@ it('keeps a long transcript in a bounded scroll region', async () => {
   })) })
   renderMeeting()
   expect(await screen.findByText('Segmento 499')).toBeTruthy()
-  const transcript = screen.getByLabelText('Segmentos da transcrição')
+  const transcript = screen.getByLabelText('Trechos da transcrição')
   expect(transcript.className).toContain('overflow-y-auto')
   expect(transcript.className).toContain('overscroll-contain')
   expect(transcript.closest('.card').parentElement.className).toContain('xl:h-[min(72vh,52rem)]')
@@ -78,9 +78,11 @@ it('allows maximum-length unbroken meeting titles to wrap', async () => {
 })
 
 it('keeps title and speaker rename controls connected to the existing APIs', async () => {
+  audioService.getMeeting.mockResolvedValueOnce({ id: 7, transcription_id: 70, title: 'Título definido pela pessoa', original_filename: `${'d'.repeat(32)}.wav`, created_at: '2026-10-01T12:00:00Z', duration_seconds: 120,
+    status: 'completed', speakers: [{ id: 'SPEAKER_00', display_name: 'Ana' }] })
   renderMeeting()
   await screen.findByText('Decidir o lançamento.')
-  expect(screen.getByRole('heading', { name: 'Product sync', level: 1 })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Título definido pela pessoa', level: 1 })).toBeTruthy()
   expect(screen.getByRole('link', { name: 'Exportar transcrição' }).getAttribute('href')).toBe('/transcriptions/70')
   fireEvent.click(screen.getByRole('button', { name: 'Editar título' }))
   fireEvent.change(screen.getByRole('textbox', { name: 'Título da reunião' }), { target: { value: 'Product planning' } })
