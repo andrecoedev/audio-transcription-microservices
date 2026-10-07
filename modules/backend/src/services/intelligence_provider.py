@@ -73,6 +73,14 @@ SCHEMA:
 class GeminiIntelligenceProvider:
     def __init__(self, generator):
         self.generator = generator
+        self._usage_observer = None
+
+    def set_usage_observer(self, callback) -> None:
+        """Attach an observer when the wrapped generator supports it."""
+        self._usage_observer = callback
+        setter = getattr(self.generator, "set_usage_observer", None)
+        if callable(setter):
+            setter(callback)
 
     def generate(self, context: dict) -> str:
         prompt = build_prompt(context)

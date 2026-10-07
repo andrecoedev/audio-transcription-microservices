@@ -31,6 +31,7 @@ from src.workers.config import (
 )
 from src.workers.transcription_worker import recover_pending_jobs
 from src.workers.meeting_intelligence_worker import recover_intelligence_jobs
+from src.services.usage_metering import reconcile_usage
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ class RecoveringWorker(Worker):
 
     def run_maintenance_tasks(self):
         super().run_maintenance_tasks()
+        reconcile_usage(apply=True)
         for queue in self.queues:
             recover_pending_jobs(queue)
             recover_intelligence_jobs(queue)
@@ -72,6 +74,7 @@ def main():
         errors = settings.validate_startup(require_api_security=False)
         if errors:
             raise RuntimeError("Invalid worker configuration: " + "; ".join(errors))
+        reconcile_usage(apply=True)
         recover_pending_jobs(queue)
         recover_intelligence_jobs(queue)
     except Exception:

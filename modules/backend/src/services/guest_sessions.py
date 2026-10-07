@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import GuestSession, TranscriptionOwnership
+from ..models import GuestSession, TranscriptionOwnership, UsageEvent
 from ..security import decode_verified_claims, oauth2_scheme
 from .audit import append_audit_event
 
@@ -46,6 +46,8 @@ def claim_guest_results(db: Session, token: str, user) -> dict:
         owner.owner_sub = user.username
         owner.guest_session_id = None
     guest.claimed_by_user_id = user.user_id
+    db.query(UsageEvent).filter_by(guest_session_id=guest.id, user_id=None).update(
+        {UsageEvent.user_id: user.user_id}, synchronize_session=False)
     append_audit_event(db, event="guest.claimed", actor_user_id=user.user_id,
                        metadata={"transcriptions": len(owners)})
     db.commit()
