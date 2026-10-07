@@ -15,6 +15,10 @@ PostgreSQL contém resultados duráveis; RQ contém estado de execução efêmer
 retry durável no PostgreSQL. Veja o [mapa de dados e lifecycle](docs/cloud_data_architecture.md).
 O frontend oficial é React; Streamlit permanece como interface legada alternativa.
 
+Consumo técnico usa um ledger privado no PostgreSQL, com journal durável para
+reconciliação e catálogo de preços vazio por padrão. Estimativas não são faturas;
+BYOK e custos da plataforma permanecem separados. Veja [métricas e custos](docs/usage-metering.md).
+
 ## Iniciar desenvolvimento
 
 Use um destino PostgreSQL pertencente ao projeto e configure secrets **localmente**.
