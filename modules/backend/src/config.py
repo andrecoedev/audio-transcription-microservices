@@ -253,6 +253,14 @@ class Settings(BaseSettings):
         """Valida configurações obrigatórias para startup seguro."""
         errors: list[str] = []
 
+        backend_root = Path(__file__).resolve().parents[1]
+        spool = Path(self.USAGE_SPOOL_DIRECTORY)
+        uploads = Path(self.AUDIO_UPLOAD_DIRECTORY)
+        spool = (spool if spool.is_absolute() else backend_root / spool).resolve()
+        uploads = (uploads if uploads.is_absolute() else backend_root / uploads).resolve()
+        if not self.USAGE_SPOOL_DIRECTORY.strip() or spool == backend_root or spool.parent == spool or spool.is_relative_to(uploads):
+            errors.append("USAGE_SPOOL_DIRECTORY must be a dedicated private directory outside audio uploads")
+
         if not self.DATABASE_URL or not self.DATABASE_URL.strip():
             errors.append("DATABASE_URL is required")
         if min(

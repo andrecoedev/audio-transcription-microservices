@@ -1,7 +1,6 @@
 """Private, owner-scoped usage history and summaries."""
 
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request

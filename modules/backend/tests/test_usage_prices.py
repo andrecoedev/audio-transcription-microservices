@@ -38,6 +38,7 @@ def test_catalog_dry_run_idempotent_import_and_immutable_versions(db_context):
     {"unit_price": 0.1}, {"unit_price": "NaN"}, {"unit_price": "-1"},
     {"unit_price": "0.0000000000001"}, {"unit_quantity": "0"},
     {"unit": "second"}, {"metric": "total_tokens"}, {"currency": "usd"},
+    {"provider": "whisper"}, {"provider": "object_storage"},
     {"source": "https://example.test/?key=synthetic"},
     {"source": "https://synthetic:password@example.test/rates"},
     {"effective_from": "2026-01-01T00:00:00"},

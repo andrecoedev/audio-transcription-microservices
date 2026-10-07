@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 _NAMESPACE = UUID("b4f6d335-c484-4968-94d5-d8fa1372879c")
 _LABEL = re.compile(r"[A-Za-z0-9_.:-]{1,100}\Z")
 _PRICEABLE = {"provider_audio_seconds", "input_uncached_tokens", "output_tokens",
-              "thinking_tokens", "cache_read_tokens", "tool_tokens", "processing_seconds", "byte_seconds"}
+              "thinking_tokens", "cache_read_tokens", "tool_tokens", "processing_seconds"}
 
 
 def utc(value):

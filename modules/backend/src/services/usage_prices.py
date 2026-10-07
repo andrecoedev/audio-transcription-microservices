@@ -27,6 +27,11 @@ def import_prices(db, rows, *, apply=False):
             raise ValueError("Audit-only metric cannot be priced")
         if data["provider"] not in {"assemblyai", "gemini", "whisper", "object_storage"}:
             raise ValueError("Unsupported pricing provider")
+        supported = {"assemblyai": {"provider_audio_seconds"}, "whisper": {"processing_seconds"},
+                     "gemini": {"input_uncached_tokens", "output_tokens", "thinking_tokens", "cache_read_tokens", "tool_tokens"},
+                     "object_storage": set()}
+        if data["metric"] not in supported[data["provider"]]:
+            raise ValueError("Unsupported provider pricing metric")
         expected_unit = "token" if data["metric"].endswith("tokens") else "byte_second" if data["metric"] == "byte_seconds" else "second"
         if data["unit"] != expected_unit or not re.fullmatch(r"[A-Z]{3}", data["currency"]):
             raise ValueError("Invalid pricing unit or currency")

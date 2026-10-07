@@ -54,8 +54,9 @@ def record_object_delete(db, context, deleted_at):
                              phase="delete", measurement_source="cleanup_observed")
     lifetime = None
     if context["quantity"] is not None and context["occurred_at"] is not None:
-        elapsed = max(Decimal(0), Decimal(str((deleted_at - context["occurred_at"]).total_seconds())))
-        lifetime = Decimal(str(context["quantity"])) * elapsed
+        elapsed = Decimal(str((deleted_at - context["occurred_at"]).total_seconds()))
+        if elapsed >= 0:
+            lifetime = Decimal(str(context["quantity"])) * elapsed
     lifetime_id = record_event(**values, metric="byte_seconds", unit="byte_second", quantity=lifetime,
                               phase="delete", measurement_source="observed_storage_lifetime")
     return deleted_id is not None and lifetime_id is not None

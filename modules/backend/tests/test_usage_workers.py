@@ -1,5 +1,7 @@
 """Worker usage lifecycle tests use fake providers and never call remote APIs."""
 
+from uuid import uuid4
+
 import pytest
 from cryptography.fernet import Fernet
 
@@ -20,6 +22,7 @@ from src.services.meeting_intelligence import fingerprint
 from src.services.meeting_projection import ordered_segments
 from src.services.provider_credentials import encrypt_credential
 from src.services.transcription_processing_service import ProcessingResult
+from src.services.usage_metering import UsageRecorder, reconcile_usage, spool_directory
 from src.workers import meeting_intelligence_worker, transcription_worker
 
 
@@ -118,8 +121,8 @@ def test_manually_requeued_local_job_gets_a_new_usage_attempt_id(db_context, mon
         db.commit()
     finally:
         db.close()
-    path.write_bytes(b"fixture audio")
 
+    path.write_bytes(b"fixture audio")
     assert transcription_worker.process_transcription_job_sync(transcription_id)["status"] == "completed"
     db = db_context["session_factory"]()
     try:
@@ -127,6 +130,90 @@ def test_manually_requeued_local_job_gets_a_new_usage_attempt_id(db_context, mon
         assert job.usage_attempt_id != first_attempt
         attempts = db.query(UsageEvent).filter_by(metric="attempt", resource_id=str(transcription_id)).all()
         assert {event.operation_id for event in attempts} == {first_attempt, job.usage_attempt_id}
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize("rq_status", ["stopped", "canceled"])
+def test_interrupted_platform_attempt_recovery_marks_old_cancelled_and_blocks_second_call(
+    db_context, monkeypatch, tmp_path, rq_status,
+):
+    path = tmp_path / f"interrupted-{rq_status}.wav"
+    path.write_bytes(b"fixture audio")
+    factory = db_context["session_factory"]
+    old_attempt_id = str(uuid4())
+    db = factory()
+    try:
+        transcription = Transcription(
+            filename="interrupted.wav", original_filename="interrupted.wav", file_size_mb=0.01,
+            duration_seconds=0, transcription_model="assemblyai", segments=[], status="processing",
+        )
+        db.add(transcription)
+        db.flush()
+        db.add(TranscriptionJob(
+            transcription_id=transcription.id, input_path=str(path), use_diarization=False,
+            transcription_model="assemblyai", status="processing", credential_source="platform",
+            usage_attempt_id=old_attempt_id,
+        ))
+        db.add(TranscriptionOwnership(transcription_id=transcription.id, owner_sub="alice", user_id=1))
+        db.add(PlatformProviderBudget(provider="assemblyai", limit_cents=100, reserved_cents=10))
+        db.add(PlatformProviderCall(
+            transcription_id=transcription.id, provider="assemblyai", context="local",
+            credential_source="platform", reserved_cents=10, state="attempted",
+        ))
+        db.commit()
+        transcription_id = transcription.id
+    finally:
+        db.close()
+
+    monkeypatch.setattr(transcription_worker, "SessionLocal", factory)
+    UsageRecorder(
+        operation_id=old_attempt_id, user_id=1, guest_session_id=None,
+        resource_type="transcription", resource_id=transcription_id, operation="transcription",
+        provider="assemblyai", credential_source="platform", model="universal-2",
+        session_factory=factory,
+    ).record("external_call", "call", 1, phase="submitted", status="unknown")
+
+    class ExistingRQJob:
+        def get_status(self, refresh=False):
+            return rq_status
+
+        def delete(self):
+            return None
+
+    monkeypatch.setattr(transcription_worker.Job, "fetch", lambda *_args, **_kwargs: ExistingRQJob())
+    assert transcription_worker.recover_pending_jobs(db_context["queue"]) == 1
+
+    db = factory()
+    try:
+        old_terminal = db.query(UsageEvent).filter_by(
+            operation_id=old_attempt_id, metric="attempt_status",
+        ).one()
+        assert old_terminal.status == "cancelled"
+    finally:
+        db.close()
+
+    monkeypatch.setattr(
+        transcription_worker, "get_cloud_processing_service",
+        lambda: pytest.fail("an attempted platform provider call must not execute again"),
+    )
+    with pytest.raises(RuntimeError, match="Transcription processing failed"):
+        transcription_worker.process_transcription_job_sync(transcription_id)
+
+    db = factory()
+    try:
+        job = db.query(TranscriptionJob).one()
+        assert job.usage_attempt_id != old_attempt_id
+        attempts = db.query(UsageEvent).filter_by(
+            resource_id=str(transcription_id), metric="attempt_status",
+        ).all()
+        assert {event.operation_id for event in attempts} == {old_attempt_id, job.usage_attempt_id}
+        external_calls = db.query(UsageEvent).filter_by(
+            resource_id=str(transcription_id), metric="external_call",
+        ).all()
+        assert len(external_calls) == 1
+        assert db.get(PlatformProviderBudget, "assemblyai").reserved_cents == 10
+        assert db.query(PlatformProviderCall).one().state == "attempted"
     finally:
         db.close()
 
@@ -258,5 +345,51 @@ def test_assemblyai_byok_records_usage_without_platform_budget_debit(db_context,
         assert db.query(PlatformProviderCall).count() == 0
         job = db.query(TranscriptionJob).one()
         assert db.query(UsageEvent).filter_by(operation_id=job.usage_attempt_id, credential_source="user").count() > 0
+    finally:
+        db.close()
+
+
+def test_usage_delivery_outage_does_not_fail_transcription_and_journal_replays(
+    db_context, monkeypatch, tmp_path,
+):
+    path = tmp_path / "ledger-outage.wav"
+    path.write_bytes(b"fixture audio")
+    transcription_id = _seed_local_job(db_context["session_factory"], path)
+    monkeypatch.setattr(transcription_worker, "SessionLocal", db_context["session_factory"])
+    monkeypatch.setattr(transcription_worker, "get_processing_service", _FakeProcessingService)
+
+    from src.services import usage_metering
+    from src.services import audio_storage
+
+    original_persist = usage_metering.persist_event
+    failures = []
+
+    def fail_one_delivery(db, data):
+        if not failures:
+            failures.append(data["id"])
+            raise RuntimeError("simulated usage event database outage")
+        return original_persist(db, data)
+
+    monkeypatch.setattr(usage_metering, "persist_event", fail_one_delivery)
+    monkeypatch.setattr(audio_storage, "reconcile_usage", lambda **_kwargs: {"pending": 0, "delivered": 0, "failed": 0})
+    result = transcription_worker.process_transcription_job_sync(transcription_id)
+    assert result["status"] == "completed"
+    assert failures
+
+    journal_path = spool_directory() / f"{failures[0]}.json"
+    assert journal_path.exists()
+    pending = reconcile_usage(apply=False, session_factory=db_context["session_factory"])
+    assert pending["pending"] >= 1 and pending["delivered"] == 0
+    assert journal_path.exists()
+
+    monkeypatch.setattr(usage_metering, "persist_event", original_persist)
+    applied = reconcile_usage(apply=True, session_factory=db_context["session_factory"])
+    assert applied["pending"] == pending["pending"]
+    assert applied["delivered"] == pending["pending"] and applied["failed"] == 0
+    assert not journal_path.exists()
+    db = db_context["session_factory"]()
+    try:
+        assert db.get(UsageEvent, failures[0]) is not None
+        assert db.get(Transcription, transcription_id).status == "completed"
     finally:
         db.close()

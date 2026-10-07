@@ -38,3 +38,20 @@ def test_unmetered_legacy_object_is_explicitly_unknown_not_zero(db_context):
     assert len(rows) == 2 and all(r.quantity is None for r in rows)
     assert all(r.user_id is None for r in rows)
     db.close()
+
+
+def test_storage_clock_reversal_is_unknown_not_zero(db_context):
+    db = db_context["session_factory"]()
+    record_object_put(db, "object:clock-fixture", 10, resource_id=7, user_id=1)
+    context = deletion_context(db, "object:clock-fixture")
+    assert record_object_delete(db, context, context["occurred_at"] - timedelta(seconds=1))
+    db.commit()
+    reconcile_usage(apply=True, session_factory=db_context["session_factory"])
+    assert db.query(UsageEvent).filter_by(metric="byte_seconds").one().quantity is None
+    db.close()
+
+
+def test_usage_journal_configuration_cannot_overlap_upload_cleanup(db_context, monkeypatch):
+    from src.config import settings
+    monkeypatch.setattr(settings, "USAGE_SPOOL_DIRECTORY", settings.AUDIO_UPLOAD_DIRECTORY + "/journal")
+    assert "USAGE_SPOOL_DIRECTORY must be a dedicated private directory outside audio uploads" in settings.validate_startup()
