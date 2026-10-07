@@ -13,6 +13,37 @@ _TRANSCRIPT_ID = re.compile(r"(?=.{1,128}$)[A-Za-z0-9-]+\Z")
 _TIMESTAMP_TOLERANCE_SECONDS = 0.1
 
 
+def _transcript_usage(
+    transcript: dict[str, Any], transcript_id: str, use_diarization: bool
+) -> dict[str, Any]:
+    event: dict[str, Any] = {
+        "phase": "polled",
+        "status": (
+            transcript.get("status")
+            if transcript.get("status") in {"completed", "error"}
+            else "unknown"
+        ),
+        "model": "universal-2",
+        "use_diarization": bool(use_diarization),
+    }
+    provider_id = transcript.get("id", transcript_id)
+    if (
+        isinstance(provider_id, str)
+        and _TRANSCRIPT_ID.fullmatch(provider_id)
+        and any(c.isalnum() for c in provider_id)
+    ):
+        event["provider_id"] = provider_id
+    duration = transcript.get("audio_duration")
+    if isinstance(duration, (int, float)) and not isinstance(duration, bool) and duration >= 0:
+        try:
+            finite = math.isfinite(duration)
+        except (OverflowError, TypeError):
+            finite = False
+        if finite:
+            event["audio_duration_seconds"] = duration
+    return event
+
+
 class AssemblyAIProcessingError(RuntimeError):
     """Safe provider failure with a stable, non-sensitive category."""
 
@@ -40,6 +71,7 @@ class AssemblyAIEngine:
         self.http_timeout = float(http_timeout)
         self.timeout_seconds = float(timeout_seconds)
         self.poll_interval = float(poll_interval)
+        self._usage_observer = None
         self.client = aai.Client(
             settings=aai.Settings(
                 api_key=api_key,
@@ -50,6 +82,18 @@ class AssemblyAIEngine:
         )
         self.transcriber = aai.Transcriber(client=self.client)
         logger.info("AssemblyAI engine initialized in worker")
+
+    def set_usage_observer(self, callback) -> None:
+        """Set an optional observer for safe provider usage metadata."""
+        self._usage_observer = callback
+
+    def _observe_usage(self, event: dict[str, Any]) -> None:
+        if self._usage_observer is None:
+            return
+        try:
+            self._usage_observer(event)
+        except Exception as exc:
+            logger.warning("Provider usage observer failed (%s)", type(exc).__name__)
 
     def transcribe_file(
         self,
@@ -69,6 +113,10 @@ class AssemblyAIEngine:
             ),
         )
         deadline = time.monotonic() + self.timeout_seconds
+        self._observe_usage({
+            "phase": "submitted", "status": "unknown", "model": "universal-2",
+            "use_diarization": bool(use_diarization),
+        })
         try:
             submitted = self.transcriber.submit(audio_path, config=config)
         except Exception as exc:
@@ -82,7 +130,15 @@ class AssemblyAIEngine:
         ):
             raise AssemblyAIProcessingError("invalid_response")
 
-        transcript = self._poll(transcript_id, deadline)
+        try:
+            transcript = self._poll(transcript_id, deadline)
+        except AssemblyAIProcessingError:
+            self._observe_usage({
+                "phase": "polled", "status": "unknown", "model": "universal-2",
+                "use_diarization": bool(use_diarization), "provider_id": transcript_id,
+            })
+            raise
+        self._observe_usage(_transcript_usage(transcript, transcript_id, use_diarization))
         if transcript.get("status") != "completed":
             code = _state_error_code(transcript.get("error"))
             raise AssemblyAIProcessingError(code)

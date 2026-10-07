@@ -6,3 +6,5 @@ httpx==0.28.1
 numpy<2
 # Existing Worker SDK required by mocked adapter/BYOK tests; no provider calls.
 assemblyai==0.40.2
+# Existing Worker SDK exercised with mocked responses, never real API calls.
+google-generativeai==0.8.5
