@@ -38,12 +38,27 @@ export const firebaseAuth = {
     return result.user.getIdToken()
   },
 
-  async getToken() {
+  async getToken(forceRefresh = false) {
     const authContext = await getAuthContextOrNull()
     if (!authContext) return null
 
     await authContext.ready
-    return authContext.auth.currentUser?.getIdToken() ?? null
+    return authContext.auth.currentUser?.getIdToken(forceRefresh) ?? null
+  },
+
+  async getTokenContext(forceRefresh = false) {
+    const authContext = await getAuthContextOrNull()
+    if (!authContext) return null
+    await authContext.ready
+    const user = authContext.auth.currentUser
+    if (!user) return null
+    const token = await user.getIdToken(forceRefresh)
+    if (authContext.auth.currentUser?.uid !== user.uid) {
+      const error = new Error('A conta mudou. Tente novamente.')
+      error.code = 'auth/account-changed'
+      throw error
+    }
+    return { token, uid: user.uid }
   },
 
   async signOut() {
@@ -59,7 +74,7 @@ export const firebaseAuth = {
     if (!authContext) return () => {}
 
     await authContext.ready
-    return authContext.sdk.onIdTokenChanged(authContext.auth, (user) => callback(Boolean(user)))
+    return authContext.sdk.onIdTokenChanged(authContext.auth, (user) => callback(Boolean(user), user?.uid ?? null))
   },
 }
 

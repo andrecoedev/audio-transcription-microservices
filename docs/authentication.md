@@ -100,6 +100,26 @@ apague ou recrie contas para alternar o provider.
 
 ## Sessão, endpoints e rollback
 
+A persistência Google usa `browserLocalPersistence` e `authStateReady` do SDK
+oficial. Cada request obtém um ID Token pelo SDK; se o servidor retornar 401,
+o frontend força uma renovação e repete a solicitação no máximo uma vez,
+somente para a mesma conta interna e Firebase UID. Provas Guest e headers
+explícitos não são substituídos. Uma segunda rejeição encerra a sessão;
+revogação e usuário desabilitado continuam verificados pelo Admin SDK.
+Não há token eterno nem cópia manual de credenciais Firebase no storage da UI.
+
+Uma falha transitória de rede/verificação não apaga a sessão SDK. No startup,
+a aplicação mostra uma ação para tentar novamente e não renderiza os recursos
+privados até verificar a identidade interna. Logout explícito não pode ser
+desfeito por uma restauração em andamento. Mudanças de conta/logout em outras
+abas são observadas pelo SDK, com nova verificação da identidade quando preciso.
+A rota e o contexto Guest da aba são preservados para continuar após autenticar.
+O contrato JWT das contas locais existentes não recebeu refresh ilimitado.
+
+Referências: [persistência oficial](https://firebase.google.com/docs/auth/web/auth-state-persistence)
+e [getIdToken/renovação oficial](https://firebase.google.com/docs/reference/js/auth.user#getidtoken).
+Testes usam SDK/API simulados; não comprovam configuração Google/ADC em produção.
+
 `POST /auth/firebase` recebe somente o ID Token no header Bearer, verifica a
 identidade e resolve/cria o usuário interno. Não emite outro JWT para contornar
 revogação. Requests privados Firebase usam ID Token atualizado pelo SDK e são

@@ -35,22 +35,37 @@ function App() {
     logout,
   } = useAuthStore()
   const [bootstrapped, setBootstrapped] = useState(false)
+  const [sessionError, setSessionError] = useState(false)
+  const [sessionRetry, setSessionRetry] = useState(0)
 
   useEffect(() => {
     let disposed = false
     let unsubscribe
+    let observedUid
     const bootstrap = async () => {
+      setSessionError(false)
       try {
         await restoreSession()
         if (!disposed) {
-          unsubscribe = await firebaseAuth.observe((signedIn) => {
+          unsubscribe = await firebaseAuth.observe((signedIn, uid) => {
+            const accountChanged = observedUid !== undefined && uid !== observedUid
+            observedUid = uid
             if (!signedIn && useAuthStore.getState().authProvider === 'firebase') logout()
+            if (signedIn && accountChanged && useAuthStore.getState().authProvider === 'firebase') {
+              setBootstrapped(false)
+              restoreSession().catch(() => {
+                if (!disposed) setSessionError(true)
+              }).finally(() => {
+                if (!disposed) setBootstrapped(true)
+              })
+            }
           })
           if (disposed) unsubscribe()
         }
       } catch {
-        // Fail closed: API unavailability never creates an anonymous session.
-        logout()
+        // Keep the SDK session/context on temporary outages, but do not render
+        // protected content until the API has verified the internal identity.
+        if (!disposed) setSessionError(true)
       } finally {
         if (!disposed) setBootstrapped(true)
       }
@@ -58,7 +73,17 @@ function App() {
 
     bootstrap()
     return () => { disposed = true; unsubscribe?.() }
-  }, [logout])
+  }, [logout, sessionRetry])
+
+  if (sessionError) {
+    return <div role="alert" className="mx-auto max-w-md p-6 text-gray-700">
+      <p>Não foi possível verificar sua sessão. Verifique sua conexão e tente novamente.</p>
+      <button type="button" className="btn-primary mt-4" onClick={() => {
+        setBootstrapped(false)
+        setSessionRetry((value) => value + 1)
+      }}>Tentar novamente</button>
+    </div>
+  }
 
   if (!bootstrapped) {
     return <p role="status" className="p-6 text-gray-600">Verificando sessão...</p>

@@ -12,6 +12,24 @@ beforeEach(() => {
   useAuthStore.getState().logout()
 })
 describe('Firebase session boundaries', () => {
+  it('preserves renewable session metadata on an API outage without granting a new identity', async () => {
+    useAuthStore.getState().setFirebaseSession(user)
+    firebaseAuth.getToken.mockResolvedValue('synthetic-proof')
+    authService.me.mockRejectedValue({ status: 503 })
+    await expect(restoreSession()).rejects.toMatchObject({ status: 503 })
+    expect(useAuthStore.getState().user.id).toBe(7)
+    expect(firebaseAuth.signOut).not.toHaveBeenCalled()
+  })
+  it('cannot restore an in-flight session after explicit logout', async () => {
+    useAuthStore.getState().setFirebaseSession(user)
+    firebaseAuth.getToken.mockResolvedValue('synthetic-proof')
+    authService.me.mockImplementation(async () => {
+      useAuthStore.getState().logout()
+      return { authenticated: true, user }
+    })
+    await restoreSession()
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+  })
   it('restores a verified internal user without copying Firebase credentials to app storage', async () => {
     useAuthStore.getState().setFirebaseSession(user)
     firebaseAuth.getToken.mockResolvedValue('synthetic-runtime-proof')
