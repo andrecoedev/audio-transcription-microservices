@@ -146,6 +146,35 @@ def test_worker_persists_queued_processing_completed(
         db.close()
 
 
+def test_worker_preserves_manually_edited_meeting_title(db_context, monkeypatch, tmp_path):
+    input_path = tmp_path / "input.wav"
+    input_path.write_bytes(b"audio")
+    transcription_id = _seed_worker_job(
+        db_context["session_factory"], input_path
+    )
+    db = db_context["session_factory"]()
+    db.add(Meeting(id=transcription_id, title="Título escolhido manualmente"))
+    db.commit()
+    db.close()
+
+    monkeypatch.setattr(
+        transcription_worker, "SessionLocal", db_context["session_factory"]
+    )
+    transcription_worker._persist_completed_job(
+        transcription_id,
+        ProcessingResult(
+            segments=[], duration_seconds=1.0, num_speakers=0, word_count=0
+        ),
+        processing_time=0.5,
+    )
+
+    db = db_context["session_factory"]()
+    try:
+        assert db.get(Meeting, transcription_id).title == "Título escolhido manualmente"
+    finally:
+        db.close()
+
+
 def test_worker_persists_queued_processing_failed(
     db_context, monkeypatch, tmp_path
 ):

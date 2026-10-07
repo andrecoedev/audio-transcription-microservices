@@ -1,7 +1,7 @@
 """Validação e persistência segura de uploads de áudio/vídeo."""
 
 import logging
-import re
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,7 +16,6 @@ from ..services.object_storage import ObjectStorage, StorageError
 logger = logging.getLogger(__name__)
 
 _CHUNK_SIZE = 1024 * 1024
-_SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._ -]+")
 
 
 class UploadValidationError(ValueError):
@@ -66,10 +65,28 @@ class _LimitedUploadReader:
 
 
 def sanitize_filename(filename: str | None) -> str:
-    """Remove componentes de caminho e caracteres inadequados para exibição."""
+    """Keep the visible basename while removing paths and unsafe format controls."""
     basename = Path((filename or "upload").replace("\\", "/")).name
-    sanitized = _SAFE_FILENAME_RE.sub("_", basename).strip(" .")
-    return sanitized[:255] or "upload"
+    basename = "".join(
+        character
+        for character in basename
+        if unicodedata.category(character) not in {"Cc", "Cf"}
+    )
+    if basename in {"", ".", ".."}:
+        return "upload"
+    if len(basename) <= 255:
+        return basename
+
+    suffix = Path(basename).suffix
+    extension = suffix[1:]
+    if (
+        len(suffix) <= 11
+        and extension
+        and extension.isascii()
+        and extension.isalnum()
+    ):
+        return basename[: 255 - len(suffix)] + suffix
+    return basename[:255]
 
 
 def _detected_format(header: bytes) -> str | None:

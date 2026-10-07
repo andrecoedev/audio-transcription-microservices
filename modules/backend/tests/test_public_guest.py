@@ -144,10 +144,13 @@ def test_guest_isolation_private_routes_and_safe_conversion(db_context, auth_hea
     client = db_context["client"]
     guest = guest_headers(client)
     other = guest_headers(client)
-    job = client.post("/guest/transcriptions/jobs", headers=guest, files={"file": ("test.wav", wav_bytes)})
+    filename = "Reunião de equipe.wav"
+    job = client.post("/guest/transcriptions/jobs", headers=guest, files={"file": (filename, wav_bytes)})
     assert job.status_code == 202
     tid = job.json()["id"]
-    assert client.get(f"/guest/transcriptions/{tid}", headers=guest).status_code == 200
+    guest_result = client.get(f"/guest/transcriptions/{tid}", headers=guest)
+    assert guest_result.status_code == 200
+    assert guest_result.json()["original_filename"] == filename
     assert client.get(f"/guest/transcriptions/{tid}", headers=other).status_code == 404
     assert client.get(f"/transcriptions/{tid}", headers=guest).status_code == 401
     assert client.get(f"/transcriptions/{tid}", headers=auth_headers()).status_code == 404
