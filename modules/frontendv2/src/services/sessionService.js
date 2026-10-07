@@ -18,6 +18,8 @@ export async function restoreSession() {
   if (!token) { store.logout(); return }
   let response
   try { response = await authService.me() } catch (error) {
+    const current = useAuthStore.getState()
+    if (current.authProvider !== store.authProvider || current.user?.id !== store.user?.id) return
     if (error.status === 401) { store.logout(); return }
     throw error
   }

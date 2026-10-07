@@ -12,6 +12,17 @@ beforeEach(() => {
   useAuthStore.getState().logout()
 })
 describe('Firebase session boundaries', () => {
+  it('does not log out a new account when an old restoration receives 401', async () => {
+    useAuthStore.getState().setFirebaseSession(user)
+    firebaseAuth.getToken.mockResolvedValue('synthetic-proof')
+    authService.me.mockImplementation(async () => {
+      useAuthStore.getState().setFirebaseSession({ ...user, id: 8 })
+      throw { status: 401 }
+    })
+    await restoreSession()
+    expect(useAuthStore.getState().user.id).toBe(8)
+    expect(firebaseAuth.signOut).not.toHaveBeenCalled()
+  })
   it('preserves renewable session metadata on an API outage without granting a new identity', async () => {
     useAuthStore.getState().setFirebaseSession(user)
     firebaseAuth.getToken.mockResolvedValue('synthetic-proof')
