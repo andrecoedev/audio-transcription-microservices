@@ -265,3 +265,35 @@ def test_usage_events_and_journal_do_not_capture_content_or_credentials(
         assert "synthetic-api-key" not in str(event.__dict__)
     finally:
         db.close()
+
+
+def test_older_gemini_sdk_unclassified_tokens_are_not_guessed_or_priced(db_context):
+    recorder = usage_metering.UsageRecorder(
+        operation_id="old-sdk-categories", resource_type="meeting", resource_id="7", operation="intelligence",
+        provider="gemini", credential_source="user", model="gemini-test", user_id=1,
+        session_factory=db_context["session_factory"])
+    recorder.provider_response(dict(status="response", prompt_tokens=100, candidates_tokens=10,
+                                    total_tokens=150, cached_tokens=0))
+    with db_context["session_factory"]() as db:
+        rows = {r.metric: r for r in db.query(UsageEvent).all()}
+        assert rows["unclassified_tokens"].quantity == Decimal(40)
+        assert rows["unclassified_tokens"].estimated_cost is None
+        assert rows["thinking_tokens"].quantity is None
+        assert rows["tool_tokens"].quantity is None
+        assert rows["input_uncached_tokens"].quantity == Decimal(100)
+
+
+def test_journal_disk_failure_falls_back_to_database_without_breaking_result(db_context, monkeypatch):
+    monkeypatch.setattr(usage_metering, "_journal", lambda _data: (_ for _ in ()).throw(OSError("synthetic disk fault")))
+    identifier = _record(db_context["session_factory"], operation_id="disk-fault")
+    assert identifier
+    with db_context["session_factory"]() as db:
+        assert db.get(UsageEvent, identifier).quantity == Decimal(2)
+
+
+def test_identifier_cannot_be_reused_for_different_resource(db_context):
+    identifier = _record(db_context["session_factory"], operation_id="conflicting-identity", resource_id="7")
+    assert identifier
+    assert _record(db_context["session_factory"], operation_id="conflicting-identity", resource_id="8") is None
+    with db_context["session_factory"]() as db:
+        assert db.query(UsageEvent).one().resource_id == "7"

@@ -8,7 +8,7 @@ import logging
 import os
 import re
 from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path
 from uuid import UUID, uuid4, uuid5
 
@@ -38,7 +38,9 @@ def decimal_quantity(value):
         raise ValueError("Invalid usage quantity") from None
     if not number.is_finite() or number < 0 or number >= Decimal("1e21"):
         raise ValueError("Invalid usage quantity")
-    return number.quantize(Decimal("0.000000001"))
+    with localcontext() as context:
+        context.prec = 60
+        return number.quantize(Decimal("0.000000001"))
 
 
 def event_id(operation_id, metric, phase):
@@ -79,9 +81,14 @@ def _freeze_cost(db, data):
         data["cost_reason"] = "ambiguous_price"
         return
     rate = matches[0]
-    amount = (Decimal(data["quantity"]) * rate.unit_price / rate.unit_quantity).quantize(Decimal("0.000000000001"))
+    with localcontext() as context:
+        context.prec = 70
+        amount = (Decimal(data["quantity"]) * rate.unit_price / rate.unit_quantity).quantize(Decimal("0.000000000001"))
+    if amount >= Decimal("1e18"):
+        data["cost_reason"] = "estimate_out_of_range"
+        return
     data.update(price_id=rate.id, currency=rate.currency, estimated_cost=str(amount),
-                cost_scope="customer" if data["credential_source"] == "user" else "usagi",
+                cost_scope="customer" if data["credential_source"] == "user" and data["metric"] != "processing_seconds" else "usagi",
                 cost_reason="configured_estimate_not_invoice")
 
 
@@ -91,7 +98,9 @@ def _journal(data):
     target = root / (data["id"] + ".json")
     # Each event is prepared once; replay never selects newer prices or timestamps.
     if target.exists():
-        return target, _read_journal(target)
+        existing = _read_journal(target)
+        _verify_context(existing, data)
+        return target, existing
     temporary = root / (data["id"] + "." + uuid4().hex + ".tmp")
     try:
         with temporary.open("x", encoding="utf-8") as handle:
@@ -103,7 +112,9 @@ def _journal(data):
         try:
             os.link(temporary, target)
         except FileExistsError:
-            data = _read_journal(target)
+            existing = _read_journal(target)
+            _verify_context(existing, data)
+            data = existing
         if os.name != "nt":
             descriptor = os.open(root, os.O_RDONLY)
             try:
@@ -128,12 +139,31 @@ def _read_journal(path):
     if data["credential_source"] not in {"user", "platform", "local", "none"} or data["status"] not in {"started", "completed", "failed", "cancelled", "unknown"}:
         raise ValueError("Invalid usage journal state")
     decimal_quantity(data["quantity"])
+    for field in ("user_id",):
+        if data[field] is not None and (type(data[field]) is not int or data[field] <= 0):
+            raise ValueError("Invalid usage identity")
+    if data["guest_session_id"] is not None and not _LABEL.fullmatch(data["guest_session_id"]):
+        raise ValueError("Invalid usage context")
+    if not isinstance(data["model"], str) or len(data["model"]) > 100:
+        raise ValueError("Invalid usage model")
+    when = datetime.fromisoformat(data["occurred_at"])
+    if when.tzinfo is None:
+        raise ValueError("Invalid usage timestamp")
     return data
+
+
+def _verify_context(existing, proposed):
+    for key in ("operation_id", "resource_type", "resource_id", "operation", "provider", "credential_source", "metric", "unit", "model", "guest_session_id"):
+        value = existing[key] if isinstance(existing, dict) else getattr(existing, key)
+        if value != proposed[key]:
+            raise ValueError("Usage identifier belongs to another context")
 
 
 def persist_event(db, data):
     """A unique ID makes concurrent/repeated delivery a no-op; never reprice."""
-    if db.get(UsageEvent, data["id"]) is not None:
+    existing = db.get(UsageEvent, data["id"])
+    if existing is not None:
+        _verify_context(existing, data)
         return False
     values = dict(data)
     values["occurred_at"] = datetime.fromisoformat(values["occurred_at"])
@@ -141,7 +171,9 @@ def persist_event(db, data):
         values[field] = Decimal(values[field]) if values[field] is not None else None
     # Replayed events must not resurrect deleted users or steal a Guest context.
     if values["guest_session_id"]:
-        guest = db.get(GuestSession, values["guest_session_id"])
+        # Serialize with Guest conversion: no event can arrive just after the
+        # claim's ownership update while still carrying an unclaimed identity.
+        guest = db.query(GuestSession).filter_by(id=values["guest_session_id"]).with_for_update().first()
         values["user_id"] = guest.claimed_by_user_id if guest else None
     if values["user_id"] is not None and db.get(User, values["user_id"]) is None:
         values["user_id"] = None
@@ -150,8 +182,10 @@ def persist_event(db, data):
             db.add(UsageEvent(**values))
             db.flush()
     except IntegrityError:
-        if db.get(UsageEvent, data["id"]) is None:
+        existing = db.get(UsageEvent, data["id"])
+        if existing is None:
             raise
+        _verify_context(existing, data)
         return False
     return True
 
@@ -183,7 +217,17 @@ def record_event(*, operation_id, resource_type, resource_id, operation, provide
                     _freeze_cost(db, data)
         except Exception as exc:
             logger.warning("Usage pricing unavailable (%s)", type(exc).__name__)
-        path, data = _journal(data)
+        try:
+            path, data = _journal(data)
+        except OSError as exc:
+            if journal_only:
+                raise
+            # Disk failure must not lose measurements when PostgreSQL is healthy.
+            logger.warning("Usage journal unavailable; attempting direct durable delivery (%s)", type(exc).__name__)
+            with factory() as db:
+                persist_event(db, data)
+                db.commit()
+            return data["id"]
         if journal_only:
             return data["id"]
         with factory() as db:
@@ -192,7 +236,7 @@ def record_event(*, operation_id, resource_type, resource_id, operation, provide
         path.unlink(missing_ok=True)
         return data["id"]
     except Exception as exc:
-        logger.error("Usage delivery deferred; reconcile private journal (%s)", type(exc).__name__)
+        logger.error("Usage delivery failed; reconcile journal or review unknown attempt (%s)", type(exc).__name__)
         return None
 
 
@@ -248,4 +292,13 @@ class UsageRecorder:
             prompt, cached = event.get("prompt_tokens"), event.get("cached_tokens")
             uncached = prompt - cached if isinstance(prompt, int) and isinstance(cached, int) and 0 <= cached <= prompt else None
             self.record("input_uncached_tokens", "token", uncached, status=status, measurement_source="derived_provider_counts")
+            total, output, thinking = event.get("total_tokens"), event.get("candidates_tokens"), event.get("thoughts_tokens")
+            residual = None
+            if all(type(value) is int for value in (total, prompt, output)):
+                remainder = total - prompt - output - (thinking if type(thinking) is int else 0)
+                if remainder >= 0:
+                    residual = remainder
+            # Older SDKs discard newer categories. Preserve the arithmetic gap
+            # without guessing that it represents thinking or pricing it twice.
+            self.record("unclassified_tokens", "token", residual, status=status, measurement_source="derived_provider_counts")
             self.record("provider_latency_seconds", "second", event.get("elapsed_seconds"), status=status)
