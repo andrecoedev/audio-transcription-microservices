@@ -15,7 +15,8 @@ import Button from '../components/Button'
 import ProcessingStatus from '../components/ProcessingStatus'
 import PageHeader from '../components/PageHeader'
 import { audioService } from '../services/audioService'
-import { formatDuration, formatNumber } from '../utils/format'
+import { requestErrorMessage } from '../services/requestError'
+import { formatDuration, formatNumber, formatSeconds, getDisplayFilename } from '../utils/format'
 import toast from 'react-hot-toast'
 
 export default function TranscriptionDetail() {
@@ -25,6 +26,7 @@ export default function TranscriptionDetail() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [copied, setCopied] = useState(false)
+  const displayFilename = getDisplayFilename(transcription)
   const canExportTranscript = transcription?.status === 'completed' && Boolean(transcription?.segments?.length)
 
   const loadTranscription = useCallback(async ({ silent = false } = {}) => {
@@ -82,7 +84,7 @@ export default function TranscriptionDetail() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${transcription.filename}_transcricao.txt`
+    a.download = `${displayFilename}_transcricao.txt`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -92,7 +94,7 @@ export default function TranscriptionDetail() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${transcription.filename}_transcricao.json`
+    a.download = `${displayFilename}_transcricao.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -109,7 +111,7 @@ export default function TranscriptionDetail() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${transcription.filename}_legendas.vtt`
+    a.download = `${displayFilename}_legendas.vtt`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -119,7 +121,7 @@ export default function TranscriptionDetail() {
     transcription.segments.forEach((seg, i) => {
       srt += `${i + 1}\n${formatSubtitleTime(seg.start, ',')} --> ${formatSubtitleTime(seg.end, ',')}\n${seg.text}\n\n`
     })
-    downloadTextFile(srt, `${transcription.filename}_legendas.srt`, 'text/plain')
+    downloadTextFile(srt, `${displayFilename}_legendas.srt`, 'text/plain')
   }
 
   const formatSubtitleTime = (seconds, decimalSeparator) => {
@@ -173,7 +175,7 @@ export default function TranscriptionDetail() {
 
   if (['queued', 'processing'].includes(transcription.status)) {
     return <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader title="Transcrevendo áudio" description={`${transcription.filename} · ${formatDuration(transcription.duration_seconds)}`} />
+      <PageHeader title="Transcrevendo áudio" description={`${displayFilename} · ${formatDuration(transcription.duration_seconds)}`} />
       <ProcessingStatus status={transcription.status} />
       <Link to="/transcriptions" className="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-900">
         <ArrowLeft className="mr-2 h-4 w-4" />Voltar ao histórico
@@ -195,7 +197,7 @@ export default function TranscriptionDetail() {
             Voltar
           </Button>
           <div className="min-w-0">
-            <h1 className="break-all text-3xl font-bold text-gray-900">{transcription.filename}</h1>
+            <h1 className="break-all text-3xl font-bold text-gray-900">{displayFilename}</h1>
             <p className="text-gray-600 mt-1">
               Criado em {new Date(transcription.created_at).toLocaleString('pt-BR')}
             </p>
@@ -206,7 +208,7 @@ export default function TranscriptionDetail() {
               </Link>
             )}
             {transcription.status === 'failed' && <p role="alert" className="text-red-700 mt-2">
-              O processamento falhou. Envie uma nova transcrição para tentar novamente.
+              {requestErrorMessage(500, transcription.error_message || 'Transcription processing failed')}
             </p>}
           </div>
         </div>
@@ -240,7 +242,7 @@ export default function TranscriptionDetail() {
         <StatCard
           icon={Clock}
           label="Duração"
-          value={`${transcription.duration_seconds?.toFixed(1)}s`}
+          value={formatSeconds(transcription.duration_seconds)}
         />
         <StatCard
           icon={FileText}
@@ -281,7 +283,7 @@ export default function TranscriptionDetail() {
                     </span>
                   </div>
                   <span className="text-sm text-gray-500">
-                    {segment.start?.toFixed(1)}s - {segment.end?.toFixed(1)}s
+                    {formatSeconds(segment.start)} - {formatSeconds(segment.end)}
                   </span>
                 </div>
                 <p className="break-words text-gray-800 leading-relaxed">{segment.text}</p>
