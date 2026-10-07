@@ -10,6 +10,9 @@ from sqlalchemy import or_
 
 from ..models import ObjectDeletion, TranscriptionJob
 from .object_storage import LocalObjectStorage, StorageError
+from .usage_storage import deletion_context, record_object_delete
+from .usage_metering import reconcile_usage
+from sqlalchemy.orm import sessionmaker
 
 logger = logging.getLogger(__name__)
 _OBJECT_PREFIX = "object:"
@@ -91,6 +94,7 @@ def retry_audio_cleanup(db, *, reference=None, apply=False, storage=None, limit=
             continue
         row.attempts += 1
         row.last_attempt_at = datetime.now(timezone.utc)
+        usage_context = deletion_context(db, row.reference)
         try:
             if row.reference.startswith(_OBJECT_PREFIX):
                 (storage or get_audio_storage()).delete(row.reference[len(_OBJECT_PREFIX):])
@@ -100,10 +104,16 @@ def retry_audio_cleanup(db, *, reference=None, apply=False, storage=None, limit=
             logger.warning("Audio cleanup deferred; durable retry retained")
             result["failed"] += 1
         else:
-            db.delete(row)
-            result["deleted"] += 1
+            # Capture a durable measurement before discarding the retry intent.
+            # On journal failure, the missing object succeeds on the next retry.
+            if record_object_delete(db, usage_context, datetime.now(timezone.utc)):
+                db.delete(row)
+                result["deleted"] += 1
+            else:
+                result["failed"] += 1
     if apply:
         db.commit()
+        reconcile_usage(apply=True, limit=100, session_factory=sessionmaker(bind=db.get_bind()))
     return result
 
 

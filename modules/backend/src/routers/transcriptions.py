@@ -275,6 +275,10 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
         )
         db.commit()
 
+        from ..services.usage_storage import record_object_put
+        record_object_put(db, "object:" + saved_upload.key, saved_upload.size_bytes,
+            resource_id=transcription.id, user_id=current_user.user_id if current_user else None,
+            guest_session_id=guest_session.id if guest_session else None)
         try:
             queue.enqueue(
                 "src.workers.transcription_worker.process_transcription_job_sync",
