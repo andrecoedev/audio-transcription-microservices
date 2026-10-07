@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = Field(default=5, description="Temporary overflow connections")
     DB_POOL_TIMEOUT_SECONDS: int = Field(default=30, description="Pool checkout timeout")
     DB_POOL_RECYCLE_SECONDS: int = Field(default=1800, description="Connection recycle age")
+    USAGE_SPOOL_DIRECTORY: str = Field(default="database/usage-spool", description="Private durable usage journal, shared by API and Worker")
     
     # Redis & Job Queue
     REDIS_URL: str = Field(
@@ -251,6 +252,14 @@ class Settings(BaseSettings):
     def validate_startup(self, *, require_api_security: bool = True) -> list[str]:
         """Valida configurações obrigatórias para startup seguro."""
         errors: list[str] = []
+
+        backend_root = Path(__file__).resolve().parents[1]
+        spool = Path(self.USAGE_SPOOL_DIRECTORY)
+        uploads = Path(self.AUDIO_UPLOAD_DIRECTORY)
+        spool = (spool if spool.is_absolute() else backend_root / spool).resolve()
+        uploads = (uploads if uploads.is_absolute() else backend_root / uploads).resolve()
+        if not self.USAGE_SPOOL_DIRECTORY.strip() or spool == backend_root or spool.parent == spool or spool.is_relative_to(uploads):
+            errors.append("USAGE_SPOOL_DIRECTORY must be a dedicated private directory outside audio uploads")
 
         if not self.DATABASE_URL or not self.DATABASE_URL.strip():
             errors.append("DATABASE_URL is required")

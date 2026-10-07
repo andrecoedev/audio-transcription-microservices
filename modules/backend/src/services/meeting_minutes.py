@@ -3,6 +3,7 @@ Serviço de geração de atas de reunião usando IA (Gemini).
 """
 
 import logging
+import math
 import time
 import google.generativeai as genai
 from typing import Dict, List, Optional
@@ -22,7 +23,36 @@ class MeetingMinutesGenerator:
             api_key: Chave da API do Google Gemini
         """
         self.api_key = api_key
+        self._usage_observer = None
         self._configure()
+
+    def set_usage_observer(self, callback) -> None:
+        """Set an optional observer for safe provider usage metadata."""
+        self._usage_observer = callback
+
+    def _observe_usage(self, response=None, *, started: float, status: str) -> None:
+        if self._usage_observer is None:
+            return
+        elapsed = time.monotonic() - started
+        event = {"status": status, "model": settings.GEMINI_MODEL}
+        if math.isfinite(elapsed) and elapsed >= 0:
+            event["elapsed_seconds"] = elapsed
+        usage = getattr(response, "usage_metadata", None) if response is not None else None
+        for event_name, field_name in (
+            ("prompt_tokens", "prompt_token_count"),
+            ("candidates_tokens", "candidates_token_count"),
+            ("total_tokens", "total_token_count"),
+            ("thoughts_tokens", "thoughts_token_count"),
+            ("cached_tokens", "cached_content_token_count"),
+            ("tool_use_prompt_tokens", "tool_use_prompt_token_count"),
+        ):
+            count = getattr(usage, field_name, None)
+            if isinstance(count, int) and not isinstance(count, bool) and count >= 0:
+                event[event_name] = count
+        try:
+            self._usage_observer(event)
+        except Exception as exc:
+            logger.warning("Provider usage observer failed (%s)", type(exc).__name__)
     
     def _configure(self):
         """Configura o cliente Gemini."""
@@ -38,11 +68,16 @@ class MeetingMinutesGenerator:
     def generate_intelligence(self, prompt: str) -> str:
         """Reuse the Gemini client; domain validation occurs in the Worker."""
         started = time.monotonic()
-        response = self.model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json", "temperature": 0.1, "max_output_tokens": 16384},
-            request_options={"timeout": min(settings.MEETING_MINUTES_TIMEOUT_SECONDS, 300), "retry": None},
-        )
+        try:
+            response = self.model.generate_content(
+                prompt,
+                generation_config={"response_mime_type": "application/json", "temperature": 0.1, "max_output_tokens": 16384},
+                request_options={"timeout": min(settings.MEETING_MINUTES_TIMEOUT_SECONDS, 300), "retry": None},
+            )
+        except Exception:
+            self._observe_usage(started=started, status="unknown")
+            raise
+        self._observe_usage(response, started=started, status="response")
         usage = getattr(response, "usage_metadata", None)
         logger.info(
             "Gemini intelligence metrics model=%s latency_seconds=%.3f input_tokens=%s output_tokens=%s total_tokens=%s retries=0",
@@ -142,7 +177,13 @@ Por favor, analise a transcrição acima e gere uma ata de reunião completa e e
 
             # Gerar ata
             logger.info("🤖 Gerando ata de reunião com Gemini...")
-            response = self.model.generate_content(prompt)
+            started = time.monotonic()
+            try:
+                response = self.model.generate_content(prompt)
+            except Exception:
+                self._observe_usage(started=started, status="unknown")
+                raise
+            self._observe_usage(response, started=started, status="response")
             
             if not response.text:
                 raise ValueError("Gemini retornou resposta vazia")

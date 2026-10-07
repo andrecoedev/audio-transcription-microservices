@@ -15,6 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -289,6 +290,7 @@ class TranscriptionJob(Base):
     credential_id = Column(String(36), ForeignKey("user_provider_credentials.id", ondelete="SET NULL"), nullable=True)
     credential_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     provider_attempted_at = Column(DateTime(timezone=True), nullable=True)
+    usage_attempt_id = Column(String(36), nullable=True)
     use_diarization = Column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
@@ -500,6 +502,7 @@ class MeetingIntelligence(Base):
     credential_source = Column(String(16), nullable=False, default="platform", server_default="platform")
     credential_id = Column(String(36), ForeignKey("user_provider_credentials.id", ondelete="SET NULL"), nullable=True)
     credential_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    usage_attempt_id = Column(String(36), nullable=True)
     status = Column(String(20), nullable=False, default="pending")
     result = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
     source_metadata = Column(JSON().with_variant(JSONB, "postgresql"), nullable=False)
@@ -510,6 +513,72 @@ class MeetingIntelligence(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     meeting = relationship("Meeting", back_populates="intelligence_revisions")
+
+
+class UsagePrice(Base):
+    """Append-only operator-supplied rate; not a commercial price or invoice."""
+
+    __tablename__ = "usage_prices"
+    __table_args__ = (
+        CheckConstraint("unit_price >= 0 AND unit_quantity > 0", name="ck_usage_price_amounts"),
+        CheckConstraint("effective_until IS NULL OR effective_until > effective_from", name="ck_usage_price_period"),
+        UniqueConstraint("catalog_version", "provider", "model", "metric", "unit", name="uq_usage_price_version_metric"),
+    )
+    id = Column(String(36), primary_key=True)
+    catalog_version = Column(String(64), nullable=False)
+    provider = Column(String(32), nullable=False)
+    model = Column(String(100), nullable=False)
+    metric = Column(String(64), nullable=False)
+    unit = Column(String(32), nullable=False)
+    currency = Column(String(3), nullable=False)
+    unit_price = Column(Numeric(30, 12), nullable=False)
+    unit_quantity = Column(Numeric(30, 9), nullable=False)
+    effective_from = Column(DateTime(timezone=True), nullable=False)
+    effective_until = Column(DateTime(timezone=True), nullable=True)
+    source = Column(String(500), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class UsageEvent(Base):
+    """Immutable measurement and frozen cost estimate, without content/secrets.
+
+    Owner can be transferred only through the existing Guest claim contract or
+    anonymized on account deletion. Resource IDs deliberately survive deletion.
+    """
+
+    __tablename__ = "usage_events"
+    __table_args__ = (
+        CheckConstraint("quantity IS NULL OR quantity >= 0", name="ck_usage_quantity"),
+        CheckConstraint("estimated_cost IS NULL OR estimated_cost >= 0", name="ck_usage_cost"),
+        CheckConstraint("credential_source IN ('user', 'platform', 'local', 'none')", name="ck_usage_source"),
+        CheckConstraint("status IN ('started', 'completed', 'failed', 'cancelled', 'unknown')", name="ck_usage_status"),
+        Index("ix_usage_owner_time", "user_id", "occurred_at"),
+        Index("ix_usage_operation", "operation_id"),
+        Index("ix_usage_guest", "guest_session_id"),
+    )
+    id = Column(String(36), primary_key=True)
+    operation_id = Column(String(100), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    guest_session_id = Column(String(36), nullable=True)
+    resource_type = Column(String(32), nullable=False)
+    resource_id = Column(String(100), nullable=False)
+    operation = Column(String(32), nullable=False)
+    provider = Column(String(32), nullable=False)
+    credential_source = Column(String(16), nullable=False)
+    metric = Column(String(64), nullable=False)
+    unit = Column(String(32), nullable=False)
+    quantity = Column(Numeric(30, 9), nullable=True)
+    status = Column(String(16), nullable=False)
+    occurred_at = Column(DateTime(timezone=True), nullable=False)
+    recorded_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    measurement_source = Column(String(32), nullable=False)
+    model = Column(String(100), nullable=False, default="")
+    use_diarization = Column(Boolean, nullable=True)
+    price_id = Column(String(36), ForeignKey("usage_prices.id", ondelete="RESTRICT"), nullable=True)
+    currency = Column(String(3), nullable=True)
+    estimated_cost = Column(Numeric(30, 12), nullable=True)
+    cost_scope = Column(String(16), nullable=False, default="unknown")
+    cost_reason = Column(String(64), nullable=False, default="no_configured_price")
 
 
 class AuditEvent(Base):

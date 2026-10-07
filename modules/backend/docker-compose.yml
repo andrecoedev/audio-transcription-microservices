@@ -1,5 +1,6 @@
 x-database-environment: &database-environment
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-transcription}:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/${POSTGRES_DB:-transcription_db}
+  USAGE_SPOOL_DIRECTORY: ${USAGE_SPOOL_DIRECTORY:-database/usage-spool}
 
 x-assemblyai-policy: &assemblyai-policy
   AAI_PLATFORM_ENABLED: ${AAI_PLATFORM_ENABLED:-false}

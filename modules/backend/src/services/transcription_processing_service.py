@@ -40,6 +40,17 @@ class TranscriptionProcessingService:
 
     def __init__(self, cloud_engine=None):
         self.cloud_engine = cloud_engine
+        self.usage_observer = None
+
+    def set_usage_observer(self, callback):
+        self.usage_observer = callback
+
+    def _observe(self, metric, quantity):
+        if self.usage_observer:
+            try:
+                self.usage_observer(metric, quantity)
+            except Exception as exc:
+                logger.warning("Processing usage observer failed (%s)", type(exc).__name__)
 
     def process_transcription(
         self,
@@ -59,6 +70,7 @@ class TranscriptionProcessingService:
             if max_duration_seconds and duration > max_duration_seconds:
                 raise PublicAudioDurationError("Audio exceeds the public duration limit")
             conversion_seconds = time.perf_counter() - conversion_started
+            self._observe("audio_seconds", duration)
             temporary_bytes = wav_path.stat().st_size
 
             if transcription_model == "assemblyai":
