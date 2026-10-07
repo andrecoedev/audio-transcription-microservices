@@ -4,6 +4,7 @@ import logging
 import time
 from contextlib import ExitStack
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from rq.exceptions import NoSuchJobError
 from rq.job import Job
@@ -14,6 +15,7 @@ from ..models import Meeting, MeetingSpeaker, Transcription, TranscriptionJob, T
 from ..services.processing_engines import initialize_processing_engines
 from ..services.audit import append_audit_event
 from ..services.platform_budget import begin_platform_call
+from ..services.usage_metering import UsageRecorder
 from ..services.provider_credentials import decrypt_credential
 from ..services.meeting_projection import ordered_segments, speaker_ids
 from ..services.audio_storage import input_reference, materialize_input, schedule_audio_cleanup, retry_audio_cleanup
@@ -87,6 +89,7 @@ def recover_pending_jobs(queue) -> int:
         for db_job in pending_jobs:
             rq_job_id = f"transcription_{db_job.transcription_id}"
             existing = None
+            rq_status = None
             try:
                 existing = Job.fetch(rq_job_id, connection=queue.connection)
             except NoSuchJobError:
@@ -107,6 +110,16 @@ def recover_pending_jobs(queue) -> int:
                 )
                 continue
 
+            interrupted_usage = None
+            if db_job.status == "processing" and db_job.usage_attempt_id:
+                owner = db.query(TranscriptionOwnership).filter_by(transcription_id=db_job.transcription_id).first()
+                interrupted_usage = UsageRecorder(operation_id=db_job.usage_attempt_id,
+                    user_id=owner.user_id if owner else None, guest_session_id=owner.guest_session_id if owner else None,
+                    resource_type="transcription", resource_id=db_job.transcription_id, operation="transcription",
+                    provider=db_job.transcription_model,
+                    credential_source="local" if db_job.transcription_model == "whisper" else db_job.credential_source,
+                    model="universal-2" if db_job.transcription_model == "assemblyai" else settings.WHISPER_MODEL,
+                    session_factory=SessionLocal)
             db_job.status = "queued"
             db_job.error_message = None
             db_job.started_at = None
@@ -116,6 +129,9 @@ def recover_pending_jobs(queue) -> int:
             transcription.error_message = None
             # Make the durable state visible before publishing the RQ message.
             db.commit()
+            if interrupted_usage:
+                interrupted_usage.record("attempt_status", "state", phase="terminal",
+                                         status="cancelled" if rq_status in {"canceled", "stopped"} else "unknown")
             queue.enqueue(
                 process_transcription_job_sync,
                 db_job.transcription_id,
@@ -155,6 +171,7 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
             return {"claim_status": "already_done"}
 
         now = datetime.now(timezone.utc)
+        attempt_id = str(uuid4())
         claimed = (
             db.query(TranscriptionJob)
             .filter(
@@ -166,6 +183,7 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
                     TranscriptionJob.status: "processing",
                     TranscriptionJob.error_message: None,
                     TranscriptionJob.started_at: now,
+                    TranscriptionJob.usage_attempt_id: attempt_id,
                     TranscriptionJob.completed_at: None,
                     TranscriptionJob.failed_at: None,
                 },
@@ -185,8 +203,12 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
             synchronize_session="fetch",
         )
         db.commit()
+        owner = db.query(TranscriptionOwnership).filter_by(transcription_id=transcription_id).first()
         return {
             "claim_status": "claimed",
+            "usage_attempt_id": attempt_id,
+            "usage_user_id": owner.user_id if owner else None,
+            "usage_guest_id": owner.guest_session_id if owner else None,
             "input_path": job.input_path,
             "input_object_key": job.input_object_key,
             "use_diarization": job.use_diarization,
@@ -313,6 +335,11 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
     """Run ML without an open DB transaction, then persist the result atomically."""
     reference: str | None = None
     claimed = False
+    usage = None
+    observed_engine = None
+    service = None
+    started_at = None
+    terminal_status = "failed"
     storage_context = ExitStack()
 
     try:
@@ -325,6 +352,14 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             return {"status": "already_processing"}
 
         claimed = True
+        usage = UsageRecorder(operation_id=claim["usage_attempt_id"],
+            user_id=claim["usage_user_id"], guest_session_id=claim["usage_guest_id"],
+            resource_type="transcription", resource_id=transcription_id, operation="transcription",
+            provider=claim["transcription_model"],
+            credential_source="local" if claim["transcription_model"] == "whisper" else claim["credential_source"],
+            model="universal-2" if claim["transcription_model"] == "assemblyai" else settings.WHISPER_MODEL,
+            use_diarization=claim["use_diarization"], session_factory=SessionLocal)
+        usage.record("attempt", "attempt", 1, phase="started", status="started")
         reference = ("object:" + claim["input_object_key"]) if claim.get("input_object_key") else claim["input_path"]
         # Resolve the object before model loading or irreversible paid admission.
         audio_path = storage_context.enter_context(materialize_input(claim))
@@ -370,6 +405,13 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             byok_secret = None
         else:
             service = get_cloud_processing_service() if claim["transcription_model"] == "assemblyai" else get_processing_service()
+        if hasattr(service, "set_usage_observer"):
+            service.set_usage_observer(lambda metric, quantity: usage.record(metric, "second", quantity,
+                                        measurement_source="ffmpeg"))
+        if claim["transcription_model"] == "assemblyai" and hasattr(service, "_get_engine"):
+            observed_engine = service._get_engine("assemblyai")
+            if hasattr(observed_engine, "set_usage_observer"):
+                observed_engine.set_usage_observer(usage.provider_response)
         if claim["transcription_model"] == "assemblyai":
             claim["max_duration_seconds"] = min(claim["max_duration_seconds"] or settings.AAI_MAX_AUDIO_SECONDS,
                                                 settings.AAI_MAX_AUDIO_SECONDS)
@@ -380,7 +422,10 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             **({"max_duration_seconds": claim["max_duration_seconds"]} if claim["max_duration_seconds"] else {}),
         )
         processing_time = time.monotonic() - started_at
+        # Measurements survive a subsequent result/schema/database failure.
+        usage.record("audio_seconds", "second", result.duration_seconds, measurement_source="ffmpeg")
         _persist_completed_job(transcription_id, result, processing_time)
+        terminal_status = "completed"
 
         logger.info(
             "Transcription job completed job_id=%s audio_duration=%.3f "
@@ -431,6 +476,15 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
         # its repr/traceback could contain credentials or transcript fragments.
         raise RuntimeError(public_error) from None
     finally:
+        if observed_engine is not None and hasattr(observed_engine, "set_usage_observer"):
+            observed_engine.set_usage_observer(None)
+        if service is not None and hasattr(service, "set_usage_observer"):
+            service.set_usage_observer(None)
+        if usage is not None:
+            usage.record("attempt_status", "state", phase="terminal", status=terminal_status)
+            if started_at is not None:
+                usage.record("processing_seconds", "second", time.monotonic() - started_at,
+                             status=terminal_status, measurement_source="monotonic_clock")
         try:
             storage_context.close()
         except Exception as cleanup_error:
