@@ -20,9 +20,16 @@ describe('ProcessingStatus', () => {
     expect(document.querySelector('li[aria-current="step"]').textContent).toContain('Transcrição concluída')
   })
 
-  it('shows the API error message on failed status', () => {
+  it('shows a clear retry message without exposing the API error', () => {
     render(<ProcessingStatus status="failed" errorMessage="Job rejeitado" />)
-    expect(screen.getByRole('alert').textContent).toContain('Job rejeitado')
+    expect(screen.getByRole('alert').textContent).toContain('Não foi possível concluir a transcrição.')
+    expect(screen.getByRole('alert').textContent).toContain('procure o suporte da USAGI')
+    expect(screen.queryByText('Job rejeitado')).toBeNull()
+  })
+
+  it('explains a known processing limit without hiding the reason for failure', () => {
+    render(<ProcessingStatus status="failed" errorMessage="Audio exceeds the public duration limit" />)
+    expect(screen.getByRole('alert').textContent).toContain('limite de duração')
   })
 
   it('uses upload progress only for the actual upload request', () => {

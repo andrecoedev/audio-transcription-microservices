@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { useAuthStore } from '../stores/authStore'
 import { firebaseAuth } from './firebaseAuth'
+import { requestErrorMessage } from './requestError'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:2020'
 
@@ -89,7 +90,7 @@ api.interceptors.response.use(
       }
     }
     const detail = error.response?.data?.detail
-    const failure = new Error(typeof detail === 'string' ? detail : 'Não foi possível concluir a solicitação')
+    const failure = new Error(requestErrorMessage(error.response?.status, detail))
     failure.status = error.response?.status
     return Promise.reject(failure)
   }
