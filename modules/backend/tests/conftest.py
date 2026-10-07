@@ -136,6 +136,12 @@ def db_context(tmp_path, monkeypatch):
     engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def isolated_usage_journal(tmp_path_factory, monkeypatch):
+    from src.config import settings
+    monkeypatch.setattr(settings, "USAGE_SPOOL_DIRECTORY", str(tmp_path_factory.mktemp("usage-journal")))
+
+
 @pytest.fixture
 def auth_headers():
     def make(username="alice", scopes=None, roles=None):

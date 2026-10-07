@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = Field(default=5, description="Temporary overflow connections")
     DB_POOL_TIMEOUT_SECONDS: int = Field(default=30, description="Pool checkout timeout")
     DB_POOL_RECYCLE_SECONDS: int = Field(default=1800, description="Connection recycle age")
+    USAGE_SPOOL_DIRECTORY: str = Field(default="database/usage-spool", description="Private durable usage journal, shared by API and Worker")
     
     # Redis & Job Queue
     REDIS_URL: str = Field(
