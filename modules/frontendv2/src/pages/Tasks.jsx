@@ -4,6 +4,7 @@ import Button from '../components/Button'
 import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import MeetingActionsPanel from '../components/MeetingActionsPanel'
 import { audioService } from '../services/audioService'
+import { formatCount, formatNumber } from '../utils/format'
 
 const limit = 20
 
@@ -54,7 +55,7 @@ export default function Tasks() {
           </select>
           <div className="mt-4 flex items-center justify-between gap-3">
             <Button variant="outline" disabled={skip === 0} onClick={() => setSkip(value => Math.max(0, value - limit))}>Anterior</Button>
-            <p className="text-sm text-gray-500">Página {page} · {total} reuniões</p>
+            <p className="text-sm text-gray-500">Página {formatNumber(page)} · {formatCount(total, 'reunião', 'reuniões')}</p>
             <Button variant="outline" disabled={skip + limit >= total} onClick={() => setSkip(value => value + limit)}>Próxima</Button>
           </div>
         </>}

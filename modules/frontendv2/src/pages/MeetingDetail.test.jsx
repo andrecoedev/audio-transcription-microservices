@@ -42,7 +42,7 @@ it('searches existing transcript segments and switches the intelligence tab', as
   fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar no áudio' }), { target: { value: 'métricas' } })
   expect(screen.queryByText('Decidir o lançamento.')).toBeNull()
   expect(screen.getByText('Revisar métricas.')).toBeTruthy()
-  expect(screen.getByText('1 de 2 segmentos')).toBeTruthy()
+  expect(screen.getByText('1 segmento de 2 segmentos')).toBeTruthy()
   fireEvent.click(screen.getByRole('tab', { name: 'Decisões' }))
   expect(screen.getByTestId('intelligence-panel').textContent).toBe('decisions')
 })

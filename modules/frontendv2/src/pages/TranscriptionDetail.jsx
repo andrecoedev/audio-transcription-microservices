@@ -15,7 +15,7 @@ import Button from '../components/Button'
 import ProcessingStatus from '../components/ProcessingStatus'
 import PageHeader from '../components/PageHeader'
 import { audioService } from '../services/audioService'
-import { formatDuration } from '../utils/format'
+import { formatDuration, formatNumber } from '../utils/format'
 import toast from 'react-hot-toast'
 
 export default function TranscriptionDetail() {
@@ -245,12 +245,12 @@ export default function TranscriptionDetail() {
         <StatCard
           icon={FileText}
           label="Palavras"
-          value={transcription.word_count || 0}
+          value={formatNumber(transcription.word_count ?? 0)}
         />
         <StatCard
           icon={User}
           label="Falantes"
-          value={transcription.num_speakers || 1}
+          value={formatNumber(transcription.num_speakers ?? 1)}
         />
         <StatCard
           icon={FileAudio}

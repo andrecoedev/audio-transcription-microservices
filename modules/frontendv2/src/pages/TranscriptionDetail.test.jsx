@@ -51,7 +51,7 @@ describe('TranscriptionDetail loading', () => {
       <Route path="/transcriptions/:id" element={<TranscriptionDetail />} />
     </Routes></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: 'Transcrevendo áudio' })).toBeTruthy()
-    expect(screen.getByText('review.m4a · 52min 0s')).toBeTruthy()
+    expect(screen.getByText('review.m4a · 52 minutos e 0 segundos')).toBeTruthy()
     expect(screen.getByRole('link', { name: /Voltar ao histórico/ })).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Status do processamento' })).toBeTruthy()
     expect(screen.queryByText('Palavras')).toBeNull()
