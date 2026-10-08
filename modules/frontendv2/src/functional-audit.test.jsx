@@ -42,8 +42,8 @@ beforeEach(() => {
     credential_storage_available: true,
     providers: {
       whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
-      assemblyai: { available: true, allowed: true, configured: true, credential_source: 'platform' },
-      gemini: { available: true, allowed: true, configured: true, credential_source: 'platform' },
+      assemblyai: { available: true, allowed: true, configured: true, credential_source: 'platform', byok_allowed: true },
+      gemini: { available: true, allowed: true, configured: true, credential_source: 'platform', byok_allowed: true },
     },
     credentials: { assemblyai: { configured: false, updated_at: null }, gemini: { configured: false, updated_at: null } },
   })
@@ -83,8 +83,8 @@ describe('functional frontend contracts', () => {
       credential_storage_available: true,
       providers: {
         whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
-        assemblyai: { available: true, allowed: true, configured: true, credential_source: 'user' },
-        gemini: { available: true, allowed: true, configured: true, credential_source: 'user' },
+        assemblyai: { available: true, allowed: true, configured: true, credential_source: 'user', byok_allowed: true },
+        gemini: { available: true, allowed: true, configured: true, credential_source: 'user', byok_allowed: true },
       },
       credentials: { assemblyai: { configured: true, updated_at: null }, gemini: { configured: false, updated_at: null } },
     }
@@ -114,8 +114,8 @@ describe('functional frontend contracts', () => {
       credential_storage_available: true,
       providers: {
         whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
-        assemblyai: { available: true, allowed: false, configured: false, credential_source: null },
-        gemini: { available: true, allowed: false, configured: false, credential_source: null },
+        assemblyai: { available: true, allowed: false, configured: false, credential_source: null, byok_allowed: true },
+        gemini: { available: true, allowed: false, configured: false, credential_source: null, byok_allowed: true },
       },
       credentials: { assemblyai: { configured: false, updated_at: null }, gemini: { configured: false, updated_at: null } },
     })
@@ -144,8 +144,8 @@ describe('functional frontend contracts', () => {
       credential_storage_available: true,
       providers: {
         whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
-        assemblyai: { available: true, allowed: provider === 'assemblyai' ? allowed : true, configured: true, credential_source: provider === 'assemblyai' && allowed ? 'user' : null },
-        gemini: { available: true, allowed: provider === 'gemini' ? allowed : true, configured: true, credential_source: provider === 'gemini' && allowed ? 'user' : null },
+        assemblyai: { available: true, allowed: provider === 'assemblyai' ? allowed : true, configured: true, credential_source: provider === 'assemblyai' && allowed ? 'user' : null, byok_allowed: provider === 'assemblyai' ? allowed : true },
+        gemini: { available: true, allowed: provider === 'gemini' ? allowed : true, configured: true, credential_source: provider === 'gemini' && allowed ? 'user' : null, byok_allowed: provider === 'gemini' ? allowed : true },
       },
       credentials: {
         assemblyai: { configured: provider === 'assemblyai' ? credentialConfigured : true, updated_at: null },

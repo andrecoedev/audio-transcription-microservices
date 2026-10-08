@@ -20,8 +20,8 @@ const settings = (overrides = {}) => ({
   credential_storage_available: true,
   providers: {
     whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
-    assemblyai: { available: true, allowed: false, configured: false, credential_source: null },
-    gemini: { available: true, allowed: false, configured: false, credential_source: null },
+    assemblyai: { available: true, allowed: false, configured: false, credential_source: null, byok_allowed: true },
+    gemini: { available: true, allowed: false, configured: false, credential_source: null, byok_allowed: true },
   },
   credentials: { assemblyai: { configured: false }, gemini: { configured: false } },
   ...overrides,
@@ -121,8 +121,8 @@ describe('Settings', () => {
     const configured = settings({ credentials: { assemblyai: { configured: false }, gemini: { configured: true } },
       providers: {
         whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
-        assemblyai: { available: true, allowed: false, configured: false, credential_source: null },
-        gemini: { available: true, allowed: true, configured: true, credential_source: 'user' },
+        assemblyai: { available: true, allowed: false, configured: false, credential_source: null, byok_allowed: true },
+        gemini: { available: true, allowed: true, configured: true, credential_source: 'user', byok_allowed: true },
       } })
     audioService.getProviderSettings.mockResolvedValue(configured)
     audioService.saveProviderCredential.mockResolvedValue(configured)
@@ -143,8 +143,8 @@ describe('Settings', () => {
     audioService.getProviderSettings.mockResolvedValue(settings({
       providers: {
         whisper: { available: true, allowed: false, configured: false, credential_source: 'none' },
-        assemblyai: { available: true, allowed: false, configured: false, credential_source: null },
-        gemini: { available: true, allowed: false, configured: false, credential_source: null },
+        assemblyai: { available: true, allowed: false, configured: false, credential_source: null, byok_allowed: false },
+        gemini: { available: true, allowed: false, configured: false, credential_source: null, byok_allowed: false },
       },
     }))
     renderSettings()
@@ -153,6 +153,27 @@ describe('Settings', () => {
     expect(transcriptionCard.textContent).toContain('Sem credencial própria')
     expect(transcriptionCard.textContent).toContain('não habilitado para esta conta')
     expect(transcriptionCard.textContent).not.toContain('Faster-Whisper ativo')
+  })
+
+  it('blocks Free BYOK setup and replacement while keeping removal of a saved key available', async () => {
+    audioService.getProviderSettings.mockResolvedValue(settings({
+      credentials: { assemblyai: { configured: false }, gemini: { configured: true } },
+      providers: {
+        whisper: { available: true, allowed: false, configured: false, credential_source: 'none' },
+        assemblyai: { available: true, allowed: false, configured: false, credential_source: null, byok_allowed: false },
+        gemini: { available: true, allowed: false, configured: false, credential_source: 'user', byok_allowed: false },
+      },
+    }))
+    renderSettings()
+
+    expect((await screen.findAllByText('Chave própria exige plano autorizado ou acesso beta.')).length).toBe(2)
+    expect(screen.getByRole('button', { name: 'Conectar minha API AssemblyAI' }).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Substituir chave Gemini' }).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Remover credencial Gemini' }).disabled).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Remover credencial Gemini' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar remoção Gemini' }))
+    await waitFor(() => expect(audioService.deleteProviderCredential).toHaveBeenCalledWith('gemini'))
+    expect(audioService.saveProviderCredential).not.toHaveBeenCalled()
   })
 
   it('clears unsaved provider credentials when refreshing settings', async () => {
@@ -224,8 +245,8 @@ describe('Settings', () => {
     audioService.getProviderSettings.mockResolvedValue(settings({ credential_storage_available: false,
       providers: {
         whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
-        assemblyai: { available: true, allowed: true, configured: true, credential_source: 'platform' },
-        gemini: { available: true, allowed: true, configured: true, credential_source: 'platform' },
+        assemblyai: { available: true, allowed: true, configured: true, credential_source: 'platform', byok_allowed: true },
+        gemini: { available: true, allowed: true, configured: true, credential_source: 'platform', byok_allowed: true },
       } }))
     renderSettings()
     expect((await screen.findAllByText(/Não é possível conectar uma chave agora/)).length).toBe(2)

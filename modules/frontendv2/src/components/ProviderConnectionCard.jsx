@@ -12,10 +12,11 @@ export default function ProviderConnectionCard({ provider, details, credential, 
   const name = providerNames[provider] || provider
   const connected = Boolean(credential.configured)
   const supported = Boolean(details.available)
+  const byokAllowed = details.byok_allowed === true
   const platformAccess = typeof details.platform_access === 'boolean'
     ? details.platform_access
     : details.credential_source === 'platform' && Boolean(details.allowed)
-  const canSave = supported && storageAvailable && Boolean(value) && !busy
+  const canSave = supported && storageAvailable && byokAllowed && Boolean(value) && !busy
   const updatedAt = credential.updated_at ? new Date(credential.updated_at) : null
 
   const cancelEditing = () => {
@@ -73,7 +74,11 @@ export default function ProviderConnectionCard({ provider, details, credential, 
 
       {storageAvailable && !supported && <p role="status" className="text-sm text-amber-800">Não é possível salvar uma chave para esta integração agora.</p>}
 
-      {editing && supported && storageAvailable && <form onSubmit={submit} className="space-y-3">
+      {!byokAllowed && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        Chave própria exige plano autorizado ou acesso beta.
+      </p>}
+
+      {editing && supported && storageAvailable && byokAllowed && <form onSubmit={submit} className="space-y-3">
         <label className="block text-sm font-medium text-gray-700" htmlFor={`credential-${provider}`}>
           {connected ? 'Nova chave de API' : 'Chave de API'}
           <input id={`credential-${provider}`} aria-label={`Credencial ${name}`} type="password" autoComplete="off" spellCheck={false}
@@ -88,14 +93,20 @@ export default function ProviderConnectionCard({ provider, details, credential, 
       </form>}
 
       {!editing && !confirmRemoval && <div className="flex flex-wrap gap-2">
-        {!connected && <Button type="button" aria-label={`Conectar minha API ${name}`} disabled={busy || !supported || !storageAvailable}
+        {!connected && <Button type="button" aria-label={`Conectar minha API ${name}`} disabled={busy || !supported || !storageAvailable || !byokAllowed}
           onClick={() => setEditing(true)}>Conectar minha API</Button>}
         {connected && <>
-          <Button type="button" variant="outline" disabled={busy || !supported || !storageAvailable}
+          <Button type="button" variant="outline" disabled={busy || !supported || !storageAvailable || !byokAllowed}
             onClick={() => setEditing(true)}>Substituir chave {name}</Button>
           <Button type="button" variant="ghost" disabled={busy}
             onClick={() => { onChange(''); setConfirmRemoval(true) }}>Remover credencial {name}</Button>
         </>}
+      </div>}
+
+      {editing && !byokAllowed && !confirmRemoval && <div className="flex flex-wrap gap-2">
+        {connected && <Button type="button" variant="ghost" disabled={busy}
+          onClick={() => { onChange(''); setConfirmRemoval(true) }}>Remover credencial {name}</Button>}
+        <Button type="button" variant="outline" disabled={busy} onClick={cancelEditing}>Cancelar</Button>
       </div>}
 
       {confirmRemoval && <div role="group" aria-label={`Confirmar remoção ${name}`} className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
