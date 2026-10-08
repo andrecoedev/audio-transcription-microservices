@@ -73,6 +73,18 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs())
 
 describe('firebaseAuth', () => {
+  it('passes force refresh to the SDK and guards against switching users during refresh', async () => {
+    const getIdToken = vi.fn().mockResolvedValue('synthetic-proof')
+    sdk.auth.currentUser = { uid: 'first', getIdToken }
+    const service = await loadService()
+    await expect(service.getTokenContext(true)).resolves.toEqual({ token: 'synthetic-proof', uid: 'first' })
+    expect(getIdToken).toHaveBeenCalledWith(true)
+    getIdToken.mockImplementation(async () => {
+      sdk.auth.currentUser = { uid: 'second' }
+      return 'synthetic-proof'
+    })
+    await expect(service.getTokenContext(true)).rejects.toMatchObject({ code: 'auth/account-changed' })
+  })
   it('does not initialize Firebase when any required public setting is missing', async () => {
     vi.stubEnv('VITE_FIREBASE_APP_ID', '')
     const service = await loadService()
@@ -136,7 +148,7 @@ describe('firebaseAuth', () => {
     expect(sdk.onIdTokenChanged).toHaveBeenCalledWith(sdk.auth, expect.any(Function))
     sdk.observer({ uid: 'user-id' })
     sdk.observer(null)
-    expect(callback.mock.calls).toEqual([[true], [false]])
+    expect(callback.mock.calls).toEqual([[true, 'user-id'], [false, null]])
     expect(unsubscribe).toBe(sdk.unsubscribe)
   })
 

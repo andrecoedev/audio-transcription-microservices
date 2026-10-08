@@ -38,6 +38,27 @@ def _seed_worker_job(session_factory, input_path):
         db.close()
 
 
+def test_audio_decode_failure_persists_safe_actionable_reason(db_context, monkeypatch, tmp_path):
+    from src.utils.audio import AudioProcessingError
+
+    source = tmp_path / "invalid.wav"
+    source.write_bytes(b"invalid audio")
+    tid = _seed_worker_job(db_context["session_factory"], source)
+    monkeypatch.setattr(transcription_worker, "SessionLocal", db_context["session_factory"])
+
+    class InvalidAudioService:
+        def process_transcription(self, **_kwargs):
+            raise AudioProcessingError("synthetic internal decoder diagnostic")
+
+    monkeypatch.setattr(transcription_worker, "get_processing_service", lambda: InvalidAudioService())
+    with pytest.raises(RuntimeError, match="^Audio could not be decoded$"):
+        transcription_worker.process_transcription_job_sync(tid)
+    with db_context["session_factory"]() as db:
+        transcription = db.get(Transcription, tid)
+        assert transcription.status == transcription.job.status == "failed"
+        assert transcription.error_message == transcription.job.error_message == "Audio could not be decoded"
+
+
 class RecordingSession:
     def __init__(self, session, snapshots):
         self._session = session
@@ -142,6 +163,35 @@ def test_worker_persists_queued_processing_completed(
         assert [speaker.speaker_id for speaker in meeting.speakers] == ["SPEAKER_00"]
         assert transcription.segments[0]["order"] == 0
         assert db.query(AuditEvent).filter_by(event="transcription.completed").count() == 1
+    finally:
+        db.close()
+
+
+def test_worker_preserves_manually_edited_meeting_title(db_context, monkeypatch, tmp_path):
+    input_path = tmp_path / "input.wav"
+    input_path.write_bytes(b"audio")
+    transcription_id = _seed_worker_job(
+        db_context["session_factory"], input_path
+    )
+    db = db_context["session_factory"]()
+    db.add(Meeting(id=transcription_id, title="Título escolhido manualmente"))
+    db.commit()
+    db.close()
+
+    monkeypatch.setattr(
+        transcription_worker, "SessionLocal", db_context["session_factory"]
+    )
+    transcription_worker._persist_completed_job(
+        transcription_id,
+        ProcessingResult(
+            segments=[], duration_seconds=1.0, num_speakers=0, word_count=0
+        ),
+        processing_time=0.5,
+    )
+
+    db = db_context["session_factory"]()
+    try:
+        assert db.get(Meeting, transcription_id).title == "Título escolhido manualmente"
     finally:
         db.close()
 

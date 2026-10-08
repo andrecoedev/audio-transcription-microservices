@@ -176,3 +176,35 @@ def summarize_usage(
             "estimated_cost_total": _decimal_string(row.estimated_cost_total),
         })
     return {"groups": groups, "after": start.isoformat(), "before": end.isoformat()}
+
+
+@router.get("/overview")
+def usage_overview(
+    request: Request,
+    after: datetime | None = None,
+    before: datetime | None = None,
+    db: Session = Depends(get_db),
+    user: TokenData = Depends(get_authenticated_user),
+):
+    """Product-facing technical metrics only: no internal pricing or identifiers."""
+    if set(request.query_params) - {"after", "before"}:
+        raise HTTPException(422, "Unsupported usage filter")
+    start, end = _time_window(after, before)
+    query = _base_query(db, user, start, end).filter(
+        ((UsageEvent.metric == "audio_seconds") & (UsageEvent.unit == "second")
+         & (UsageEvent.operation == "transcription"))
+        | ((UsageEvent.metric == "attempt") & (UsageEvent.unit == "attempt")
+           & UsageEvent.operation.in_(["transcription", "intelligence", "legacy_minutes"]))
+    )
+    rows = query.with_entities(
+        UsageEvent.operation, UsageEvent.metric, UsageEvent.unit,
+        func.count(UsageEvent.id).label("observations"),
+        func.sum(UsageEvent.quantity).label("quantity_total"),
+        func.sum(case((UsageEvent.quantity.is_(None), 1), else_=0)).label("unknown_observations"),
+    ).group_by(UsageEvent.operation, UsageEvent.metric, UsageEvent.unit).all()
+    return {"after": start.isoformat(), "before": end.isoformat(), "metrics": [
+        {"operation": row.operation, "metric": row.metric, "unit": row.unit,
+         "quantity_total": _decimal_string(row.quantity_total),
+         "observations": row.observations, "unknown_observations": row.unknown_observations}
+        for row in rows
+    ]}

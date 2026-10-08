@@ -1,3 +1,5 @@
+import { requestErrorMessage } from '../services/requestError'
+
 const STATUS = {
   queued: { label: 'Na fila', current: 0 },
   processing: { label: 'Processando', current: 1 },
@@ -13,11 +15,11 @@ export default function ProcessingStatus({ status, errorMessage, uploadProgress 
     <progress className="h-2 w-full accent-primary-700" max="100" value={uploadProgress} aria-label="Progresso do envio" />
   </section>
   const state = STATUS[status]
-  if (!state) return <p role="status">Status: {status || 'indisponível'}</p>
+  if (!state) return <p role="status">O status do processamento ainda não está disponível.</p>
 
   if (status === 'failed') return <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-    <p className="font-medium">O processamento falhou.</p>
-    <p className="mt-1">{errorMessage || 'Tente enviar o áudio novamente.'}</p>
+    <p className="font-medium">Não foi possível concluir a transcrição.</p>
+    <p className="mt-1">{errorMessage ? requestErrorMessage(500, errorMessage) : 'Tente enviar o áudio novamente.'}</p>
   </div>
 
   return <section aria-label="Status do processamento" className="rounded-lg border border-gray-200 bg-white p-5">
@@ -32,6 +34,6 @@ export default function ProcessingStatus({ status, errorMessage, uploadProgress 
         </li>
       })}
     </ol>
-    <p className="mt-4 text-sm text-gray-600">O status é atualizado pelo serviço de transcrição. Você pode sair desta página.</p>
+    <p className="mt-4 text-sm text-gray-600">O status é atualizado automaticamente. Você pode acompanhar o processamento nesta página.</p>
   </section>
 }

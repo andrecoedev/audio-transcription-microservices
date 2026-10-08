@@ -6,6 +6,6 @@ const statuses = {
 }
 
 export default function StatusBadge({ status }) {
-  const [label, colors] = statuses[status] || [status || 'Indisponível', 'bg-gray-100 text-gray-700']
+  const [label, colors] = statuses[status] || ['Status indisponível', 'bg-gray-100 text-gray-700']
   return <span className={`badge ${colors}`}>{label}</span>
 }

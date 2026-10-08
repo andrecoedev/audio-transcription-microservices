@@ -100,7 +100,7 @@ def test_file_above_limit_is_rejected(
 def test_job_creation_persists_and_enqueues(db_context, auth_headers, wav_bytes):
     response = db_context["client"].post(
         "/transcriptions/jobs",
-        files={"file": ("../unsafe?.wav", wav_bytes, "audio/wav")},
+        files={"file": ("../Reunião da equipe.wav", wav_bytes, "audio/wav")},
         headers=auth_headers(),
     )
 
@@ -118,7 +118,7 @@ def test_job_creation_persists_and_enqueues(db_context, auth_headers, wav_bytes)
             transcription_id=transcription_id
         ).one()
         assert transcription.status == "queued"
-        assert transcription.original_filename == "unsafe_.wav"
+        assert transcription.original_filename == "Reunião da equipe.wav"
         assert job.input_path == ""
         assert job.input_object_key == transcription.filename
         assert (db_context["tmp_path"] / "uploads" / job.input_object_key).read_bytes() == wav_bytes

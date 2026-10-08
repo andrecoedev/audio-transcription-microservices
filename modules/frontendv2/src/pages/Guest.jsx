@@ -5,6 +5,7 @@ import Button from '../components/Button'
 import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import ProcessingStatus from '../components/ProcessingStatus'
 import NewTranscription from './NewTranscription'
+import { formatCount, formatNumber } from '../utils/format'
 import { guestService } from '../services/guestService'
 import { useAuthStore } from '../stores/authStore'
 
@@ -131,7 +132,7 @@ export default function Guest({ showUpload = true }) {
         </>}
       </CardContent></Card> : showUpload && !authenticated && policy && !session?.spent && <NewTranscription guestPolicy={policy} onCreate={createJob} onCreated={() => {}} />}
       {!authenticated && policy && <div className="text-sm text-gray-500 space-y-2">
-        <p>Até {policy.max_upload_mb} MB e {Math.floor(policy.max_audio_seconds / 60)} minutos. {policy.jobs_per_session} transcrição por sessão; resultado temporário por {policy.retention_hours}h nesta aba.</p>
+        <p>Até {formatNumber(policy.max_upload_mb)} MB e {formatCount(Math.floor(policy.max_audio_seconds / 60), 'minuto', 'minutos')}. {formatCount(policy.jobs_per_session, 'transcrição', 'transcrições')} por sessão; o resultado fica nesta aba por {formatCount(policy.retention_hours, 'hora', 'horas')}.</p>
         <p><Link className="text-primary-700" to="/login?saveGuest=1">Entrar</Link> ou <Link className="text-primary-700" to="/signup?saveGuest=1">criar conta</Link> para salvar suas reuniões.</p>
       </div>}
       {session?.spent && <p>Resultado excluído. Crie uma conta para continuar; excluir não reinicia a cota de visitante.</p>}

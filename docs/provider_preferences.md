@@ -6,8 +6,8 @@ Configurações → Serviços de IA / Transcrição salva preferências no Postg
 localStorage. Transcrição: `automatic`, `whisper`, `assemblyai`. Resumo inteligente:
 `automatic`, `gemini`. Detecção de falantes tem default por conta e override por job.
 Guest não acessa este contrato: continua AssemblyAI platform com política/orçamento
-próprios e sem BYOK. Perfil visual antigo em Settings ainda é local; não confundir
-preferências persistentes de providers com atualização de identidade.
+próprios e sem BYOK. Minha conta consulta os dados persistidos em `/auth/me`;
+não oferece edição sem suporte de persistência no backend.
 
 `GET/PATCH /settings/providers` consulta/salva preferências e capabilities seguras.
 `POST /settings/providers/{assemblyai|gemini}/credential` recebe `{secret: ...}`;
@@ -20,6 +20,15 @@ bucket Redis separado, teto `JOB_RATE_LIMIT_PER_USER` (default 30/h), fail-close
 Salvar comprova somente armazenamento, não validade/cota/acesso externo. Disponível
 significa provider suportado nesta aplicação; não garante rede/modelo carregado.
 Falhas de credencial/provider são explícitas, sem troca silenciosa de engine/origem.
+
+`platform_access` informa separadamente se o fornecimento USAGI está autorizado
+e configurado para a conta. Para AssemblyAI inclui uma consulta somente leitura
+à margem disponível para a reserva conservadora existente; a reserva transacional
+na criação do trabalho continua sendo a decisão final. Não retorna orçamento,
+chave ou preços. A chave própria e sua possibilidade de cadastro não dependem
+desse acesso: integração suportada, fornecimento USAGI, elegibilidade da opção
+e armazenamento BYOK são estados distintos. Nenhum deles comprova conectividade
+ou validade de chave no serviço externo.
 
 ## Seleção e proveniência
 
@@ -113,13 +122,16 @@ conectar a chave ou escolher outra opção; não é substituída silenciosamente
 | Automático | AssemblyAI próprio salvo ou local; para resumos, Gemini; sem retry em outro serviço após erro |
 
 Conectar/substituir envia a chave somente no corpo POST autenticado. O campo
-password é temporário em memória e limpo ao enviar/falhar/cancelar/trocar de aba;
+password é temporário em memória e limpo ao enviar/falhar/cancelar/sair da tela;
 nenhuma chave vai para stores persistentes, URL, analytics ou mensagens. Após
-salvar, **Conectado** significa chave armazenada, com aviso explícito de que não
+salvar, **Credencial salva** significa chave armazenada, com ajuda explícita de que não
 foi testada no serviço. Só metadata segura (`configured`, `updated_at`) é exibida.
 Remover exige confirmação com aviso sobre trabalhos aguardando a chave e sobre
 a ausência de revogação remota. Armazenamento BYOK indisponível é comunicado mesmo
 quando o processamento fornecido pela USAGI ainda está permitido.
+O formulário abre por **Conectar minha API** ou **Substituir chave**. Remoção
+continua disponível mesmo sem a chave de criptografia no ambiente: elimina
+o registro do próprio usuário sem decriptar ou contornar a proteção.
 
 Limites deliberados da UX: não existe preflight/teste externo de chave, consulta
 de saldo ou cota, nem seletor independente para usar a chave plataforma enquanto

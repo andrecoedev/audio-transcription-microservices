@@ -27,6 +27,31 @@ describe('Transcriptions history', () => {
     expect(screen.getByRole('link', { name: 'interview.mp3' })).toBeTruthy()
   })
 
+  it('shows and searches by the original Unicode filename instead of the storage key', async () => {
+    audioService.listTranscriptions.mockResolvedValue({ total: 1, transcriptions: [
+      { id: 3, filename: `${'a'.repeat(32)}.wav`, original_filename: 'Reunião da equipe.wav', status: 'completed', created_at: '2026-10-02T10:00:00Z' },
+    ] })
+    render(<MemoryRouter><Transcriptions /></MemoryRouter>)
+    expect(await screen.findByRole('link', { name: 'Reunião da equipe.wav' })).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText('Buscar por nome do arquivo...'), { target: { value: 'reunião' } })
+    expect(screen.getByRole('link', { name: 'Reunião da equipe.wav' })).toBeTruthy()
+  })
+
+  it('renders speaker counts with the correct singular and plural forms', async () => {
+    audioService.listTranscriptions.mockResolvedValue({ total: 3, transcriptions: [
+      { id: 3, filename: 'silent.wav', num_speakers: 0, status: 'completed', created_at: '2026-10-02T10:00:00Z' },
+      { id: 4, filename: 'solo.wav', num_speakers: 1, status: 'completed', created_at: '2026-10-02T10:00:00Z' },
+      { id: 5, filename: 'duet.wav', num_speakers: 2, status: 'completed', created_at: '2026-10-02T10:00:00Z' },
+    ] })
+    render(<MemoryRouter><Transcriptions /></MemoryRouter>)
+
+    const soloRow = await screen.findByRole('row', { name: /solo\.wav/ })
+    expect(soloRow.textContent).toContain('1 falante')
+    expect(soloRow.textContent).not.toContain('1 falantes')
+    expect(screen.getByRole('row', { name: /duet\.wav/ }).textContent).toContain('2 falantes')
+    expect(screen.getByRole('row', { name: /silent\.wav/ }).textContent).not.toContain('falante')
+  })
+
   it('passes status filter to API and resets server pagination', async () => {
     audioService.listTranscriptions.mockResolvedValue({ total: 42, transcriptions: [
       { id: 1, filename: 'team-sync.wav', status: 'completed', created_at: '2026-10-02T10:00:00Z' },

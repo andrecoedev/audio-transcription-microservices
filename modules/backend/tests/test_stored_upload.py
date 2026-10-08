@@ -4,7 +4,12 @@ import pytest
 from starlette.datastructures import UploadFile
 
 from src.services.object_storage import LocalObjectStorage, StorageError
-from src.utils.uploads import StoredUpload, UploadValidationError, store_validated_upload
+from src.utils.uploads import (
+    StoredUpload,
+    UploadValidationError,
+    sanitize_filename,
+    store_validated_upload,
+)
 
 
 WAV = b"RIFF" + (4).to_bytes(4, "little") + b"WAVE" + b"data"
@@ -15,11 +20,11 @@ def upload(filename: str, payload: bytes) -> UploadFile:
 
 
 @pytest.mark.asyncio
-async def test_stores_valid_upload_with_opaque_key_and_sanitized_name(tmp_path):
+async def test_stores_valid_upload_with_opaque_key_and_original_name(tmp_path):
     storage = LocalObjectStorage(tmp_path / "objects")
 
     result = await store_validated_upload(
-        upload("../../private meeting?.wav", WAV),
+        upload("../../Reunião da equipe 2026.wav", WAV),
         storage,
         ["wav"],
         1024,
@@ -28,11 +33,43 @@ async def test_stores_valid_upload_with_opaque_key_and_sanitized_name(tmp_path):
     assert isinstance(result, StoredUpload)
     assert result.key.endswith(".wav")
     assert "/" not in result.key and "\\" not in result.key
-    assert result.original_filename == "private meeting_.wav"
+    assert result.original_filename == "Reunião da equipe 2026.wav"
     assert result.extension == "wav"
     assert result.size_bytes == len(WAV)
     with storage.open(result.key) as stream:
         assert stream.read() == WAV
+
+
+@pytest.mark.asyncio
+async def test_repeated_original_names_keep_distinct_opaque_storage_keys(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "objects")
+
+    first = await store_validated_upload(
+        upload("Reunião.wav", WAV), storage, ["wav"], 1024
+    )
+    second = await store_validated_upload(
+        upload("Reunião.wav", WAV), storage, ["wav"], 1024
+    )
+
+    assert first.original_filename == second.original_filename == "Reunião.wav"
+    assert first.key != second.key
+
+
+def test_filename_removes_controls_and_bidi_formatting_but_keeps_visible_unicode():
+    assert sanitize_filename("ReuniÃ£o\x00\r\n\u202eFinal.wav") == "ReuniÃ£oFinal.wav"
+
+
+@pytest.mark.asyncio
+async def test_long_filename_is_capped_without_losing_supported_extension(tmp_path):
+    storage = LocalObjectStorage(tmp_path / "objects")
+
+    result = await store_validated_upload(
+        upload(f"{ 'á' * 300 }.wav", WAV), storage, ["wav"], 1024
+    )
+
+    assert len(result.original_filename) == 255
+    assert result.original_filename.endswith(".wav")
+    assert result.extension == "wav"
 
 
 @pytest.mark.asyncio

@@ -77,7 +77,7 @@ def test_http_upload_worker_completion_cleanup_and_result_survive_queue_loss(
     assert job.input_object_key == transcription.filename
     assert job.input_object_key.endswith(".wav")
     assert len(job.input_object_key.split(".")[0]) == 32
-    assert transcription.original_filename == "private meeting_.wav"
+    assert transcription.original_filename == "private meeting?.wav"
 
     result = transcription_worker.process_transcription_job_sync(transcription_id)
     assert result["status"] == "completed"
@@ -93,11 +93,11 @@ def test_http_upload_worker_completion_cleanup_and_result_survive_queue_loss(
     assert api_result.json()["segments"][0]["text"] == "stored audio result"
     serialized_result = json.dumps(api_result.json())
     assert str(db_context["tmp_path"]) not in serialized_result
-    assert "private meeting_.wav" in serialized_result
+    assert "private meeting?.wav" in serialized_result
 
     db = db_context["session_factory"]()
     try:
-        assert db.get(Meeting, transcription_id).title == "private meeting_.wav"
+        assert db.get(Meeting, transcription_id).title == "private meeting?.wav"
         assert db.query(ObjectDeletion).filter_by(
             reference="object:" + job.input_object_key
         ).count() == 0

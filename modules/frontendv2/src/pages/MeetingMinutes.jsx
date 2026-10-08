@@ -4,11 +4,15 @@ import { FileText, Calendar, Users, Sparkles, Download, Loader2 } from 'lucide-r
 import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import Button from '../components/Button'
 import { audioService } from '../services/audioService'
+import { getDisplayFilename } from '../utils/format'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../stores/authStore'
 
 export default function MeetingMinutes() {
   const publicAccount = useAuthStore((state) => state.user?.registration_source === 'public')
+  const geminiUnavailableMessage = publicAccount
+    ? 'A geração de atas ainda não aceita uma conta Gemini conectada. O serviço está indisponível no momento.'
+    : 'O Gemini está indisponível no momento. Tente novamente mais tarde.'
   const [transcriptions, setTranscriptions] = useState([])
   const [selectedTranscription, setSelectedTranscription] = useState('')
   const [meetingData, setMeetingData] = useState({
@@ -26,16 +30,13 @@ export default function MeetingMinutes() {
       const status = await audioService.getMeetingMinutesStatus()
       setGeminiAvailable(status.available)
       if (!status.available) {
-        toast.error(
-          publicAccount ? 'Providers externos exigirão sua própria credencial. BYOK ainda não disponível.' : 'Gemini indisponível. Solicite ao administrador a configuração do worker.',
-          { duration: 6000 }
-        )
+        toast.error(geminiUnavailableMessage, { duration: 6000 })
       }
     } catch (error) {
       console.error('Erro ao verificar status do Gemini:', error)
       setGeminiAvailable(false)
     }
-  }, [publicAccount])
+  }, [geminiUnavailableMessage])
 
   useEffect(() => {
     loadTranscriptions()
@@ -67,7 +68,7 @@ export default function MeetingMinutes() {
     }
 
     if (!geminiAvailable) {
-      toast.error('Solicite ao administrador a configuração do Gemini no worker')
+      toast.error(geminiUnavailableMessage)
       return
     }
 
@@ -92,7 +93,7 @@ export default function MeetingMinutes() {
       
       if (errorMsg.includes('API_KEY_INVALID') || errorMsg.includes('401')) {
         toast.error(
-          'Gemini indisponível. Solicite ao administrador a verificação do worker.',
+          publicAccount ? 'A geração de atas não conseguiu acessar o Gemini. Confira a conexão da conta ou tente novamente.' : 'Não foi possível acessar o Gemini. Tente novamente mais tarde.',
           { duration: 6000 }
         )
       } else if (errorMsg.includes('SAFETY')) {
@@ -101,7 +102,7 @@ export default function MeetingMinutes() {
           { duration: 6000 }
         )
       } else {
-        toast.error(`Erro ao gerar ata: ${errorMsg}`)
+        toast.error('Não foi possível gerar a ata. Tente novamente mais tarde.')
       }
     } finally {
       setLoading(false)
@@ -149,7 +150,7 @@ export default function MeetingMinutes() {
           Geração de Atas de Reunião
         </h1>
         <p className="text-gray-600 mt-1">
-          Gerador legado: o resultado é temporário e não utiliza a revisão de tarefas.
+          O resultado desta tela é temporário. Para salvar a reunião e revisar as tarefas sugeridas, use a área Reuniões.
         </p>
         <Link to="/meetings" className="text-primary-700 underline">Use Reuniões para análise persistente, tarefas revisadas e ata consolidada.</Link>
       </div>
@@ -165,7 +166,7 @@ export default function MeetingMinutes() {
                   Gemini indisponível
                 </h3>
                 <p className="text-sm text-yellow-800">
-                  Solicite ao administrador a configuração do Gemini no worker para usar este recurso.
+                  {geminiUnavailableMessage}
                 </p>
                 <a
                   href="/settings"
@@ -207,7 +208,7 @@ export default function MeetingMinutes() {
                   <option value="">Selecione uma transcrição</option>
                   {transcriptions.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.filename} - {new Date(t.created_at).toLocaleDateString()}
+                      {getDisplayFilename(t)} - {new Date(t.created_at).toLocaleDateString()}
                     </option>
                   ))}
                 </select>

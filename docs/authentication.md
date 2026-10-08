@@ -100,6 +100,41 @@ apague ou recrie contas para alternar o provider.
 
 ## Sessão, endpoints e rollback
 
+A persistência Google usa `browserLocalPersistence` e `authStateReady` do SDK
+oficial. Cada request obtém um ID Token pelo SDK; se o servidor retornar 401,
+o frontend força uma renovação e repete a solicitação no máximo uma vez,
+somente para a mesma conta interna e Firebase UID. Provas Guest e headers
+explícitos não são substituídos. Uma segunda rejeição encerra a sessão;
+revogação e usuário desabilitado continuam verificados pelo Admin SDK.
+Não há token eterno nem cópia manual de credenciais Firebase no storage da UI.
+
+Uma falha transitória de rede/verificação não apaga a sessão SDK. No startup,
+a aplicação mostra uma ação para tentar novamente e não renderiza os recursos
+privados até verificar a identidade interna. Logout explícito não pode ser
+desfeito por uma restauração em andamento. Mudanças de conta/logout em outras
+abas são observadas pelo SDK, com nova verificação da identidade quando preciso.
+A rota e o contexto Guest da aba são preservados para continuar após autenticar.
+O contrato JWT das contas locais existentes não recebeu refresh ilimitado.
+
+Referências: [persistência oficial](https://firebase.google.com/docs/auth/web/auth-state-persistence)
+e [getIdToken/renovação oficial](https://firebase.google.com/docs/reference/js/auth.user#getidtoken).
+Testes usam SDK/API simulados; não comprovam configuração Google/ADC em produção.
+
+## Conta e senha em Configurações
+
+Minha conta consulta `/auth/me` e apresenta nome/e-mail persistidos como leitura,
+não como preferências locais editáveis. O backend não oferece atualização de
+perfil, troca ou redefinição de senha legada. Não existe Firebase e-mail/senha
+integrado: a validação Firebase admite somente Google. Não se adiciona uma ação
+fictícia nem se muda esse contrato para aparentar suporte.
+
+Na sessão Google verificada, a tela aponta para a segurança da conta Google.
+Na sessão com senha USAGI, informa que sua alteração ainda não está disponível.
+O vínculo seguro com Google existente continua disponível quando configurado,
+com reautenticação pela senha atual; não equivale a troca de senha. A tela rejeita
+uma resposta de conta com ID diferente do usuário interno atual e oculta dados
+anteriores durante a troca de identidade.
+
 `POST /auth/firebase` recebe somente o ID Token no header Bearer, verifica a
 identidade e resolve/cria o usuário interno. Não emite outro JWT para contornar
 revogação. Requests privados Firebase usam ID Token atualizado pelo SDK e são

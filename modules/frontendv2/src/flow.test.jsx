@@ -11,6 +11,7 @@ import MeetingDetail from './pages/MeetingDetail'
 import Login from './pages/Login'
 import { authService } from './services/authService'
 import { audioService } from './services/audioService'
+import { guestService } from './services/guestService'
 import { useAuthStore } from './stores/authStore'
 import toast from 'react-hot-toast'
 
@@ -41,6 +42,7 @@ vi.mock('./services/audioService', () => ({
     requestMeetingIntelligence: vi.fn(),
   },
 }))
+vi.mock('./services/guestService', () => ({ guestService: { policy: vi.fn() } }))
 vi.mock('react-hot-toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
   Toaster: () => null,
@@ -50,6 +52,7 @@ beforeEach(() => {
   localStorage.clear()
   useAuthStore.setState({ user: null, token: null, isAuthenticated: false })
   authService.getConfig.mockResolvedValue({ strict: true })
+  guestService.policy.mockResolvedValue({ allowed_extensions: ['wav', 'mp3', 'm4a'], max_upload_mb: 100, max_audio_seconds: 600 })
   audioService.getProviderSettings.mockResolvedValue({
     preferences: { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: false },
     credential_storage_available: true,
@@ -93,7 +96,7 @@ describe('public React flow', () => {
   it('redirects protected routes and clears an unverified persisted session', async () => {
     localStorage.setItem('token', 'stale')
     useAuthStore.setState({ user: { name: 'Alice' }, isAuthenticated: true })
-    authService.me.mockRejectedValue(new Error('expired'))
+    authService.me.mockRejectedValue(Object.assign(new Error('expired'), { status: 401 }))
     window.history.pushState({}, '', '/transcriptions')
     render(<App />)
     expect(await screen.findByText('Salve e acompanhe suas reuniões')).toBeTruthy()
@@ -149,6 +152,7 @@ describe('public React flow', () => {
         </Routes>
       </MemoryRouter>
     )
+    await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeTruthy())
     const input = document.querySelector('input[type="file"]')
     await userEvent.upload(input, new File(['RIFFdataWAVE'], 'meeting.wav', { type: 'audio/wav' }))
     fireEvent.click(screen.getByText('Iniciar Transcrição'))
@@ -171,6 +175,7 @@ describe('public React flow', () => {
     })
     audioService.createTranscriptionJob.mockResolvedValue({ id: 43 })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
+    await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeTruthy())
     const upload = document.querySelector('input[type="file"]')
     await userEvent.upload(upload, new File(['RIFFdataWAVE'], 'account.wav', { type: 'audio/wav' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Iniciar Transcrição' }))
@@ -205,34 +210,36 @@ describe('public React flow', () => {
   })
 
   it('shows upload failures without navigating away', async () => {
-    audioService.createTranscriptionJob.mockRejectedValue(new Error('Too many requests'))
+    audioService.createTranscriptionJob.mockRejectedValue(new Error('A franquia de transcrição da USAGI está esgotada no momento.'))
     render(
       <MemoryRouter>
         <NewTranscription />
       </MemoryRouter>
     )
+    await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeTruthy())
     await userEvent.upload(
       document.querySelector('input[type="file"]'),
       new File(['RIFFdataWAVE'], 'meeting.wav', { type: 'audio/wav' })
     )
     fireEvent.click(screen.getByText('Iniciar Transcrição'))
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Too many requests'))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('A franquia de transcrição da USAGI está esgotada no momento.'))
     expect(screen.getByText('Iniciar Transcrição')).toBeTruthy()
   })
 
   it('shows a rate-limit rejection without losing the selected file', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     audioService.createTranscriptionJob.mockRejectedValue(
-      new Error('Too many requests; please retry later')
+      new Error('Muitas solicitações em pouco tempo. Aguarde um pouco antes de tentar novamente.')
     )
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
+    await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeTruthy())
     await userEvent.upload(
       document.querySelector('input[type="file"]'),
       new File(['RIFFdataWAVE'], 'meeting.wav', { type: 'audio/wav' })
     )
     fireEvent.click(screen.getByRole('button', { name: /Iniciar/ }))
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
-      'Too many requests; please retry later'
+      'Muitas solicitações em pouco tempo. Aguarde um pouco antes de tentar novamente.'
     ))
     expect(screen.getByText('meeting.wav')).toBeTruthy()
   })

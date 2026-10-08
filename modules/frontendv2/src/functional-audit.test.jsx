@@ -12,6 +12,7 @@ import Login from './pages/Login'
 import MeetingMinutes from './pages/MeetingMinutes'
 import MeetingDetail from './pages/MeetingDetail'
 import { audioService } from './services/audioService'
+import { guestService } from './services/guestService'
 import { useAuthStore } from './stores/authStore'
 import toast from 'react-hot-toast'
 
@@ -23,6 +24,7 @@ vi.mock('./services/audioService', () => ({ audioService: {
   getMeetingMinutesStatus: vi.fn(), createTranscriptionJob: vi.fn(),
   getMeeting: vi.fn(), getMeetingTranscript: vi.fn(), getMeetingMinutes: vi.fn(),
 } }))
+vi.mock('./services/guestService', () => ({ guestService: { policy: vi.fn() } }))
 vi.mock('./components/MeetingIntelligencePanel', () => ({ default: ({ onResultChange }) =>
   <button onClick={() => onResultChange(2)}>Simular nova revisão concluída</button> }))
 vi.mock('./components/MeetingActionsPanel', () => ({ default: () => null }))
@@ -30,6 +32,7 @@ vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() 
 
 beforeEach(() => {
   vi.resetAllMocks()
+  guestService.policy.mockResolvedValue({ allowed_extensions: ['wav', 'mp3', 'm4a'], max_upload_mb: 100, max_audio_seconds: 600 })
   useAuthStore.setState({ user: { name: 'Teste', roles: [] } })
   audioService.checkHealth.mockResolvedValue({ database: 'connected',
     processing: { redis: 'connected', worker_available: true, worker_count: 1 },
@@ -64,7 +67,7 @@ describe('functional frontend contracts', () => {
   it('shows provider configuration for non-admins without requesting secrets/status admin APIs', async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>)
     await screen.findByText('disponível')
-    const provider = screen.getByText('Gemini externo').parentElement
+    const provider = screen.getByText('Resumos via Gemini').parentElement
     expect(provider.textContent).toContain('configurado')
     expect(provider.textContent).not.toContain('não configurado')
     expect(audioService.getApiKeysStatus).not.toHaveBeenCalled()
@@ -96,6 +99,7 @@ describe('functional frontend contracts', () => {
       transcription_provider: 'whisper', intelligence_provider: 'gemini', use_diarization: true,
     }))
 
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar minha API Gemini' }))
     const secretInput = screen.getByLabelText('Credencial Gemini')
     fireEvent.change(secretInput, { target: { value: 'synthetic-key-never-rendered' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[0])
@@ -117,7 +121,8 @@ describe('functional frontend contracts', () => {
     })
     audioService.saveProviderCredential.mockRejectedValue(new Error('provider returned sensitive detail'))
     render(<MemoryRouter><Settings /></MemoryRouter>)
-    const secretInput = await screen.findByLabelText('Credencial AssemblyAI')
+    fireEvent.click(await screen.findByRole('button', { name: 'Conectar minha API AssemblyAI' }))
+    const secretInput = screen.getByLabelText('Credencial AssemblyAI')
     fireEvent.change(secretInput, { target: { value: 'synthetic-key' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[0])
     await waitFor(() => expect(secretInput.value).toBe(''))
@@ -150,7 +155,7 @@ describe('functional frontend contracts', () => {
     audioService.getProviderSettings.mockResolvedValue(metadata(true, true))
     audioService.deleteProviderCredential.mockResolvedValue(metadata(false, false))
     render(<MemoryRouter><Settings /></MemoryRouter>)
-    const selector = await screen.findByLabelText(label)
+    const selector = await screen.findByRole('combobox', { name: label })
     expect(selector.value).toBe(provider)
     fireEvent.click(screen.getByRole('button', { name: `Remover credencial ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}` }))
     expect(audioService.deleteProviderCredential).not.toHaveBeenCalled()
@@ -217,6 +222,7 @@ describe('functional frontend contracts', () => {
 
   it('reports rejected uploads instead of silently ignoring them', async () => {
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
+    await screen.findByText(/Formatos disponíveis:/)
     fireEvent.drop(screen.getByText('Arraste um arquivo ou clique para selecionar').parentElement, {
       dataTransfer: { files: [new File(['x'], 'invalid.exe', { type: 'application/octet-stream' })],
         items: [{ kind: 'file', type: 'application/octet-stream', getAsFile: () => new File(['x'], 'invalid.exe', { type: 'application/octet-stream' }) }], types: ['Files'] },
@@ -232,10 +238,12 @@ describe('functional frontend contracts', () => {
   })
 
   it('does not send users to Settings to enter a Gemini secret', async () => {
+    useAuthStore.setState({ user: { registration_source: 'public' } })
     render(<MemoryRouter><MeetingMinutes /></MemoryRouter>)
     await waitFor(() => expect(audioService.getMeetingMinutesStatus).toHaveBeenCalled())
     expect(screen.queryByText(/na página de Configurações para usar/)).toBeNull()
-    expect(screen.getByText(/administrador.*worker/i)).toBeTruthy()
+    expect(screen.getByText(/Geração de atas ainda não aceita uma conta Gemini conectada/i)).toBeTruthy()
+    expect(screen.queryByText(/worker/i)).toBeNull()
   })
 
   it('refreshes reviewed minutes when a new Intelligence revision completes', async () => {

@@ -23,7 +23,8 @@ describe('Meetings history', () => {
     expect(await screen.findByRole('link', { name: 'Planning sync' })).toBeTruthy()
     const row = screen.getByRole('row', { name: /Planning sync/ })
     expect(row.textContent).toContain('3')
-    expect(row.textContent).toContain('1min 15s')
+    expect(row.textContent).toContain('3 falantes')
+    expect(row.textContent).toContain('1 minuto e 15 segundos')
     expect(row.textContent).toContain('Concluída')
   })
 

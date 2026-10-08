@@ -176,3 +176,90 @@ def test_unauthenticated_and_guest_principal_cannot_read_usage(usage_client):
     guest = create_access_token({"sub": "guest-session", "purpose": "guest"})
     assert usage_client.get("/usage/events", headers={"Authorization": f"Bearer {guest}"}).status_code == 401
     assert usage_client.get("/usage/summary", headers=_headers()).status_code == 200
+
+
+def test_overview_is_owner_scoped_for_users_and_admins_and_rejects_identity_filters(
+    db_context, usage_client
+):
+    db = db_context["session_factory"]()
+    now = datetime.now(timezone.utc)
+    try:
+        _event(db, user_id=1, occurred_at=now, operation="transcription",
+               metric="audio_seconds", unit="second", quantity="12", provider="whisper")
+        _event(db, user_id=2, occurred_at=now, operation="transcription",
+               metric="audio_seconds", unit="second", quantity="900", provider="assemblyai")
+        _event(db, user_id=None, guest_session_id="guest-overview", occurred_at=now,
+               operation="transcription", metric="audio_seconds", unit="second", quantity="99")
+        db.get(User, 2).is_superuser = True
+        db.commit()
+    finally:
+        db.close()
+
+    own = usage_client.get("/usage/overview", headers=_headers()).json()
+    admin = usage_client.get("/usage/overview", headers=_headers(2, admin=True)).json()
+    assert [metric["quantity_total"] for metric in own["metrics"]] == ["12.000000000"]
+    assert [metric["quantity_total"] for metric in admin["metrics"]] == ["900.000000000"]
+    assert usage_client.get("/usage/overview").status_code == 401
+    guest = create_access_token({"sub": "guest-session", "purpose": "guest"})
+    assert usage_client.get("/usage/overview", headers={"Authorization": f"Bearer {guest}"}).status_code == 401
+    assert usage_client.get("/usage/overview?user_id=2", headers=_headers()).status_code == 422
+
+
+def test_overview_only_aggregates_product_metrics_and_keeps_unknowns_explicit(
+    db_context, usage_client
+):
+    db = db_context["session_factory"]()
+    now = datetime.now(timezone.utc)
+    try:
+        _event(db, user_id=1, occurred_at=now, operation="transcription",
+               metric="audio_seconds", unit="second", quantity="42", provider="whisper")
+        _event(db, user_id=1, occurred_at=now, operation="transcription",
+               metric="attempt", unit="attempt", quantity=None, estimated_cost=None,
+               provider="assemblyai", credential_source="platform")
+        _event(db, user_id=1, occurred_at=now, operation="intelligence",
+               metric="attempt", unit="attempt", quantity="1", provider="gemini")
+        # Token usage, provider-reported audio duration, and unrelated metrics are excluded.
+        _event(db, user_id=1, occurred_at=now, operation="intelligence",
+               metric="input_uncached_tokens", unit="token", quantity="100")
+        _event(db, user_id=1, occurred_at=now, operation="transcription",
+               metric="provider_audio_seconds", unit="second", quantity="42")
+        db.commit()
+    finally:
+        db.close()
+
+    response = usage_client.get("/usage/overview", headers=_headers())
+    assert response.status_code == 200
+    body = response.json()
+    assert {(row["operation"], row["metric"], row["unit"]) for row in body["metrics"]} == {
+        ("transcription", "audio_seconds", "second"),
+        ("transcription", "attempt", "attempt"),
+        ("intelligence", "attempt", "attempt"),
+    }
+    transcription_attempt = next(
+        row for row in body["metrics"]
+        if row["operation"] == "transcription" and row["metric"] == "attempt"
+    )
+    assert transcription_attempt == {
+        "operation": "transcription", "metric": "attempt", "unit": "attempt",
+        "quantity_total": None, "observations": 1, "unknown_observations": 1,
+    }
+    assert set(body) == {"after", "before", "metrics"}
+    for row in body["metrics"]:
+        assert set(row) == {
+            "operation", "metric", "unit", "quantity_total", "observations", "unknown_observations",
+        }
+    assert not any(term in str(body) for term in (
+        "provider", "price_id", "estimated_cost", "currency", "cost_scope", "provider_audio_seconds",
+    ))
+
+
+@pytest.mark.parametrize("query", [
+    "after=2026-10-01T00:00:00&before=2026-10-02T00:00:00Z",
+    "after=2026-10-03T00:00:00Z&before=2026-10-02T00:00:00Z",
+    "after=2025-01-01T00:00:00Z&before=2026-10-02T00:00:00Z",
+    "user_id=2",
+    "userId=2",
+])
+def test_overview_rejects_invalid_periods_and_spoofed_identity(usage_client, query):
+    response = usage_client.get(f"/usage/overview?{query}", headers=_headers())
+    assert response.status_code == 422
