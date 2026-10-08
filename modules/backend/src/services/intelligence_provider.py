@@ -88,7 +88,16 @@ class GeminiIntelligenceProvider:
         return self.generator.generate_intelligence(prompt)
 
 
-def get_provider(api_key: str | None = None) -> MeetingIntelligenceProvider:
+def get_provider(api_key: str | None = None, *, provider: str = "gemini", model: str | None = None) -> MeetingIntelligenceProvider:
+    if provider == "groq":
+        from .groq_intelligence import GroqIntelligenceProvider
+        if api_key is not None:
+            raise RuntimeError("Groq user credentials are not supported")
+        if not settings.GROQ_API_KEY:
+            raise RuntimeError("Groq is not configured")
+        return GroqIntelligenceProvider(settings.GROQ_API_KEY, model or settings.GROQ_MODEL)
+    if provider != "gemini":
+        raise RuntimeError("Unsupported intelligence provider")
     if api_key is not None:
         from .meeting_minutes import MeetingMinutesGenerator
         return GeminiIntelligenceProvider(MeetingMinutesGenerator(api_key))

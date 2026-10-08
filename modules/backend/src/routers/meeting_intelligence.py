@@ -14,6 +14,7 @@ from ..services.audit import append_audit_event
 from ..services.meeting_intelligence import fingerprint, latest_revision, metadata_view, snapshot
 from ..services.rate_limit import enforce_rate_limit
 from ..services.provider_credentials import resolve_intelligence
+from ..services.groq_budget import reserve_groq_call
 from ..workers.config import get_transcription_queue, is_redis_available
 
 router = APIRouter(prefix="/meetings", tags=["meeting intelligence"])
@@ -52,13 +53,16 @@ def request_generation(meeting_id, request, response, db, user, *, regenerate):
         raise HTTPException(503, "Processing service temporarily unavailable") from None
     row = MeetingIntelligence(
         meeting_id=meeting_id, revision=current.revision + 1 if current else 1,
-        schema_version="1", provider="gemini", model=settings.GEMINI_MODEL,
+        schema_version="1", provider=selection["provider"],
+        model=settings.GROQ_MODEL if selection["provider"] == "groq" else settings.GEMINI_MODEL,
         status="pending", source_metadata=source, input_fingerprint=fingerprint(source, segments),
         credential_source=selection["credential_source"], credential_id=selection["credential_id"],
         credential_user_id=selection["credential_user_id"],
     )
     db.add(row)
     db.flush()
+    if row.provider == "groq":
+        reserve_groq_call(db, user.user_id, row.id, {**source, "segments": segments})
     append_audit_event(db, event="intelligence.requested", actor_user_id=user.user_id,
                        resource_type="meeting", resource_id=meeting_id,
                        metadata={"revision": row.revision})

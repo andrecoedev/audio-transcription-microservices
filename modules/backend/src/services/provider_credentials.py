@@ -10,6 +10,7 @@ from ..models import UserProviderCredential, UserProviderPreferences
 from .provider_policy import require_provider_credential
 from .platform_budget import platform_budget_has_headroom
 from .transcription_entitlements import require_execution
+from .groq_budget import has_headroom, require_groq_configuration
 
 SUPPORTED_PROVIDERS = {"assemblyai", "gemini"}
 DEFAULT_PREFERENCES = {"transcription_provider": "automatic", "intelligence_provider": "automatic", "use_diarization": False}
@@ -69,6 +70,12 @@ def select_provider(db, user, provider):
     if provider == "whisper":
         require_execution(db, user.user_id, provider, "none")
         return {"provider": provider, "credential_source": "none", "credential_id": None, "credential_user_id": None}
+    if provider == "groq":
+        require_execution(db, user.user_id, provider, "platform")
+        require_groq_configuration()
+        if not has_headroom(db):
+            raise HTTPException(429, "O limite de uso do serviço foi atingido. Escolha outro serviço de resumo.")
+        return {"provider": provider, "credential_source": "platform", "credential_id": None, "credential_user_id": None}
     if provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(422, "Unsupported provider")
     own = credential_for(db, user.user_id, provider)
@@ -138,5 +145,13 @@ def providers_view(db, user):
         providers[provider] = {"available": True, "allowed": allowed, "configured": allowed,
                                "credential_source": source, "platform_access": platform_access,
                                "byok_allowed": byok_allowed}
+    try:
+        select_provider(db, user, "groq")
+        groq_allowed = True
+    except HTTPException:
+        groq_allowed = False
+    providers["groq"] = {"available": True, "allowed": groq_allowed, "configured": groq_allowed,
+                         "credential_source": "platform", "platform_access": groq_allowed,
+                         "byok_allowed": False, "model": settings.GROQ_MODEL}
     return {"preferences": preferences_for(db, user.user_id), "providers": providers, "credentials": credentials,
             "credential_storage_available": credential_storage_available()}

@@ -18,6 +18,7 @@ from ..services.meeting_intelligence import fingerprint
 from ..services.meeting_projection import ordered_segments
 from ..services.provider_credentials import decrypt_credential
 from ..services.transcription_entitlements import require_execution
+from ..services.groq_budget import authorize_groq_claim, begin_groq_call
 
 logger = logging.getLogger(__name__)
 PUBLIC_FAILURE = "Meeting analysis failed; a new attempt can be requested"
@@ -52,11 +53,16 @@ def _claim(intelligence_id):
         context = {**row.source_metadata, "segments": segments}
         if fingerprint(row.source_metadata, segments) != row.input_fingerprint:
             raise ValueError("Source transcript changed")
-        if row.model != settings.GEMINI_MODEL:
+        expected_model = settings.GROQ_MODEL if row.provider == "groq" else settings.GEMINI_MODEL
+        if row.model != expected_model:
             raise ValueError("Provider model configuration mismatch")
         execution = {"credential_source": row.credential_source, "credential_id": row.credential_id,
                      "credential_user_id": row.credential_user_id, "provider": row.provider}
         owner = db.query(TranscriptionOwnership).filter_by(transcription_id=row.meeting_id).first()
+        if row.provider == "groq":
+            if row.credential_source != "platform":
+                raise RuntimeError("Invalid Groq credential source")
+            authorize_groq_claim(db, owner.user_id if owner else None, row.id)
         execution.update(usage_user_id=owner.user_id if owner else None,
                          usage_guest_id=owner.guest_session_id if owner else None,
                          usage_attempt_id=str(uuid4()), meeting_id=row.meeting_id, model=row.model)
@@ -110,7 +116,7 @@ def process_intelligence_job(intelligence_id: int) -> dict:
             provider=execution["provider"], credential_source=execution["credential_source"],
             model=execution["model"], session_factory=SessionLocal)
         usage.record("attempt", "attempt", 1, phase="started", status="started")
-        if execution["provider"] != "gemini":
+        if execution["provider"] not in {"gemini", "groq"}:
             raise RuntimeError("Unsupported intelligence provider")
         authorization_db = SessionLocal()
         try:
@@ -129,7 +135,15 @@ def process_intelligence_job(intelligence_id: int) -> dict:
             provider = get_provider(api_key=secret)
             secret = None
         elif execution["credential_source"] == "platform":
-            provider = get_provider()
+            if execution["provider"] == "groq":
+                authorization_db = SessionLocal()
+                try:
+                    begin_groq_call(authorization_db, intelligence_id, execution["usage_user_id"], context, execution["model"])
+                finally:
+                    authorization_db.close()
+                provider = get_provider(provider="groq", model=execution["model"])
+            else:
+                provider = get_provider()
         else:
             raise RuntimeError("Invalid intelligence credential source")
         if hasattr(provider, "set_usage_observer"):

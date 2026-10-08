@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ..config import settings
 from ..models import BetaAccessGrant, TranscriptionReservation, TranscriptionJob, TranscriptionOwnership, Transcription, User
 
-CAPABILITIES = {"transcription.byok", "transcription.local", "transcription.platform", "intelligence.byok", "intelligence.platform"}
+CAPABILITIES = {"transcription.byok", "transcription.local", "transcription.platform", "intelligence.byok", "intelligence.platform", "intelligence.groq.platform"}
 ACTIVE = {"queued", "processing", "started"}
 HELD = ACTIVE | {"unknown"}
 
@@ -79,7 +79,10 @@ def access(db, user_id, *, now=None, lock=False):
 
 def require_execution(db, user_id, provider, credential_source):
     _, caps, _, _ = access(db, user_id)
-    capability = ("transcription.local" if provider == "whisper" else
+    if provider == "groq" and credential_source != "platform":
+        raise HTTPException(403, "Chave própria para este serviço ainda não está disponível.")
+    capability = ("intelligence.groq.platform" if provider == "groq" else
+        "transcription.local" if provider == "whisper" else
         ("transcription." if provider == "assemblyai" else "intelligence.") +
         ("byok" if credential_source == "user" else "platform"))
     if capability not in caps:
