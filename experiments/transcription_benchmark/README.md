@@ -81,6 +81,12 @@ A autorização de publicação usa IDs exatos, não aceita apenas prefixos.
 python experiments/transcription_benchmark/summarize.py .local-artifacts/cpu-gpu-benchmark/results --public-only --csv experiments/transcription_benchmark/evidence/public-results.csv --summary experiments/transcription_benchmark/evidence/public-summary.json
 ```
 
+Os resultados executados estão em [REPORT.md](REPORT.md), com CSV público,
+resumo de dispersão e manifest de hashes/revisões dos modelos. `prepare.ps1`
+gera esse manifest pelo `provenance.py` no Linux, inclusive configs/tokenizers
+e symlinks do cache HF. Downloads novos seguem `main`: para repetição exata,
+obtenha as revisões/artefatos registrados e confira seus hashes antes da matriz.
+
 ## Pyannote (separado)
 
 `diarization.py` usa apenas speaker-diarization-3.1 em cache, offline, sem token
