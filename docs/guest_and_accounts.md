@@ -54,8 +54,10 @@ BYOK por conta está separado deste orçamento, sem fallback de execução para 
 [configuração, recuperação e limites AssemblyAI](assemblyai.md), inclusive a
 retenção externa, que não é coberta pela exclusão local.
 Contas públicas podem salvar e revisar reuniões, editar ações e usar os recursos
-P3 locais; não herdam credenciais externas da plataforma. A diarização local
-permanece permitida para contas autenticadas, conforme configuração existente.
+P3 locais; não herdam credenciais externas da plataforma. Transcrição e detecção
+de falantes local exigem ambiente explicitamente habilitado e homologado, além
+dos limites de plano. BYOK exige plano autorizado ou beta: veja
+[planos e reservas](account_plans.md). Histórico próprio não exige plano pago.
 
 Defaults operacionais configuráveis, não planos comerciais:
 

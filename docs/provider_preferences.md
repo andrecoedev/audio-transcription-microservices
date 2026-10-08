@@ -2,6 +2,11 @@
 
 ## Contrato por conta
 
+Novas gravações BYOK e inferências exigem Starter/Business ou beta explícito válido.
+Todas as contas existentes começam Free, inclusive locais/administradores; o papel
+não concede processamento. Chaves existentes não são apagadas: metadata e remoção
+continuam disponíveis. Veja [planos e reservas](account_plans.md).
+
 Configurações → Serviços de IA / Transcrição salva preferências no PostgreSQL, não no JWT nem em
 localStorage. Transcrição: `automatic`, `whisper`, `assemblyai`. Resumo inteligente:
 `automatic`, `gemini`. Detecção de falantes tem default por conta e override por job.
@@ -40,12 +45,12 @@ Override explícito por job continua válido. Antes de upload/queue:
   Não tenta Whisper depois de erro AssemblyAI. Uma credencial existente mas
   indisponível para decriptação não autoriza fallback.
 - Automático Intelligence: Gemini (único suportado atualmente), credencial própria
-  primeiro. Conta pública sem chave não gera análise com chave USAGI.
-- Identidades locais provisionadas pelo operador mantêm compatibilidade platform
-  explícita quando não há chave própria e a política daquele provider permite.
-  AssemblyAI platform ainda exige reserva/teto; não constitui benefício de signup.
-- Origem `user` não toca ledger/orçamento platform, mas preserva limites de upload,
-  duração, timeout, rate limiting e ownership. A cota/cobrança é da conta do usuário.
+  primeiro; a credencial da plataforma exige capability beta explícita.
+- Origem de cadastro/papel de admin não concedem uso platform. AssemblyAI exige
+  capability, reserva/teto global e franquia USAGI configurada.
+- Origem `user` não toca franquia/orçamento platform; o ledger registra uso BYOK
+  separadamente, preservando duração, armazenamento, fila, concorrência e rate limits.
+  A cota/cobrança externa é da conta do usuário.
 
 Job/revisão guardam provider, credential_source, credential_id e usuário da
 credencial, nunca secret. Redis recebe só ID do job. Worker decripta envelope
