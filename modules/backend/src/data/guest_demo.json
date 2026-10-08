@@ -1,0 +1,30 @@
+{
+  "id": "usagi-demo-v1",
+  "is_demo": true,
+  "title": "Reunião de exemplo",
+  "description": "Conversa fictícia criada exclusivamente para demonstrar a USAGI. Nenhum áudio foi enviado a serviços de IA nesta demonstração.",
+  "duration_seconds": 90,
+  "speakers": [
+    {"id": "SPEAKER_00", "display_name": "Falante 1"},
+    {"id": "SPEAKER_01", "display_name": "Falante 2"}
+  ],
+  "segments": [
+    {"order": 0, "start": 0, "end": 15, "speaker": "SPEAKER_00", "text": "Vamos organizar a apresentação do nosso projeto fictício. Precisamos mostrar o objetivo, um exemplo e os próximos passos."},
+    {"order": 1, "start": 15, "end": 30, "speaker": "SPEAKER_01", "text": "Concordo. Proponho começar pelo exemplo, mas ainda podemos discutir a ordem dos slides."},
+    {"order": 2, "start": 30, "end": 45, "speaker": "SPEAKER_00", "text": "Decidimos que a apresentação terá três partes: objetivo, exemplo e próximos passos. A ordem dos slides será definida depois."},
+    {"order": 3, "start": 45, "end": 60, "speaker": "SPEAKER_01", "text": "Eu, Falante 2, vou preparar o exemplo até sexta-feira."},
+    {"order": 4, "start": 60, "end": 75, "speaker": "SPEAKER_00", "text": "Também precisamos revisar os slides. Essa tarefa está confirmada, mas ainda não definimos responsável nem prazo."},
+    {"order": 5, "start": 75, "end": 90, "speaker": "SPEAKER_01", "text": "Fica em aberto qual será a ordem dos slides. Vamos discutir isso na próxima conversa."}
+  ],
+  "intelligence": {
+    "schema_version": "1",
+    "summary": "Os dois falantes organizaram uma apresentação fictícia em três partes: objetivo, exemplo e próximos passos. O Falante 2 preparará o exemplo até sexta-feira. A revisão dos slides foi confirmada, sem responsável ou prazo definidos. A ordem dos slides continua em aberto.",
+    "topics": [{"description": "Organização da apresentação do projeto fictício.", "evidence": [{"segment_order": 0, "quote": "Precisamos mostrar o objetivo, um exemplo e os próximos passos."}]}],
+    "decisions": [{"description": "A apresentação terá três partes: objetivo, exemplo e próximos passos.", "evidence": [{"segment_order": 2, "quote": "Decidimos que a apresentação terá três partes: objetivo, exemplo e próximos passos."}]}],
+    "action_items": [
+      {"description": "Preparar o exemplo da apresentação.", "assignee": "Falante 2", "due_date": "sexta-feira", "evidence": [{"segment_order": 3, "quote": "Eu, Falante 2, vou preparar o exemplo até sexta-feira."}]},
+      {"description": "Revisar os slides.", "assignee": null, "due_date": null, "evidence": [{"segment_order": 4, "quote": "Também precisamos revisar os slides. Essa tarefa está confirmada, mas ainda não definimos responsável nem prazo."}]}
+    ],
+    "open_questions": [{"description": "Qual será a ordem dos slides?", "evidence": [{"segment_order": 5, "quote": "Fica em aberto qual será a ordem dos slides."}]}]
+  }
+}

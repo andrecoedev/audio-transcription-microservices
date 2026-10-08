@@ -2,8 +2,18 @@
 
 ## Experiência e identidade
 
-`/` e `/new-transcription` usam o Layout, navegação e upload do aplicativo,
-inclusive sem conta; `/guest` é somente um redirect compatível para `/`.
+`/` e `/new-transcription` usam o Layout e a navegação do aplicativo.
+Sem conta, Início apresenta o produto e Nova Transcrição abre uma demonstração
+interativa read-only. `/guest` redireciona para `/new-transcription`.
+O visitante explora transcrição, filtro de falantes, resumo, decisões, tarefas e
+suas evidências, sem enviar áudio. Toda a conversa é fictícia e identificada como
+demonstração; não contém dados de usuários nem informação pessoal real.
+
+`GET /guest/demo` entrega o exemplo versionado `src/data/guest_demo.json`, sem
+banco, Redis, ML ou provider externo. Não cria sessão, recurso privado ou evento
+de consumo. Seu identificador textual não é um ID de transcrição/reunião.
+O resumo usa o contrato v1 existente, com referências literais verificadas nos
+testes. Foi redigido para demonstração, não gerado por uma chamada de IA.
 Recursos privados mostram um convite para entrar/criar conta, sem montar telas
 que disparem requests privados. `/signup` cria usuário persistente não administrador;
 login mantém o JWT no navegador como antes e logout remove a sessão local.
@@ -22,17 +32,23 @@ Os resultados continuam no PostgreSQL, não no estado efêmero RQ.
 
 ## Operações e limites
 
-Guest usa exclusivamente AssemblyAI com detecção de falantes nativa, sem
-Whisper/Pyannote/CUDA nem fallback. Uma submissão por arquivo, com timestamps
-normalizados em segundos e falhas propagadas, não texto falso de sucesso.
-Fica desligado por padrão: exige política explícita, chave no Worker, indicação
-segura na API e orçamento PostgreSQL. A política publica `can_create_job` conforme
-essa admissão; configuração ausente retorna 503, quota/orçamento esgotado 429.
-Jobs legados sem reserva ou Guest Whisper são rejeitados antes de engines.
-Sessão, leitura de resultados, claim e exclusão continuam protegidos.
+Novas inferências Guest foram encerradas deliberadamente: o endpoint depreciado
+`POST /guest/transcriptions/jobs` retorna **403**, mesmo com chave, orçamento e
+`AAI_GUEST_ENABLED=true`. O bloqueio precede Redis, leitura do corpo e spool
+multipart. `/guest/policy` publica `mode=demo`, `can_create_job=false` e
+`blocked_by=demo_only`. Os campos de limites/formato permanecem por compatibilidade:
+o upload de contas públicas também consulta esse contrato; não autorizam Guest.
 
-O ledger financeiro persiste origem platform/contexto original mesmo após claim,
-reserva custo conservador antes do enqueue e marca tentativa antes de upload.
+O Worker rejeita jobs ainda pertencentes a Guest antes de materializar áudio ou
+inicializar engines. Reservas AssemblyAI com contexto original Guest não podem
+ser executadas nem após claim. Jobs antigos pendentes/recuperados falham de forma
+segura; resultados já concluídos não são alterados. Não há cancelamento forçado
+de chamadas que já estavam em andamento durante a implantação: suspenda admissão
+e deixe os work horses ativos terminarem antes de atualizar o Worker.
+Sessão, leitura de resultados, claim e exclusão anteriores continuam protegidos.
+
+O ledger operacional histórico persiste origem platform/contexto original mesmo após claim,
+reservava custo conservador antes do enqueue e marcava tentativa antes de upload.
 Não há reembolso/reset em exclusão nem segunda submissão automática em recovery.
 BYOK por conta está separado deste orçamento, sem fallback de execução para a chave da plataforma. Consulte
 [configuração, recuperação e limites AssemblyAI](assemblyai.md), inclusive a
@@ -47,23 +63,24 @@ Defaults operacionais configuráveis, não planos comerciais:
 |---|---:|---|
 | `SIGNUP_RATE_LIMIT_PER_IP` | 5/h | Cadastro |
 | `GUEST_SESSION_RATE_LIMIT_PER_IP` | 5/h | Criação de sessão |
-| `GUEST_JOBS_PER_SESSION` | 1 | Reserva atômica persistente |
+| `GUEST_JOBS_PER_SESSION` | 1 | Compatibilidade histórica; não autoriza novos jobs |
 | `GUEST_RETENTION_HOURS` | 24 | Desde criação da sessão |
-| `PUBLIC_MAX_UPLOAD_MB` | 100 MiB | Guest e conta pública |
+| `PUBLIC_MAX_UPLOAD_MB` | 100 MiB | Conta pública; uploads Guest encerrados |
 | `PUBLIC_MAX_AUDIO_SECONDS` | 600s | Snapshot no job |
 | `PUBLIC_JOB_TIMEOUT_SECONDS` | 300s | Snapshot no job/RQ/recovery |
-| `PUBLIC_JOB_RATE_LIMIT_PER_IP` | 3/h | Guest e conta pública |
+| `PUBLIC_JOB_RATE_LIMIT_PER_IP` | 3/h | Novos jobs de conta pública |
 | `PUBLIC_JOB_RATE_LIMIT_GLOBAL` | 10/h | Quota de jobs públicos, não orçamento pago |
 
-Redis indisponível fecha criação de sessão, signup e upload/job com 503.
+Redis indisponível fecha criação de sessão, signup e upload/job de conta com 503.
+Demonstração e negativa de upload Guest não dependem de Redis.
 Login, signup e claim limitam o corpo JSON real a 16 KiB antes de parsing.
 Limite retorna 429/Retry-After; consultas a resultados persistidos não dependem
 de Redis. Janela fixa pode permitir dois orçamentos próximos à virada de hora;
 não é contabilização financeira. Cadastro de múltiplas contas não reinicia o
 orçamento global público. Falhas/tentativas podem consumir o orçamento horário;
-excluir um resultado não reinicia a cota persistente de Guest.
+excluir um resultado anterior não reinicia sua contabilização histórica.
 
-O upload Guest e o JWT emitido para conta pública limitam também os bytes reais da requisição antes do spool
+O JWT emitido para conta pública limita também os bytes reais da requisição antes do spool
 multipart, com margem de 64 KiB para envelope. O Worker converte somente até
 limite de duração + 1s e rejeita excedentes antes da inferência. Não confia na
 duração declarada pelo cliente. Timeout inclui carregamento de modelos; máquina
@@ -110,6 +127,14 @@ exige plano explícito de preservação/transferência, não transforma silencio
 conta pública em identidade local privilegiada nem descarta dados temporários.
 
 ## BYOK e providers
+
+Esta Task não implementa planos nem restringe BYOK existente. Free permanente
+com franquias UTC, Starter/BYOK e concessões beta administrativas explícitas com
+prazo são **planejados**, não benefícios já disponíveis. Nenhuma conta é promovida
+automaticamente; nenhuma credencial/reunião/transcrição é apagada. Free com
+Whisper dependerá de ambiente explicitamente habilitado e homologado, sem
+AssemblyAI automático como alternativa. Groq, cobrança e infraestrutura ficam
+nas entregas posteriores. Cadastro não é promessa de transcrição gratuita real.
 
 BYOK é o padrão para contas públicas e está disponível em Settings, com proteção
 de armazenamento e respostas somente de metadados; ver [providers](provider_preferences.md).

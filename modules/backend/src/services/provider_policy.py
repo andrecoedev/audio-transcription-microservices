@@ -11,9 +11,8 @@ from ..config import settings
 
 
 def require_guest_processing() -> None:
-    if not settings.AAI_GUEST_ENABLED:
-        raise HTTPException(503, "Visitor transcription is unavailable")
-    require_platform_processing()
+    # Guest is a read-only demonstration, even if old deployment flags/key remain.
+    raise HTTPException(403, "A demonstração não processa arquivos. Entre para consultar os serviços disponíveis para sua conta.")
 
 
 def require_platform_processing() -> None:

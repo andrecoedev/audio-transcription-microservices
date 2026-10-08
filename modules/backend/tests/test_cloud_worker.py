@@ -12,7 +12,6 @@ from src.workers import transcription_worker
 def test_cloud_worker_preserves_native_result_and_never_repeats_attempt(db_context, monkeypatch, tmp_path, failure):
     factory = db_context["session_factory"]
     monkeypatch.setattr(settings, "AAI_PLATFORM_ENABLED", True)
-    monkeypatch.setattr(settings, "AAI_GUEST_ENABLED", True)
     monkeypatch.setattr(settings, "AAI_PLATFORM_BUDGET_CENTS", 200)
     monkeypatch.setattr(transcription_worker, "SessionLocal", factory)
     source = tmp_path / "cloud.wav"
@@ -25,7 +24,7 @@ def test_cloud_worker_preserves_native_result_and_never_repeats_attempt(db_conte
     tid = row.id
     db.add(TranscriptionJob(transcription_id=tid, input_path=str(source), use_diarization=True,
         transcription_model="assemblyai", max_duration_seconds=600, status="queued"))
-    reserve_platform_call(db, tid, "guest")
+    reserve_platform_call(db, tid, "local")
     db.commit()
     calls = []
 

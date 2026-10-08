@@ -69,6 +69,10 @@ def begin_platform_call(db, transcription_id: int) -> str:
     call = db.query(PlatformProviderCall).filter_by(transcription_id=transcription_id).one_or_none()
     if not call or call.credential_source != "platform" or call.provider != "assemblyai":
         raise RuntimeError("Platform call has no authorized reservation")
+    if call.context == "guest":
+        # Preserve old reservations for audit, but never revive a paid Guest call,
+        # including after its ownership was claimed by an authenticated account.
+        raise RuntimeError("Visitor processing is disabled; demonstration only")
     if not settings.AAI_PLATFORM_ENABLED:
         raise RuntimeError("Platform transcription is disabled")
     updated = db.query(PlatformProviderCall).filter(

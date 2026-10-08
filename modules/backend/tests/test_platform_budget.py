@@ -124,7 +124,9 @@ def test_reserved_context_survives_ownership_transfer(db_context, monkeypatch):
 
     call = db.query(PlatformProviderCall).filter_by(transcription_id=transcription.id).one()
     assert call.context == "guest"
-    assert begin_platform_call(db, transcription.id) == "guest"
+    with pytest.raises(RuntimeError, match="demonstration only"):
+        begin_platform_call(db, transcription.id)
+    assert call.state == "reserved"
     db.close()
 
 

@@ -3,50 +3,64 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from src.config import settings
-from src.models import GuestSession, Transcription, TranscriptionOwnership, User
+from src.models import GuestSession, Transcription, TranscriptionJob, TranscriptionOwnership, User
 from src.security import create_access_token
 from src.services.guest_retention import apply_guest_retention
 from src.services import rate_limit
 from .conftest import FakeRedisConnection
 
 
-@pytest.fixture(autouse=True)
-def simulated_guest_provider_admission(monkeypatch):
-    # These ownership/upload regressions use a fake queue, never paid calls.
-    # P4-04 admission is simulated only here; production remains fail-closed.
-    from src.routers import transcriptions
-    monkeypatch.setattr(transcriptions, "require_guest_processing", lambda: None)
-    monkeypatch.setattr(transcriptions, "reserve_platform_call", lambda *_args: None)
-
-
-def test_guest_processing_blocked_by_provider_recovery_without_local_fallback(db_context, monkeypatch, wav_bytes):
-    from src.routers import transcriptions
-    from src.services.provider_policy import require_guest_processing
-    monkeypatch.setattr(transcriptions, "require_guest_processing", require_guest_processing)
+def test_guest_job_creation_is_permanently_disabled(db_context, monkeypatch, wav_bytes):
     client = db_context["client"]
     policy = client.get("/guest/policy").json()
-    assert policy["provider"] == "assemblyai" and policy["diarization"] is True
-    assert policy["can_create_job"] is False and policy["blocked_by"] == "P4-04"
+    assert policy["mode"] == "demo" and policy["provider"] is None
+    assert policy["demo_url"] == "/guest/demo" and policy["blocked_by"] == "demo_only"
+    assert policy["can_create_job"] is False
     assert policy["max_upload_mb"] == settings.PUBLIC_MAX_UPLOAD_MB
     assert policy["max_audio_seconds"] == settings.PUBLIC_MAX_AUDIO_SECONDS
     assert policy["allowed_extensions"] == settings.allowed_extensions_list
     guest = guest_headers(client)
-    response = client.post("/guest/transcriptions/jobs", headers=guest,
-        files={"file": ("synthetic.wav", wav_bytes)}, data={"use_diarization": "true"})
-    assert response.status_code == 503
+    for enabled in (False, True):
+        monkeypatch.setattr(settings, "AAI_GUEST_ENABLED", enabled, raising=False)
+        response = client.post("/guest/transcriptions/jobs", headers=guest,
+            files={"file": ("synthetic.wav", wav_bytes)}, data={"use_diarization": "true"})
+        assert response.status_code == 403
     assert db_context["queue"].enqueued == []
     assert client.get("/guest/session", headers=guest).json()["jobs_created"] == 0
 
 
-def test_simulated_guest_assemblyai_admission_preserves_speaker_option(db_context, wav_bytes):
-    client = db_context["client"]
-    response = client.post("/guest/transcriptions/jobs", headers=guest_headers(client),
-        files={"file": ("synthetic.wav", wav_bytes)}, data={"use_diarization": "true"})
-    assert response.status_code == 202
+def seed_legacy_guest_result(db_context, headers, *, filename="test.wav", status="queued", job_status=None,
+                             object_storage=False):
+    """Create persisted legacy guest data without exercising the retired upload API."""
     db = db_context["session_factory"]()
-    job = db.get(Transcription, response.json()["id"]).job
-    assert job.transcription_model == "assemblyai" and job.use_diarization is True
+    from src.security import decode_verified_claims
+    session_id = decode_verified_claims(headers["Authorization"][7:])["sub"]
+    guest_session = db.get(GuestSession, session_id)
+    guest_session.jobs_created = 1
+    row = Transcription(filename=filename, original_filename=filename, file_size_mb=1,
+        duration_seconds=1, transcription_model="assemblyai", segments=[], status=status)
+    db.add_all([guest_session, row])
+    db.flush()
+    input_path = db_context["tmp_path"] / "uploads" / f"legacy-{row.id}.wav"
+    input_path.parent.mkdir(parents=True, exist_ok=True)
+    input_path.write_bytes(b"synthetic legacy audio")
+    object_key = f"{row.id:032x}.wav" if object_storage else None
+    if object_key:
+        input_path = input_path.parent / object_key
+        input_path.write_bytes(b"synthetic legacy object")
+    db.add_all([
+        TranscriptionJob(transcription_id=row.id, input_path=str(input_path),
+            input_object_key=object_key, max_duration_seconds=settings.PUBLIC_MAX_AUDIO_SECONDS,
+            timeout_seconds=settings.PUBLIC_JOB_TIMEOUT_SECONDS,
+            transcription_model="assemblyai", use_diarization=True,
+            status=job_status or status),
+        TranscriptionOwnership(transcription_id=row.id, owner_sub=f"guest:{session_id}",
+            guest_session_id=session_id),
+    ])
+    db.commit()
+    result = (session_id, row.id)
     db.close()
+    return result
 
 
 def guest_headers(client):
@@ -146,9 +160,7 @@ def test_guest_isolation_private_routes_and_safe_conversion(db_context, auth_hea
     guest = guest_headers(client)
     other = guest_headers(client)
     filename = "Reunião de equipe.wav"
-    job = client.post("/guest/transcriptions/jobs", headers=guest, files={"file": (filename, wav_bytes)})
-    assert job.status_code == 202
-    tid = job.json()["id"]
+    _, tid = seed_legacy_guest_result(db_context, guest, filename=filename)
     guest_result = client.get(f"/guest/transcriptions/{tid}", headers=guest)
     assert guest_result.status_code == 200
     assert guest_result.json()["original_filename"] == filename
@@ -171,9 +183,9 @@ def test_guest_isolation_private_routes_and_safe_conversion(db_context, auth_hea
 def test_guest_expiry_and_job_budget_are_server_side(db_context, wav_bytes):
     client = db_context["client"]
     headers = guest_headers(client)
-    for expected in (202, 429):
+    for _ in range(2):
         assert client.post("/guest/transcriptions/jobs", headers=headers,
-                           files={"file": ("test.wav", wav_bytes)}).status_code == expected
+                           files={"file": ("test.wav", wav_bytes)}).status_code == 403
     db = db_context["session_factory"]()
     db.query(GuestSession).one().expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
     db.commit()
@@ -210,7 +222,7 @@ def test_public_budgets_and_redis_failure_are_fail_closed(db_context, monkeypatc
 def test_guest_retention_dry_run_repeated_and_active_preservation(db_context, wav_bytes):
     client = db_context["client"]
     headers = guest_headers(client)
-    tid = client.post("/guest/transcriptions/jobs", headers=headers, files={"file": ("test.wav", wav_bytes)}).json()["id"]
+    _, tid = seed_legacy_guest_result(db_context, headers)
     db = db_context["session_factory"]()
     db.query(GuestSession).one().expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
     db.commit()
@@ -227,10 +239,9 @@ def test_guest_retention_dry_run_repeated_and_active_preservation(db_context, wa
 
 
 def test_guest_upload_body_is_bounded_before_multipart_parsing(db_context, monkeypatch):
-    monkeypatch.setattr(settings, "PUBLIC_MAX_UPLOAD_MB", 1)
     response = db_context["client"].post("/guest/transcriptions/jobs",
         content=b"x" * (2 * 1024 * 1024), headers={"Content-Type": "multipart/form-data; boundary=test"})
-    assert response.status_code == 413
+    assert response.status_code == 403
     assert db_context["queue"].enqueued == []
 
 
@@ -243,9 +254,9 @@ def test_guest_global_budget_is_shared_with_public_accounts(db_context, monkeypa
     public = signup(client).json()
     headers = {"Authorization": "Bearer " + public["access_token"]}
     assert client.post("/guest/transcriptions/jobs", headers=guest,
-        files={"file": ("test.wav", wav_bytes)}).status_code == 202
+        files={"file": ("test.wav", wav_bytes)}).status_code == 403
     assert client.post("/transcriptions/jobs", headers=headers,
-        files={"file": ("test.wav", wav_bytes)}).status_code == 429
+        files={"file": ("test.wav", wav_bytes)}).status_code == 202
     assert len(db_context["queue"].enqueued) == 1
 
 
@@ -272,8 +283,7 @@ def test_sensitive_json_bodies_are_bounded_before_parsing(db_context, route):
 def test_deletion_does_not_report_missing_input_as_cleanup_failure(db_context, wav_bytes, caplog):
     client = db_context["client"]
     guest = guest_headers(client)
-    tid = client.post("/guest/transcriptions/jobs", headers=guest,
-                      files={"file": ("test.wav", wav_bytes)}).json()["id"]
+    _, tid = seed_legacy_guest_result(db_context, guest, status="failed", job_status="failed", object_storage=True)
     db = db_context["session_factory"]()
     row = db.get(Transcription, tid)
     row.status = row.job.status = "failed"
@@ -288,7 +298,7 @@ def test_deletion_does_not_report_missing_input_as_cleanup_failure(db_context, w
 def test_claimed_result_survives_guest_retention_and_preserves_job_limits(db_context, auth_headers, wav_bytes):
     client = db_context["client"]
     guest = guest_headers(client)
-    tid = client.post("/guest/transcriptions/jobs", headers=guest, files={"file": ("test.wav", wav_bytes)}).json()["id"]
+    _, tid = seed_legacy_guest_result(db_context, guest, status="completed", job_status="completed")
     assert client.post("/guest/claim", headers=auth_headers(), json={"guest_token": guest["Authorization"][7:]}).status_code == 200
     db = db_context["session_factory"]()
     session = db.query(GuestSession).one()
@@ -306,7 +316,8 @@ def test_guest_retention_reports_partial_file_failure(db_context, monkeypatch, w
     from src.services.object_storage import LocalObjectStorage, StorageError
     client = db_context["client"]
     guest = guest_headers(client)
-    tid = client.post("/guest/transcriptions/jobs", headers=guest, files={"file": ("test.wav", wav_bytes)}).json()["id"]
+    _, tid = seed_legacy_guest_result(db_context, guest, status="failed", job_status="failed",
+                                     object_storage=True)
     db = db_context["session_factory"]()
     db.query(GuestSession).one().expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
     row = db.get(Transcription, tid)

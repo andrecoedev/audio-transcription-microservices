@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import Button from '../components/Button'
 import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import ProcessingStatus from '../components/ProcessingStatus'
-import NewTranscription from './NewTranscription'
-import { formatCount, formatNumber } from '../utils/format'
 import { guestService } from '../services/guestService'
 import { useAuthStore } from '../stores/authStore'
 
@@ -20,11 +18,12 @@ function storedSession() {
   }
 }
 
-export default function Guest({ showUpload = true }) {
+// Restores only a temporary result created by the legacy guest flow. This
+// component never creates a guest session or a transcription job.
+export default function Guest() {
   const navigate = useNavigate()
   const authenticated = useAuthStore((state) => state.isAuthenticated)
   const [session, setSession] = useState(storedSession)
-  const [policy, setPolicy] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -35,14 +34,6 @@ export default function Guest({ showUpload = true }) {
     if (value) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value))
     else sessionStorage.removeItem(STORAGE_KEY)
   }
-
-  useEffect(() => {
-    if (authenticated || !showUpload) return
-    let active = true
-    guestService.policy().then((value) => { if (active) { setPolicy(value); setError('') } })
-      .catch(() => { if (active) setError('Não foi possível carregar os limites. Tente novamente.') })
-    return () => { active = false }
-  }, [retry, authenticated, showUpload])
 
   useEffect(() => {
     if (!session?.guest_token) return
@@ -70,18 +61,6 @@ export default function Guest({ showUpload = true }) {
     load()
     return () => { active = false; clearTimeout(timer) }
   }, [session, retry])
-
-  async function createJob(file, options) {
-    if (!policy?.can_create_job) throw new Error(policy?.unavailable_reason || 'Transcrição temporariamente indisponível')
-    let current = session
-    if (!current) {
-      current = await guestService.createSession()
-      saveSession(current)
-    }
-    const created = await guestService.createJob(current.guest_token, file, options)
-    saveSession({ ...current, resultId: created.id })
-    return created
-  }
 
   async function claim() {
     try {
@@ -112,14 +91,13 @@ export default function Guest({ showUpload = true }) {
     }
   }
 
-  if ((authenticated || !showUpload) && !session?.resultId && !error) return null
+  if (!session?.resultId && !session?.spent && !error) return null
 
   return <div className="max-w-6xl mx-auto space-y-6">
-      {error && <Card><CardContent><div role="alert">{error}<Button variant="outline" onClick={() => setRetry((n) => n + 1)}>Tentar novamente</Button></div></CardContent></Card>}
-      {showUpload && !authenticated && !policy && !error && <p role="status">Carregando limites...</p>}
-      {session?.resultId ? <Card>
-        <CardHeader><CardTitle>{authenticated ? 'Salve sua transcrição anterior' : 'Resultado da transcrição'}</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
+    {error && <Card><CardContent><div role="alert">{error}<Button variant="outline" onClick={() => setRetry((n) => n + 1)}>Tentar novamente</Button></div></CardContent></Card>}
+    {session?.resultId ? <Card>
+      <CardHeader><CardTitle>{authenticated ? 'Salve sua transcrição anterior' : 'Resultado da transcrição'}</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
         {!result ? <p role="status">Carregando resultado...</p> : <>
           <ProcessingStatus status={result.status} errorMessage={result.error_message} />
           {result.status === 'completed' && result.segments?.map((segment, index) => <p key={index}>
@@ -130,11 +108,7 @@ export default function Guest({ showUpload = true }) {
             <Button variant="outline" onClick={remove} disabled={busy || ['queued', 'processing'].includes(result.status)}>Excluir resultado temporário</Button>
           </div>
         </>}
-      </CardContent></Card> : showUpload && !authenticated && policy && !session?.spent && <NewTranscription guestPolicy={policy} onCreate={createJob} onCreated={() => {}} />}
-      {!authenticated && policy && <div className="text-sm text-gray-500 space-y-2">
-        <p>Até {formatNumber(policy.max_upload_mb)} MB e {formatCount(Math.floor(policy.max_audio_seconds / 60), 'minuto', 'minutos')}. {formatCount(policy.jobs_per_session, 'transcrição', 'transcrições')} por sessão; o resultado fica nesta aba por {formatCount(policy.retention_hours, 'hora', 'horas')}.</p>
-        <p><Link className="text-primary-700" to="/login?saveGuest=1">Entrar</Link> ou <Link className="text-primary-700" to="/signup?saveGuest=1">criar conta</Link> para salvar suas reuniões.</p>
-      </div>}
-      {session?.spent && <p>Resultado excluído. Crie uma conta para continuar; excluir não reinicia a cota de visitante.</p>}
+      </CardContent>
+    </Card> : session?.spent && <p>Resultado temporário excluído.</p>}
   </div>
 }

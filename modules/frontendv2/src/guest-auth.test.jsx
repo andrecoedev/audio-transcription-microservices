@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import Guest from './pages/Guest'
+import GuestDemo from './pages/GuestDemo'
 import App from './App'
 import Login from './pages/Login'
 import NewTranscription from './pages/NewTranscription'
@@ -11,7 +12,7 @@ import { useAuthStore } from './stores/authStore'
 import { audioService } from './services/audioService'
 
 vi.mock('./services/guestService', () => ({ guestService: {
-  policy: vi.fn(), session: vi.fn(), result: vi.fn(), createSession: vi.fn(),
+  policy: vi.fn(), demo: vi.fn(), session: vi.fn(), result: vi.fn(), createSession: vi.fn(),
   createJob: vi.fn(), claim: vi.fn(), delete: vi.fn(),
 } }))
 vi.mock('./services/authService', () => ({ authService: { signup: vi.fn(), login: vi.fn(), me: vi.fn(), getConfig: vi.fn() } }))
@@ -31,6 +32,12 @@ beforeEach(() => {
   useAuthStore.setState({ user: null, token: null, authProvider: 'local', isAuthenticated: false })
   authService.getConfig.mockResolvedValue({ firebase_enabled: false, local_signup_enabled: true })
   guestService.policy.mockResolvedValue(policy)
+  guestService.demo.mockResolvedValue({
+    id: 'usagi-demo-v1', is_demo: true, title: 'Reunião de exemplo', description: 'Demonstração sintética.', duration_seconds: 90,
+    speakers: [{ id: 'SPEAKER_00', display_name: 'Falante 1' }],
+    segments: [{ order: 0, start: 0, end: 15, speaker: 'SPEAKER_00', text: 'Trecho sintético.' }],
+    intelligence: { schema_version: '1', summary: 'Resumo sintético.', topics: [], decisions: [], action_items: [], open_questions: [] },
+  })
   audioService.getProviderSettings.mockResolvedValue({
     preferences: { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: true },
     credential_storage_available: true,
@@ -90,19 +97,21 @@ describe('Guest and account boundaries', () => {
     expect(await screen.findByRole('heading', { name: 'Início' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Iniciar Transcrição' })).toBeNull()
     expect(document.querySelector('input[type="file"]')).toBeNull()
-    expect(screen.getByRole('link', { name: 'Iniciar uma transcrição' }).getAttribute('href')).toBe('/new-transcription')
+    expect(screen.getByRole('link', { name: 'Ver demonstração' }).getAttribute('href')).toBe('/new-transcription')
     expect(screen.getByRole('complementary')).toBeTruthy()
     expect(authService.me).not.toHaveBeenCalled()
     expect(guestService.policy).not.toHaveBeenCalled()
   })
 
-  it('navigates from the guest dashboard to the only upload route without creating a session', async () => {
+  it('opens the synthetic demo without exposing upload or creating a guest session/job', async () => {
     render(<App />)
-    fireEvent.click(await screen.findByRole('link', { name: 'Iniciar uma transcrição' }))
-    expect(await screen.findByRole('heading', { name: 'Nova Transcrição' })).toBeTruthy()
-    expect(document.querySelector('input[type="file"]')).not.toBeNull()
+    fireEvent.click(await screen.findByRole('link', { name: 'Ver demonstração' }))
+    expect(await screen.findByRole('heading', { name: 'Demonstração interativa' })).toBeTruthy()
+    expect(await screen.findByText('Reunião de exemplo')).toBeTruthy()
+    expect(document.querySelector('input[type="file"]')).toBeNull()
     expect(window.location.pathname).toBe('/new-transcription')
     expect(guestService.createSession).not.toHaveBeenCalled()
+    expect(guestService.createJob).not.toHaveBeenCalled()
   })
 
   it('App keeps protected history behind login', async () => {
@@ -111,17 +120,13 @@ describe('Guest and account boundaries', () => {
     expect(await screen.findByText('Salve e acompanhe suas reuniões')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Reuniões' })).toBeNull()
   })
-  it('opens public upload without logging in or creating an identity on page load', async () => {
-    render(<MemoryRouter><Guest /></MemoryRouter>)
-    expect(await screen.findByText(/Até 100 MB e 10 minutos/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'criar conta' })).toBeTruthy()
-    expect(screen.getByText('Transcrição com AssemblyAI')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Faster-Whisper/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /AssemblyAI/ })).toBeNull()
-    expect(screen.getByLabelText('Detecção de falantes')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
+  it('opens the public demo without upload, policy lookup, or creating an identity', async () => {
+    render(<MemoryRouter><GuestDemo /></MemoryRouter>)
+    expect(await screen.findByText('Reunião de exemplo')).toBeTruthy()
+    expect(document.querySelector('input[type="file"]')).toBeNull()
     expect(guestService.createSession).not.toHaveBeenCalled()
     expect(guestService.createJob).not.toHaveBeenCalled()
+    expect(guestService.policy).not.toHaveBeenCalled()
     expect(audioService.getProviderSettings).not.toHaveBeenCalled()
   })
 

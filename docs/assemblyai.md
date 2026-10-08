@@ -25,7 +25,7 @@ Whisper/P3 mantêm contratos existentes. Automatic/Settings/BYOK são descritos 
 | Variável | Default | Uso |
 |---|---:|---|
 | AAI_PLATFORM_ENABLED | false | Permissão explícita para consumir a chave platform |
-| AAI_GUEST_ENABLED | false | Permissão adicional para Guest |
+| AAI_GUEST_ENABLED | false | Legado; não habilita processamento Guest demonstrativo |
 | AAI_PLATFORM_BUDGET_CENTS | 0 | Teto cumulativo USD, não diário/mensal |
 | AAI_MAX_AUDIO_SECONDS | 600 | Máximo cloud, também para identidades locais |
 | AAI_TIMEOUT_SECONDS | 180 | Deadline da submissão/polling |
@@ -36,7 +36,10 @@ Chave somente no Worker; API recebe AAI_API_KEY_CONFIGURED como booleano.
 Presença da chave não autoriza consumo. Recrie API/Worker após alterar política.
 Contas públicas autenticadas NÃO herdam credencial platform, mesmo com flags
 ligadas; user credential ainda é explicitamente negada, nunca desviada para platform.
-Guest mantém limites públicos 100 MiB/600s, quota por sessão/IP/global e retenção.
+Guest agora é exclusivamente demonstrativo: novas chamadas AssemblyAI são negadas
+independentemente de `AAI_GUEST_ENABLED`. Limites e retenção permanecem nos registros
+anteriores; evidências de chamadas Guest abaixo são históricas, não autorização
+para consumo novo. Consulte [contrato Guest atual](guest_and_accounts.md).
 Seu timeout RQ default 300s é independente da duração do áudio. Deadline HTTP não
 substitui supervisão RQ: upload em streaming pode consumir várias operações socket.
 
