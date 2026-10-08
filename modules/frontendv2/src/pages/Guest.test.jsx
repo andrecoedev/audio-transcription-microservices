@@ -16,6 +16,7 @@ beforeEach(() => {
   sessionStorage.setItem('usagi-guest-session', JSON.stringify({ guest_token: 'guest-proof', resultId: 7 }))
   guestService.result.mockResolvedValue({ id: 7, status: 'completed', segments: [{ start: 0, end: 1, text: 'Guest result' }] })
   guestService.claim.mockResolvedValue({ transferred: 1 })
+  guestService.delete.mockResolvedValue({ deleted: true })
 })
 afterEach(cleanup)
 
@@ -36,5 +37,13 @@ describe('Guest result ownership', () => {
     render(<MemoryRouter><Guest /></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: 'Na fila' })).toBeTruthy()
     expect(screen.queryByText(/%|minuto|segundo/i)).toBeNull()
+  })
+
+  it('confirms temporary result deletion without mentioning an obsolete visitor quota', async () => {
+    render(<MemoryRouter><Guest /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir resultado temporário' }))
+    expect(await screen.findByText('Resultado temporário excluído.')).toBeTruthy()
+    expect(screen.queryByText(/cota de visitante/i)).toBeNull()
+    expect(guestService.delete).toHaveBeenCalledWith('guest-proof', 7)
   })
 })

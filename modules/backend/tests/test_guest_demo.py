@@ -96,3 +96,17 @@ def test_claimed_legacy_guest_reservation_cannot_start_paid_call(db_context, mon
     db.expire_all()
     assert db.query(PlatformProviderCall).one().state == "reserved"
     db.close()
+
+
+@pytest.mark.parametrize("path,payload", [
+    ("/transcriptions/jobs", {}),
+    ("/meetings/1/intelligence", {}),
+    ("/meetings/1/intelligence/regenerate", {}),
+    ("/meeting-minutes/generate", {"transcription_id": 1, "title": "Exemplo"}),
+])
+def test_guest_proof_cannot_authorize_private_processing(db_context, path, payload):
+    from .test_public_guest import guest_headers
+    headers = guest_headers(db_context["client"])
+    response = db_context["client"].post(path, headers=headers, json=payload)
+    assert response.status_code == 401
+    assert db_context["queue"].enqueued == []
