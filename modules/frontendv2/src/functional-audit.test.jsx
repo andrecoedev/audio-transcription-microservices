@@ -99,6 +99,7 @@ describe('functional frontend contracts', () => {
       transcription_provider: 'whisper', intelligence_provider: 'gemini', use_diarization: true,
     }))
 
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar minha API Gemini' }))
     const secretInput = screen.getByLabelText('Credencial Gemini')
     fireEvent.change(secretInput, { target: { value: 'synthetic-key-never-rendered' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[0])
@@ -120,7 +121,8 @@ describe('functional frontend contracts', () => {
     })
     audioService.saveProviderCredential.mockRejectedValue(new Error('provider returned sensitive detail'))
     render(<MemoryRouter><Settings /></MemoryRouter>)
-    const secretInput = await screen.findByLabelText('Credencial AssemblyAI')
+    fireEvent.click(await screen.findByRole('button', { name: 'Conectar minha API AssemblyAI' }))
+    const secretInput = screen.getByLabelText('Credencial AssemblyAI')
     fireEvent.change(secretInput, { target: { value: 'synthetic-key' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[0])
     await waitFor(() => expect(secretInput.value).toBe(''))

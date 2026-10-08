@@ -5,7 +5,7 @@ import HelpPopover from './HelpPopover'
 
 const providerNames = {
   automatic: 'Automático',
-  whisper: 'Transcrição local (Faster-Whisper)',
+  whisper: 'Transcrição local',
   assemblyai: 'AssemblyAI',
   gemini: 'Gemini',
 }
@@ -23,15 +23,15 @@ function resolveProvider(preference, settings, kind) {
 function serviceDescription(provider, settings) {
   if (!isEligible(settings.providers?.[provider])) {
     if (provider === 'assemblyai' && settings.credentials?.assemblyai?.configured) {
-      return 'Há uma credencial AssemblyAI salva, mas o serviço está indisponível. Verifique o armazenamento ou conecte novamente sua conta. Automático não tenta outro serviço se houver falha.'
+      return 'Sua chave AssemblyAI não está disponível para uso. Confira Serviços conectados.'
     }
-    return `${providerNames[provider]} está indisponível para esta conta. Conecte ou atualize a credencial em Serviços conectados.`
+    return `Conecte ou atualize sua conta ${providerNames[provider]} em Serviços conectados.`
   }
-  if (provider === 'whisper') return 'O áudio é processado localmente e não exige uma conta externa.'
+  if (provider === 'whisper') return null
   const source = settings.providers[provider].credential_source
-  if (source === 'platform') return `${providerNames[provider]} é cobrado da cota da USAGI. Fornecido pela USAGI: utiliza a franquia/créditos disponíveis na USAGI. Não há informação de saldo disponível aqui.`
-  if (source === 'user') return `${providerNames[provider]} usa sua própria conta e pode gerar cobranças conforme o uso.`
-  return `${providerNames[provider]} está disponível.`
+  if (source === 'platform') return 'Usa a franquia da USAGI.'
+  if (source === 'user') return `Cobrança na sua conta ${providerNames[provider]}.`
+  return null
 }
 
 function choiceLabel(provider, providers) {
@@ -43,9 +43,14 @@ function ProviderSelect({ kind, label, ariaLabel, savedValue, value, providers, 
   const choices = kind === 'transcription' ? ['automatic', 'whisper', 'assemblyai'] : ['automatic', 'gemini']
   const unavailableSavedChoice = value !== 'automatic' && !isEligible(providers[value]) && value === savedValue
 
-  return <label className="block text-sm font-medium text-gray-700">
-    {label}
-    <select aria-label={ariaLabel} className="input mt-2" value={value} disabled={busy}
+  return <div className="text-sm font-medium text-gray-700">
+    <div className="flex items-center gap-2"><label htmlFor={`preference-${kind}`}>{label}</label>
+      <HelpPopover label={kind === 'transcription' ? 'Transcrição automática' : 'Resumos automáticos'}>
+        {kind === 'transcription'
+          ? 'Automático usa sua conta AssemblyAI quando há uma chave salva; caso contrário, usa transcrição local quando disponível. Se houver falha, não tenta outro serviço. O processamento local não envia áudio a um serviço externo.'
+          : 'Automático usa Gemini nesta versão. É necessário conectar uma chave própria ou ter acesso fornecido pela USAGI.'}
+      </HelpPopover></div>
+    <select id={`preference-${kind}`} aria-label={ariaLabel} className="input mt-2" value={value} disabled={busy}
       onChange={(event) => onChange(event.target.value)}>
       {choices.filter((provider) => provider === 'automatic' || isEligible(providers[provider]) || provider === savedValue)
         .map((provider) => <option key={provider} value={provider} disabled={provider !== 'automatic' && !isEligible(providers[provider])}>
@@ -53,9 +58,9 @@ function ProviderSelect({ kind, label, ariaLabel, savedValue, value, providers, 
         </option>)}
     </select>
     {unavailableSavedChoice && <span role="alert" className="mt-2 block text-sm text-amber-800">
-      Esta opção salva está indisponível. Conecte ou atualize a credencial em Serviços conectados, ou escolha Automático.
+      Opção salva indisponível. Confira Serviços conectados ou escolha outra opção.
     </span>}
-  </label>
+  </div>
 }
 
 function ActiveService({ preference, kind, settings, title }) {
@@ -65,7 +70,7 @@ function ActiveService({ preference, kind, settings, title }) {
     <p className="text-gray-700">{title}: <span className="font-medium">{providerNames[provider] || provider}</span>
       {!eligible && <span className="font-medium text-amber-800"> (indisponível)</span>}
     </p>
-    <p className="mt-1 text-gray-600">{serviceDescription(provider, settings)}</p>
+    {serviceDescription(provider, settings) && <p className="mt-1 text-gray-600">{serviceDescription(provider, settings)}</p>}
   </div>
 }
 
@@ -76,14 +81,6 @@ export function ProviderPreferenceFields({ kind, settings, preferences, updatePr
   const savedValue = saved[key] || 'automatic'
   const dirty = selected !== savedValue || (kind === 'transcription' && Boolean(preferences?.use_diarization) !== Boolean(saved.use_diarization))
   return <div className="space-y-3">
-    <div className="flex items-center justify-between gap-3">
-      <p className="text-sm font-medium text-gray-700">Preferência de serviço</p>
-      <HelpPopover label={kind === 'transcription' ? 'Transcrição automática' : 'Resumos automáticos'}>
-        {kind === 'transcription'
-          ? 'Automático usa sua conta AssemblyAI se houver uma chave salva; caso contrário, usa processamento local quando disponível. Se a transcrição falhar, não tenta outro serviço.'
-          : 'Automático usa Gemini, o único serviço de resumos suportado nesta versão. Salvar uma chave não testa a conexão.'}
-      </HelpPopover>
-    </div>
     <ProviderSelect kind={kind} label={kind === 'transcription' ? 'Como transcrever seu áudio' : 'Serviço para resumos'}
       ariaLabel={kind === 'transcription' ? 'Como transcrever seu áudio' : 'Resumos inteligentes'}
       savedValue={savedValue} value={selected} providers={settings.providers || {}} busy={saving}
@@ -95,10 +92,9 @@ export function ProviderPreferenceFields({ kind, settings, preferences, updatePr
     </label>}
     <div className="text-sm"><ActiveService title={kind === 'transcription' ? 'Transcrição' : 'Resumos inteligentes'}
       preference={savedValue} kind={kind} settings={settings} /></div>
-    {savedValue === 'automatic' && <p className="text-sm text-gray-600">{kind === 'transcription' ? 'Se a transcrição falhar, não tenta outro serviço.' : 'Automático usa Gemini nesta versão.'}</p>}
     {dirty && <div role="status" className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900">
-      <p>Alteração não salva: {providerNames[selected]}. A alteração só entra em vigor depois de salva.</p>
-      <p className="mt-1">{serviceDescription(resolveProvider(selected, settings, kind), settings)}</p>
+      <p>Alteração pendente: {providerNames[selected]}.</p>
+      {serviceDescription(resolveProvider(selected, settings, kind), settings) && <p className="mt-1">{serviceDescription(resolveProvider(selected, settings, kind), settings)}</p>}
     </div>}
   </div>
 }
@@ -115,7 +111,6 @@ export function PreferenceSaveButton({ settings, preferences, saving }) {
     || Boolean(preferences?.use_diarization) !== Boolean(saved.use_diarization)
   return <div className="flex flex-wrap items-center gap-3">
     <Button type="submit" icon={Save} loading={saving} disabled={saving || unavailableExplicit || !dirty}>Salvar preferências</Button>
-    {dirty && <p className="text-sm text-gray-600">Há alterações não salvas.</p>}
   </div>
 }
 

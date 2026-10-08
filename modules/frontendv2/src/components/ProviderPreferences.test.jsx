@@ -28,15 +28,15 @@ function setup(overrides = {}) {
 
 it('resolves automatic transcription to local processing when there is no saved AssemblyAI key', () => {
   setup()
-  expect(paragraphContaining('Transcrição local (Faster-Whisper)')).toBeTruthy()
-  expect(screen.getByText(/processado localmente e não exige uma conta externa/)).toBeTruthy()
-  expect(screen.getByText(/Se a transcrição falhar, não tenta outro serviço/)).toBeTruthy()
+  expect(paragraphContaining('Transcrição local')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Ajuda: Transcrição automática' }))
+  expect(screen.getByRole('tooltip').textContent).toContain('Se houver falha, não tenta outro serviço')
 })
 
 it('resolves automatic transcription to AssemblyAI when its own credential is configured', () => {
   setup({ settings: { credentials: { assemblyai: { configured: true } } } })
   expect(paragraphContaining('Transcrição: AssemblyAI')).toBeTruthy()
-  expect(paragraphContaining('AssemblyAI usa sua própria conta e pode gerar cobranças')).toBeTruthy()
+  expect(paragraphContaining('Cobrança na sua conta AssemblyAI.')).toBeTruthy()
 })
 
 it('shows a configured AssemblyAI route as unavailable when credential storage makes it ineligible', () => {
@@ -52,7 +52,7 @@ it('shows a configured AssemblyAI route as unavailable when credential storage m
   })
   expect(paragraphContaining('Transcrição: AssemblyAI')).toBeTruthy()
   expect(screen.getByText('(indisponível)')).toBeTruthy()
-  expect(screen.getByText(/credencial AssemblyAI salva, mas o serviço está indisponível/)).toBeTruthy()
+  expect(screen.getByText(/Sua chave AssemblyAI não está disponível para uso/)).toBeTruthy()
   expect(screen.queryByText(/Transcrição: Transcrição local/)).toBeNull()
 })
 
@@ -78,7 +78,7 @@ it('marks a saved unavailable explicit choice and blocks saving until it is chan
     preferences: { transcription_provider: 'assemblyai' },
   })
   expect(screen.getByRole('option', { name: 'AssemblyAI (indisponível)' }).disabled).toBe(true)
-  expect(screen.getAllByText(/Conecte ou atualize a credencial em Serviços conectados/).length).toBeGreaterThan(0)
+  expect(screen.getAllByText(/Confira Serviços conectados/).length).toBeGreaterThan(0)
   expect(screen.getByRole('button', { name: 'Salvar preferências' }).disabled).toBe(true)
   fireEvent.change(screen.getByLabelText('Como transcrever seu áudio'), { target: { value: 'whisper' } })
   expect(updatePreference).toHaveBeenCalledWith('transcription_provider', 'whisper')
@@ -91,7 +91,7 @@ it('shows automatic intelligence as unavailable when Gemini has no eligible cred
     gemini: { available: true, allowed: false, configured: false, credential_source: null },
   }, credentials: { assemblyai: { configured: false }, gemini: { configured: false } } } })
   expect(paragraphContaining('Resumos inteligentes: Gemini')).toBeTruthy()
-  expect(screen.getByText(/Gemini está indisponível para esta conta/)).toBeTruthy()
+  expect(screen.getByText(/Conecte ou atualize sua conta Gemini em Serviços conectados/)).toBeTruthy()
   expect(screen.queryByText(/Gemini usa sua própria conta/)).toBeNull()
 })
 
@@ -107,8 +107,8 @@ it('explains that explicit AssemblyAI uses the USAGI quota when the platform cre
     },
     preferences: { transcription_provider: 'assemblyai', intelligence_provider: 'automatic' },
   })
-  expect(screen.getByRole('status').textContent).toContain('AssemblyAI é cobrado da cota da USAGI')
-  expect(screen.getByText(/Gemini é cobrado da cota da USAGI/)).toBeTruthy()
+  expect(screen.getByRole('status').textContent).toContain('Usa a franquia da USAGI.')
+  expect(screen.getAllByText('Usa a franquia da USAGI.')).toHaveLength(2)
 })
 
 it('uses the configured AssemblyAI credential for automatic routing regardless of credential source metadata', () => {
@@ -121,7 +121,7 @@ it('uses the configured AssemblyAI credential for automatic routing regardless o
     },
   } })
   expect(paragraphContaining('Transcrição: AssemblyAI')).toBeTruthy()
-  expect(paragraphContaining('AssemblyAI é cobrado da cota da USAGI')).toBeTruthy()
+  expect(paragraphContaining('Usa a franquia da USAGI.')).toBeTruthy()
 })
 
 it('keeps saved active services distinct from draft selections', () => {
@@ -131,12 +131,11 @@ it('keeps saved active services distinct from draft selections', () => {
     },
     preferences: { transcription_provider: 'assemblyai', intelligence_provider: 'automatic' },
   })
-  expect(paragraphContaining('Transcrição local (Faster-Whisper)')).toBeTruthy()
+  expect(paragraphContaining('Transcrição local')).toBeTruthy()
   expect(paragraphContaining('Resumos inteligentes: Gemini')).toBeTruthy()
   const drafts = screen.getAllByRole('status').map(element => element.textContent)
-  expect(drafts.some(text => text.includes('Alteração não salva: AssemblyAI'))).toBe(true)
-  expect(drafts.every(text => text.includes('só entra em vigor depois de salva'))).toBe(true)
-  expect(drafts.some(text => text.includes('AssemblyAI usa sua própria conta'))).toBe(true)
+  expect(drafts.some(text => text.includes('Alteração pendente: AssemblyAI'))).toBe(true)
+  expect(drafts.some(text => text.includes('Cobrança na sua conta AssemblyAI'))).toBe(true)
 })
 
 it('disables all preference controls while saving', () => {
