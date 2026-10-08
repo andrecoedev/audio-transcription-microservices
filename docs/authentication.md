@@ -120,6 +120,21 @@ Referências: [persistência oficial](https://firebase.google.com/docs/auth/web/
 e [getIdToken/renovação oficial](https://firebase.google.com/docs/reference/js/auth.user#getidtoken).
 Testes usam SDK/API simulados; não comprovam configuração Google/ADC em produção.
 
+## Conta e senha em Configurações
+
+Minha conta consulta `/auth/me` e apresenta nome/e-mail persistidos como leitura,
+não como preferências locais editáveis. O backend não oferece atualização de
+perfil, troca ou redefinição de senha legada. Não existe Firebase e-mail/senha
+integrado: a validação Firebase admite somente Google. Não se adiciona uma ação
+fictícia nem se muda esse contrato para aparentar suporte.
+
+Na sessão Google verificada, a tela aponta para a segurança da conta Google.
+Na sessão com senha USAGI, informa que sua alteração ainda não está disponível.
+O vínculo seguro com Google existente continua disponível quando configurado,
+com reautenticação pela senha atual; não equivale a troca de senha. A tela rejeita
+uma resposta de conta com ID diferente do usuário interno atual e oculta dados
+anteriores durante a troca de identidade.
+
 `POST /auth/firebase` recebe somente o ID Token no header Bearer, verifica a
 identidade e resolve/cria o usuário interno. Não emite outro JWT para contornar
 revogação. Requests privados Firebase usam ID Token atualizado pelo SDK e são
