@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from ..config import settings
 from ..models import UserProviderCredential, UserProviderPreferences
 from .provider_policy import require_provider_credential
+from .platform_budget import platform_budget_has_headroom
 
 SUPPORTED_PROVIDERS = {"assemblyai", "gemini"}
 DEFAULT_PREFERENCES = {"transcription_provider": "automatic", "intelligence_provider": "automatic", "use_diarization": False}
@@ -103,11 +104,23 @@ def providers_view(db, user):
     for provider in sorted(SUPPORTED_PROVIDERS):
         own = credential_for(db, user.user_id, provider)
         credentials[provider] = {"configured": own is not None, "updated_at": own.updated_at.isoformat() if own else None}
+        platform_access = False
+        try:
+            require_provider_credential(user, provider)
+            if provider == "assemblyai":
+                platform_access = platform_budget_has_headroom(db)
+            else:
+                platform_access = bool(settings.GEMINI_API_KEY_CONFIGURED or settings.GEMINI_API_KEY)
+        except HTTPException:
+            pass
         try:
             selection = select_provider(db, user, provider)
             allowed, source = True, selection["credential_source"]
+            if source == "platform":
+                allowed = platform_access
         except HTTPException:
             allowed, source = False, "user" if own else None
-        providers[provider] = {"available": True, "allowed": allowed, "configured": allowed, "credential_source": source}
+        providers[provider] = {"available": True, "allowed": allowed, "configured": allowed,
+                               "credential_source": source, "platform_access": platform_access}
     return {"preferences": preferences_for(db, user.user_id), "providers": providers, "credentials": credentials,
             "credential_storage_available": credential_storage_available()}

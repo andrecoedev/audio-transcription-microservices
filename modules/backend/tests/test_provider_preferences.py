@@ -6,7 +6,7 @@ from cryptography.fernet import Fernet
 import pytest
 
 from src.config import settings
-from src.models import Transcription, TranscriptionJob, UserProviderCredential, UserProviderPreferences
+from src.models import PlatformProviderBudget, Transcription, TranscriptionJob, User, UserProviderCredential, UserProviderPreferences
 from src.services.provider_credentials import decrypt_credential, resolve_transcription
 
 
@@ -270,3 +270,75 @@ def test_public_account_upload_queues_byok_reference_without_platform_reservatio
         assert (job.credential_source, job.credential_id, job.credential_user_id) == ("user", credential.id, 1)
     finally:
         db.close()
+
+
+def test_platform_access_is_separate_from_byok_and_storage_capability(
+    db_context, auth_headers, credential_cipher, monkeypatch
+):
+    from src.services.platform_budget import platform_reservation_amount_cents
+
+    client = db_context["client"]
+    headers = auth_headers()
+    monkeypatch.setattr(settings, "AAI_API_KEY_CONFIGURED", True)
+    monkeypatch.setattr(settings, "AAI_API_KEY", "")
+    monkeypatch.setattr(settings, "AAI_PLATFORM_ENABLED", True)
+    monkeypatch.setattr(settings, "AAI_PLATFORM_BUDGET_CENTS", 100)
+    monkeypatch.setattr(settings, "AAI_MAX_AUDIO_SECONDS", 600)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY_CONFIGURED", True)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+
+    # Public accounts cannot inherit configured platform credentials.
+    db = db_context["session_factory"]()
+    try:
+        db.get(User, 1).registration_source = "public"
+        db.commit()
+    finally:
+        db.close()
+    public_view = client.get("/settings/providers", headers=headers).json()
+    assert public_view["providers"]["assemblyai"]["platform_access"] is False
+    assert public_view["providers"]["assemblyai"]["allowed"] is False
+
+    # A user credential remains usable when platform access is off.
+    monkeypatch.setattr(settings, "AAI_PLATFORM_ENABLED", False)
+    byok = _save(client, headers, secret=secrets.token_urlsafe(32))
+    assert byok.status_code == 200
+    byok_view = byok.json()
+    assert byok_view["providers"]["assemblyai"]["platform_access"] is False
+    assert byok_view["providers"]["assemblyai"]["allowed"] is True
+    assert byok_view["providers"]["assemblyai"]["credential_source"] == "user"
+
+    # A local account can use platform access without BYOK encryption storage.
+    db = db_context["session_factory"]()
+    try:
+        db.get(User, 1).registration_source = "local"
+        db.query(UserProviderCredential).filter_by(user_id=1, provider="assemblyai").delete()
+        db.commit()
+    finally:
+        db.close()
+    monkeypatch.setattr(settings, "AAI_PLATFORM_ENABLED", True)
+    monkeypatch.setattr(settings, "PROVIDER_CREDENTIAL_ENCRYPTION_KEY", None)
+    platform_view = client.get("/settings/providers", headers=headers).json()
+    assert platform_view["credential_storage_available"] is False
+    assert platform_view["providers"]["assemblyai"]["platform_access"] is True
+    assert platform_view["providers"]["assemblyai"]["allowed"] is True
+    assert platform_view["providers"]["assemblyai"]["credential_source"] == "platform"
+    rejected_secret = secrets.token_urlsafe(32)
+    rejected = _save(client, headers, secret=rejected_secret)
+    assert rejected.status_code == 503
+    assert rejected_secret not in rejected.text
+
+    # Exhausted cumulative budget removes platform access without disclosing amounts.
+    exhausted = db_context["session_factory"]()
+    try:
+        exhausted.add(PlatformProviderBudget(
+            provider="assemblyai", limit_cents=100,
+            reserved_cents=100 - platform_reservation_amount_cents() + 1,
+        ))
+        exhausted.commit()
+    finally:
+        exhausted.close()
+    exhausted_view = client.get("/settings/providers", headers=headers).json()
+    assert exhausted_view["providers"]["assemblyai"]["platform_access"] is False
+    assert exhausted_view["providers"]["assemblyai"]["allowed"] is False
+    assert "reserved_cents" not in str(exhausted_view)
+    assert "limit_cents" not in str(exhausted_view)

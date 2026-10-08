@@ -14,12 +14,33 @@ from ..config import settings
 from ..models import PlatformProviderBudget, PlatformProviderCall
 
 
+def platform_reservation_amount_cents() -> int:
+    """Worst-case reservation for one maximum-length AssemblyAI request."""
+    return math.ceil(settings.AAI_MAX_AUDIO_SECONDS * 100 / 3600)
+
+
+def platform_budget_has_headroom(db) -> bool:
+    """Read-only snapshot of whether one full reservation currently fits.
+
+    The reservation transaction remains authoritative; this capability check can
+    become stale immediately after it returns.
+    """
+    if not settings.AAI_PLATFORM_ENABLED or settings.AAI_PLATFORM_BUDGET_CENTS <= 0:
+        return False
+    budget = db.get(PlatformProviderBudget, "assemblyai")
+    reserved_cents = budget.reserved_cents if budget is not None else 0
+    configured_limit = budget.limit_cents if budget is not None else settings.AAI_PLATFORM_BUDGET_CENTS
+    amount = platform_reservation_amount_cents()
+    return (reserved_cents + amount <= configured_limit
+            and reserved_cents + amount <= settings.AAI_PLATFORM_BUDGET_CENTS)
+
+
 def reserve_platform_call(db, transcription_id: int, context: str) -> None:
     if not settings.AAI_PLATFORM_ENABLED or settings.AAI_PLATFORM_BUDGET_CENTS <= 0:
         raise HTTPException(503, "Platform transcription is unavailable")
     # Worst case includes silence and rounded-up cents; mono WAV only, no add-ons
     # beyond speaker detection, fixed model. Budget is shared by all platform use.
-    amount = math.ceil(settings.AAI_MAX_AUDIO_SECONDS * 100 / 3600)
+    amount = platform_reservation_amount_cents()
     budget = db.get(PlatformProviderBudget, "assemblyai")
     if budget is None:
         try:
