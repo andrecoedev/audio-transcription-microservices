@@ -12,6 +12,9 @@ class SummaryTests(unittest.TestCase):
     def test_public_export_excludes_private_audio_fingerprint(self):
         self.assertEqual(exportable_rows([{"fixture_id": "local-video-001", "audio_sha256": "private-fingerprint"}], True), [])
 
+    def test_prefix_alone_cannot_authorize_a_private_fixture(self):
+        self.assertEqual(exportable_rows([{"fixture_id": "ami-private-upload", "audio_seconds": 1}], True), [])
+
     def test_never_calls_cpu_a_gpu(self):
         with self.assertRaises(ValueError):
             summarize([{"status": "completed", "actual_device": "cpu", "requested_device": "cuda"}])

@@ -4,8 +4,8 @@ param(
     [string[]]$Models = @('tiny','base','small','medium'),
     [string[]]$Devices = @('cpu','cuda'),
     [int]$Sessions = 3,
-    [string]$Fixture = 'fleurs-ptbr-quality-1m',
-    [string]$FixtureId = 'fleurs-quality',
+    [ValidatePattern('^[a-z0-9][a-z0-9-]{0,63}$')][string]$Fixture = 'fleurs-ptbr-quality-1m',
+    [ValidatePattern('^[a-z0-9][a-z0-9-]{0,63}$')][string]$FixtureId = 'fleurs-quality',
     [switch]$Resume
 )
 $ErrorActionPreference = 'Stop'

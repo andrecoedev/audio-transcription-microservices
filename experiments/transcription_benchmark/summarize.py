@@ -8,6 +8,10 @@ from pathlib import Path
 from metrics import dispersion
 
 
+PUBLIC_FIXTURES = frozenset({"fleurs-quality", "fleurs-six-minute", "fleurs-two-speaker",
+                             "ami-clean-2spk", "ami-four-speakers"})
+
+
 METRIC_FIELDS = set("""schema_version engine model requested_device requested_compute
 fixture_id session audio_sha256 audio_seconds conversion_seconds threads beam_size
 vad runtime cold_definition model_load_scope resource_scope harness_sha256
@@ -22,7 +26,7 @@ der_skip_overlap torch_peak_allocated_mib model_revisions""".split())
 
 def exportable_rows(rows, public_only=False):
     if public_only:
-        rows = [row for row in rows if row.get("fixture_id", "").startswith(("fleurs-", "ami-"))]
+        rows = [row for row in rows if row.get("fixture_id") in PUBLIC_FIXTURES]
     # Closed field list prevents future debug fields/secrets/transcripts leaking
     # into a CSV when someone extends the local metrics artifact.
     return [{key: value for key, value in row.items() if key in METRIC_FIELDS} for row in rows]

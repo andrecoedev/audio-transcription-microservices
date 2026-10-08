@@ -74,6 +74,12 @@ aprovadas; não incluir arquivos privados, dados pessoais ou credenciais.
 Use `summarize.py --public-only` para publicar apenas FLEURS/AMI; o exportador
 também aceita somente campos de métricas conhecidos, descartando texto, paths,
 segredos ou campos de debug adicionados a um JSON local por engano.
+Sem essa opção, a exportação é **local-only** e pode conter métricas privadas.
+A autorização de publicação usa IDs exatos, não aceita apenas prefixos.
+
+```powershell
+python experiments/transcription_benchmark/summarize.py .local-artifacts/cpu-gpu-benchmark/results --public-only --csv experiments/transcription_benchmark/evidence/public-results.csv --summary experiments/transcription_benchmark/evidence/public-summary.json
+```
 
 ## Pyannote (separado)
 
