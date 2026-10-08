@@ -1,0 +1,167 @@
+{
+  "estimate_only": true,
+  "not_a_cost_ledger_or_commercial_plan": true,
+  "currency": "USD",
+  "audio_hours_sent": "100",
+  "jobs": "200",
+  "concurrency": 1,
+  "monthly_hours_available": "720",
+  "target_utilization": "0.75",
+  "capacity_note": "Single-worker RTF is never multiplied by concurrency; the exact concurrency profile must be measured.",
+  "queue_note": "Queue delay is reported only for supplied deterministic arrivals; monthly averages do not establish real queue latency.",
+  "options": [
+    {
+      "name": "Hetzner CX23 EU cost-optimized VPS",
+      "kind": "self_hosted",
+      "capacity": {
+        "status": "unknown_until_measured_rtf",
+        "concurrency": 1,
+        "target_utilization": "0.75",
+        "audio_hours_processable_monthly": null,
+        "wall_hours_for_sent_work": null,
+        "fits_monthly_target_capacity": null
+      },
+      "queue": null,
+      "cost": {
+        "fixed_monthly": "6.49",
+        "setup_amortized_monthly": "0",
+        "other_monthly": "0",
+        "variable_usage": "0",
+        "compute_usage": "0",
+        "partial_total": "6.49",
+        "total": "6.49",
+        "total_status": "complete"
+      }
+    },
+    {
+      "name": "Hetzner CPX32 EU regular-performance VPS",
+      "kind": "self_hosted",
+      "capacity": {
+        "status": "unknown_until_measured_rtf",
+        "concurrency": 1,
+        "target_utilization": "0.75",
+        "audio_hours_processable_monthly": null,
+        "wall_hours_for_sent_work": null,
+        "fits_monthly_target_capacity": null
+      },
+      "queue": null,
+      "cost": {
+        "fixed_monthly": "41.99",
+        "setup_amortized_monthly": "0",
+        "other_monthly": "0",
+        "variable_usage": "0",
+        "compute_usage": "0",
+        "partial_total": "41.99",
+        "total": "41.99",
+        "total_status": "complete"
+      }
+    },
+    {
+      "name": "Hetzner GEX44 GPU dedicated server",
+      "kind": "self_hosted",
+      "capacity": {
+        "status": "unknown_until_measured_rtf",
+        "concurrency": 1,
+        "target_utilization": "0.75",
+        "audio_hours_processable_monthly": null,
+        "wall_hours_for_sent_work": null,
+        "fits_monthly_target_capacity": null
+      },
+      "queue": null,
+      "cost": {
+        "fixed_monthly": "272.10",
+        "setup_amortized_monthly": "11.16666666666666666666666667",
+        "other_monthly": "0",
+        "variable_usage": "0",
+        "compute_usage": "0",
+        "partial_total": "283.2666666666666666666666667",
+        "total": "283.2666666666666666666666667",
+        "total_status": "complete"
+      }
+    },
+    {
+      "name": "AssemblyAI Universal-2 plus diarization",
+      "kind": "provider",
+      "capacity": {
+        "status": "unknown_until_measured_rtf",
+        "concurrency": 1,
+        "target_utilization": "0.75",
+        "audio_hours_processable_monthly": null,
+        "wall_hours_for_sent_work": null,
+        "fits_monthly_target_capacity": null
+      },
+      "queue": null,
+      "cost": {
+        "fixed_monthly": "0",
+        "setup_amortized_monthly": "0",
+        "other_monthly": "0",
+        "variable_usage": "17.00",
+        "compute_usage": "0",
+        "partial_total": "17.00",
+        "total": "17.00",
+        "total_status": "complete"
+      }
+    },
+    {
+      "name": "AssemblyAI Universal-3.5 Pro plus diarization",
+      "kind": "provider",
+      "capacity": {
+        "status": "unknown_until_measured_rtf",
+        "concurrency": 1,
+        "target_utilization": "0.75",
+        "audio_hours_processable_monthly": null,
+        "wall_hours_for_sent_work": null,
+        "fits_monthly_target_capacity": null
+      },
+      "queue": null,
+      "cost": {
+        "fixed_monthly": "0",
+        "setup_amortized_monthly": "0",
+        "other_monthly": "0",
+        "variable_usage": "23.00",
+        "compute_usage": "0",
+        "partial_total": "23.00",
+        "total": "23.00",
+        "total_status": "complete"
+      }
+    }
+  ],
+  "break_even": [
+    {
+      "self_hosted": "Hetzner CX23 EU cost-optimized VPS",
+      "provider": "AssemblyAI Universal-2 plus diarization",
+      "status": "unknown_until_measured_rtf",
+      "audio_hours_per_month": null
+    },
+    {
+      "self_hosted": "Hetzner CX23 EU cost-optimized VPS",
+      "provider": "AssemblyAI Universal-3.5 Pro plus diarization",
+      "status": "unknown_until_measured_rtf",
+      "audio_hours_per_month": null
+    },
+    {
+      "self_hosted": "Hetzner CPX32 EU regular-performance VPS",
+      "provider": "AssemblyAI Universal-2 plus diarization",
+      "status": "unknown_until_measured_rtf",
+      "audio_hours_per_month": null
+    },
+    {
+      "self_hosted": "Hetzner CPX32 EU regular-performance VPS",
+      "provider": "AssemblyAI Universal-3.5 Pro plus diarization",
+      "status": "unknown_until_measured_rtf",
+      "audio_hours_per_month": null
+    },
+    {
+      "self_hosted": "Hetzner GEX44 GPU dedicated server",
+      "provider": "AssemblyAI Universal-2 plus diarization",
+      "status": "unknown_until_measured_rtf",
+      "audio_hours_per_month": null
+    },
+    {
+      "self_hosted": "Hetzner GEX44 GPU dedicated server",
+      "provider": "AssemblyAI Universal-3.5 Pro plus diarization",
+      "status": "unknown_until_measured_rtf",
+      "audio_hours_per_month": null
+    }
+  ]
+}

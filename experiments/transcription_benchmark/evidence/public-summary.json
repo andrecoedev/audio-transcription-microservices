@@ -1,0 +1,4962 @@
+[
+  {
+    "fixture_id": "ami-clean-2spk",
+    "engine": "pyannote",
+    "model": "speaker-diarization-3.1",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 60.0,
+      "min": 60.0,
+      "max": 60.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.0613661180013878,
+      "min": 0.9314138979989366,
+      "max": 1.4628616270001658,
+      "mad": 0.1299522200024512,
+      "n": 3
+    },
+    "startup_seconds": null,
+    "inference_seconds": {
+      "median": 39.17409444299847,
+      "min": 39.05853222299993,
+      "max": 39.18178581699976,
+      "mad": 0.007691374001296936,
+      "n": 3
+    },
+    "total_seconds": null,
+    "rtf": {
+      "median": 0.6529015740499744,
+      "min": 0.6509755370499988,
+      "max": 0.6530297636166628,
+      "mad": 0.00012818956668836368,
+      "n": 3
+    },
+    "wer": null,
+    "cer": null,
+    "der": {
+      "median": 0.22639488636363614,
+      "min": 0.22639488636363614,
+      "max": 0.22639488636363614,
+      "mad": 0.0,
+      "n": 3
+    },
+    "ram_peak_mib": {
+      "median": 2408.8203125,
+      "min": 2376.140625,
+      "max": 2479.74609375,
+      "mad": 32.6796875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 30.0,
+      "min": 28.0,
+      "max": 44.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 4.931818181818182,
+      "min": 4.711610486891386,
+      "max": 5.086792452830188,
+      "mad": 0.15497427101200678,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": []
+  },
+  {
+    "fixture_id": "ami-clean-2spk",
+    "engine": "pyannote",
+    "model": "speaker-diarization-3.1",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 60.0,
+      "min": 60.0,
+      "max": 60.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.0613661180013878,
+      "min": 0.9314138979989366,
+      "max": 1.4628616270001658,
+      "mad": 0.1299522200024512,
+      "n": 3
+    },
+    "startup_seconds": null,
+    "inference_seconds": {
+      "median": 39.04845320700042,
+      "min": 38.92579826399924,
+      "max": 39.10914404399955,
+      "mad": 0.060690836999128805,
+      "n": 3
+    },
+    "total_seconds": null,
+    "rtf": {
+      "median": 0.650807553450007,
+      "min": 0.6487633043999873,
+      "max": 0.6518190673999925,
+      "mad": 0.001011513949985554,
+      "n": 3
+    },
+    "wer": null,
+    "cer": null,
+    "der": {
+      "median": 0.22639488636363614,
+      "min": 0.22639488636363614,
+      "max": 0.22639488636363614,
+      "mad": 0.0,
+      "n": 3
+    },
+    "ram_peak_mib": {
+      "median": 2408.8203125,
+      "min": 2376.140625,
+      "max": 2479.74609375,
+      "mad": 32.6796875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 30.0,
+      "min": 28.0,
+      "max": 44.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 4.931818181818182,
+      "min": 4.711610486891386,
+      "max": 5.086792452830188,
+      "mad": 0.15497427101200678,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": []
+  },
+  {
+    "fixture_id": "ami-clean-2spk",
+    "engine": "pyannote",
+    "model": "speaker-diarization-3.1",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 60.0,
+      "min": 60.0,
+      "max": 60.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.0117768129985052,
+      "min": 1.004630430999896,
+      "max": 1.35661192400039,
+      "mad": 0.007146381998609286,
+      "n": 3
+    },
+    "startup_seconds": null,
+    "inference_seconds": {
+      "median": 2.124965364999298,
+      "min": 2.0824404529994354,
+      "max": 3.042689756999607,
+      "mad": 0.042524911999862525,
+      "n": 3
+    },
+    "total_seconds": null,
+    "rtf": {
+      "median": 0.035416089416654965,
+      "min": 0.034707340883323924,
+      "max": 0.050711495949993454,
+      "mad": 0.0007087485333310412,
+      "n": 3
+    },
+    "wer": null,
+    "cer": null,
+    "der": {
+      "median": 0.22639488636363614,
+      "min": 0.22639488636363614,
+      "max": 0.22639488636363614,
+      "mad": 0.0,
+      "n": 3
+    },
+    "ram_peak_mib": {
+      "median": 1517.20703125,
+      "min": 1517.0859375,
+      "max": 1517.78515625,
+      "mad": 0.12109375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2487.0,
+      "min": 2444.0,
+      "max": 2487.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 53.5,
+      "min": 42.333333333333336,
+      "max": 56.5,
+      "mad": 3.0,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": {
+      "median": 1628.822265625,
+      "min": 1628.822265625,
+      "max": 1628.822265625,
+      "mad": 0.0,
+      "n": 3
+    },
+    "languages": []
+  },
+  {
+    "fixture_id": "ami-clean-2spk",
+    "engine": "pyannote",
+    "model": "speaker-diarization-3.1",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 60.0,
+      "min": 60.0,
+      "max": 60.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.0117768129985052,
+      "min": 1.004630430999896,
+      "max": 1.35661192400039,
+      "mad": 0.007146381998609286,
+      "n": 3
+    },
+    "startup_seconds": null,
+    "inference_seconds": {
+      "median": 1.3960839899991697,
+      "min": 1.3787974459992256,
+      "max": 1.4035448760005238,
+      "mad": 0.007460886001354083,
+      "n": 3
+    },
+    "total_seconds": null,
+    "rtf": {
+      "median": 0.02326806649998616,
+      "min": 0.022979957433320427,
+      "max": 0.02339241460000873,
+      "mad": 0.0001243481000225699,
+      "n": 3
+    },
+    "wer": null,
+    "cer": null,
+    "der": {
+      "median": 0.22639488636363614,
+      "min": 0.22639488636363614,
+      "max": 0.22639488636363614,
+      "mad": 0.0,
+      "n": 3
+    },
+    "ram_peak_mib": {
+      "median": 1517.20703125,
+      "min": 1517.0859375,
+      "max": 1517.78515625,
+      "mad": 0.12109375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2487.0,
+      "min": 2444.0,
+      "max": 2487.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 53.5,
+      "min": 42.333333333333336,
+      "max": 56.5,
+      "mad": 3.0,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": {
+      "median": 1628.822265625,
+      "min": 1628.822265625,
+      "max": 1628.822265625,
+      "mad": 0.0,
+      "n": 3
+    },
+    "languages": []
+  },
+  {
+    "fixture_id": "ami-four-speakers",
+    "engine": "pyannote",
+    "model": "speaker-diarization-3.1",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 90.0,
+      "min": 90.0,
+      "max": 90.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.0332672410004307,
+      "min": 0.9869256319998385,
+      "max": 1.0723915270009456,
+      "mad": 0.039124286000514985,
+      "n": 3
+    },
+    "startup_seconds": null,
+    "inference_seconds": {
+      "median": 65.85159037599988,
+      "min": 64.35451820799972,
+      "max": 77.37622003700017,
+      "mad": 1.4970721680001589,
+      "n": 3
+    },
+    "total_seconds": null,
+    "rtf": {
+      "median": 0.7316843375111097,
+      "min": 0.7150502023111079,
+      "max": 0.8597357781888907,
+      "mad": 0.016634135200001787,
+      "n": 3
+    },
+    "wer": null,
+    "cer": null,
+    "der": {
+      "median": 0.12078961488017168,
+      "min": 0.12078961488017168,
+      "max": 0.12078961488017168,
+      "mad": 0.0,
+      "n": 3
+    },
+    "ram_peak_mib": {
+      "median": 2474.73828125,
+      "min": 2466.6953125,
+      "max": 2589.30859375,
+      "mad": 8.04296875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 16.0,
+      "min": 0.0,
+      "max": 73.0,
+      "mad": 16.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 5.501165501165501,
+      "min": 5.237875288683603,
+      "max": 5.865384615384615,
+      "mad": 0.2632902124818983,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": []
+  },
+  {
+    "fixture_id": "ami-four-speakers",
+    "engine": "pyannote",
+    "model": "speaker-diarization-3.1",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 90.0,
+      "min": 90.0,
+      "max": 90.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.0332672410004307,
+      "min": 0.9869256319998385,
+      "max": 1.0723915270009456,
+      "mad": 0.039124286000514985,
+      "n": 3
+    },
+    "startup_seconds": null,
+    "inference_seconds": {
+      "median": 65.02362407300097,
+      "min": 64.8827857489996,
+      "max": 70.53432539499954,
+      "mad": 0.14083832400137908,
+      "n": 3
+    },
+    "total_seconds": null,
+    "rtf": {
+      "median": 0.7224847119222331,
+      "min": 0.720919841655551,
+      "max": 0.783714726611106,
+      "mad": 0.0015648702666820613,
+      "n": 3
+    },
+    "wer": null,
+    "cer": null,
+    "der": {
+      "median": 0.12078961488017168,
+      "min": 0.12078961488017168,
+      "max": 0.12078961488017168,
+      "mad": 0.0,
+      "n": 3
+    },
+    "ram_peak_mib": {
+      "median": 2474.73828125,
+      "min": 2466.6953125,
+      "max": 2589.30859375,
+      "mad": 8.04296875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 16.0,
+      "min": 0.0,
+      "max": 73.0,
+      "mad": 16.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 5.501165501165501,
+      "min": 5.237875288683603,
+      "max": 5.865384615384615,
+      "mad": 0.2632902124818983,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": []
+  },
+  {
+    "fixture_id": "ami-four-speakers",
+    "engine": "pyannote",
+    "model": "speaker-diarization-3.1",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 90.0,
+      "min": 90.0,
+      "max": 90.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.0483366859989474,
+      "min": 1.0008839310012263,
+      "max": 1.500245380000706,
+      "mad": 0.04745275499772106,
+      "n": 3
+    },
+    "startup_seconds": null,
+    "inference_seconds": {
+      "median": 2.944053064999025,
+      "min": 2.7443572730007872,
+      "max": 4.2908864750006614,
+      "mad": 0.19969579199823784,
+      "n": 3
+    },
+    "total_seconds": null,
+    "rtf": {
+      "median": 0.03271170072221139,
+      "min": 0.030492858588897637,
+      "max": 0.04767651638889624,
+      "mad": 0.0022188421333137545,
+      "n": 3
+    },
+    "wer": null,
+    "cer": null,
+    "der": {
+      "median": 0.12078961488017168,
+      "min": 0.12078961488017168,
+      "max": 0.12078961488017168,
+      "mad": 0.0,
+      "n": 3
+    },
+    "ram_peak_mib": {
+      "median": 1515.08203125,
+      "min": 1514.6484375,
+      "max": 1553.59375,
+      "mad": 0.43359375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2499.0,
+      "min": 2494.0,
+      "max": 2522.0,
+      "mad": 5.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 64.36363636363636,
+      "min": 53.44827586206897,
+      "max": 66.14285714285714,
+      "mad": 1.779220779220779,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": {
+      "median": 1628.822265625,
+      "min": 1628.822265625,
+      "max": 1628.822265625,
+      "mad": 0.0,
+      "n": 3
+    },
+    "languages": []
+  },
+  {
+    "fixture_id": "ami-four-speakers",
+    "engine": "pyannote",
+    "model": "speaker-diarization-3.1",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 90.0,
+      "min": 90.0,
+      "max": 90.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.0483366859989474,
+      "min": 1.0008839310012263,
+      "max": 1.500245380000706,
+      "mad": 0.04745275499772106,
+      "n": 3
+    },
+    "startup_seconds": null,
+    "inference_seconds": {
+      "median": 2.256981952999922,
+      "min": 2.170594881999932,
+      "max": 2.275949668000976,
+      "mad": 0.018967715001053875,
+      "n": 3
+    },
+    "total_seconds": null,
+    "rtf": {
+      "median": 0.025077577255554692,
+      "min": 0.024117720911110356,
+      "max": 0.02528832964445529,
+      "mad": 0.0002107523889005973,
+      "n": 3
+    },
+    "wer": null,
+    "cer": null,
+    "der": {
+      "median": 0.12078961488017168,
+      "min": 0.12078961488017168,
+      "max": 0.12078961488017168,
+      "mad": 0.0,
+      "n": 3
+    },
+    "ram_peak_mib": {
+      "median": 1515.08203125,
+      "min": 1514.6484375,
+      "max": 1553.59375,
+      "mad": 0.43359375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2499.0,
+      "min": 2494.0,
+      "max": 2522.0,
+      "mad": 5.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 64.36363636363636,
+      "min": 53.44827586206897,
+      "max": 66.14285714285714,
+      "mad": 1.779220779220779,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": {
+      "median": 1628.822265625,
+      "min": 1628.822265625,
+      "max": 1628.822265625,
+      "mad": 0.0,
+      "n": 3
+    },
+    "languages": []
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "base",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.0874423169989313,
+      "min": 1.0077356040001177,
+      "max": 2.2883071030009887,
+      "mad": 0.0797067129988136,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.0874423169989313,
+      "min": 1.0077356040001177,
+      "max": 2.2883071030009887,
+      "mad": 0.0797067129988136,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 4.078606161998323,
+      "min": 4.001004215999274,
+      "max": 4.601360316000864,
+      "mad": 0.07760194599904935,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 5.235030589998132,
+      "min": 5.100259768998512,
+      "max": 6.960080482002013,
+      "mad": 0.1347708209996199,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.05250522865600312,
+      "min": 0.051506233470639456,
+      "max": 0.059234813542750564,
+      "mad": 0.0009989951853636644,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.1323529411764706,
+      "min": 0.1323529411764706,
+      "max": 0.1323529411764706,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.03194444444444444,
+      "min": 0.03194444444444444,
+      "max": 0.03194444444444444,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 394.1015625,
+      "min": 376.66015625,
+      "max": 411.72265625,
+      "mad": 17.44140625,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 5.0,
+      "min": 0.0,
+      "max": 21.0,
+      "mad": 5.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 2.78125,
+      "min": 2.34375,
+      "max": 2.8974358974358974,
+      "mad": 0.11618589743589736,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "base",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.0874423169989313,
+      "min": 1.0077356040001177,
+      "max": 2.2883071030009887,
+      "mad": 0.0797067129988136,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.0874423169989313,
+      "min": 1.0077356040001177,
+      "max": 2.2883071030009887,
+      "mad": 0.0797067129988136,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 4.174374954000086,
+      "min": 4.006399762000001,
+      "max": 4.2041535770003975,
+      "mad": 0.0297786230003112,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 4.244788017000246,
+      "min": 4.075381873000879,
+      "max": 4.2956735259995185,
+      "mad": 0.05088550899927213,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.053738091580845596,
+      "min": 0.05157569209577756,
+      "max": 0.05412144151648297,
+      "mad": 0.00038334993563737124,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.1323529411764706,
+      "min": 0.1323529411764706,
+      "max": 0.1323529411764706,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.03194444444444444,
+      "min": 0.03194444444444444,
+      "max": 0.03194444444444444,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 394.1015625,
+      "min": 376.66015625,
+      "max": 411.72265625,
+      "mad": 17.44140625,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 5.0,
+      "min": 0.0,
+      "max": 21.0,
+      "mad": 5.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 2.78125,
+      "min": 2.34375,
+      "max": 2.8974358974358974,
+      "mad": 0.11618589743589736,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "base",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.1265287820006051,
+      "min": 1.120739025000148,
+      "max": 1.1594644560009328,
+      "mad": 0.00578975700045703,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.1265287820006051,
+      "min": 1.120739025000148,
+      "max": 1.1594644560009328,
+      "mad": 0.00578975700045703,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 1.961389695001344,
+      "min": 1.9122774210009084,
+      "max": 2.1027111929997773,
+      "mad": 0.04911227400043572,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 3.198124390002704,
+      "min": 3.111734633001106,
+      "max": 3.3074970430006942,
+      "mad": 0.0863897570015979,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.0252496098738587,
+      "min": 0.02461737153708687,
+      "max": 0.02706888765447705,
+      "mad": 0.0006322383367718294,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.11029411764705882,
+      "min": 0.11029411764705882,
+      "max": 0.11029411764705882,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.020833333333333332,
+      "min": 0.020833333333333332,
+      "max": 0.020833333333333332,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 702.18359375,
+      "min": 701.9140625,
+      "max": 713.4609375,
+      "mad": 0.26953125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 418.0,
+      "min": 356.0,
+      "max": 428.0,
+      "mad": 10.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 25.4375,
+      "min": 23.941176470588236,
+      "max": 25.58823529411765,
+      "mad": 0.15073529411764852,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "base",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.1265287820006051,
+      "min": 1.120739025000148,
+      "max": 1.1594644560009328,
+      "mad": 0.00578975700045703,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.1265287820006051,
+      "min": 1.120739025000148,
+      "max": 1.1594644560009328,
+      "mad": 0.00578975700045703,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 1.5277810839997983,
+      "min": 1.5039089559995773,
+      "max": 1.5929177010002604,
+      "mad": 0.023872128000220982,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 1.6050513230002252,
+      "min": 1.5826271429996268,
+      "max": 1.6711747690005723,
+      "mad": 0.022424180000598426,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.019667624665290914,
+      "min": 0.019360310968068707,
+      "max": 0.02050614960093023,
+      "mad": 0.0003073136972222071,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.11029411764705882,
+      "min": 0.11029411764705882,
+      "max": 0.11029411764705882,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.020833333333333332,
+      "min": 0.020833333333333332,
+      "max": 0.020833333333333332,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 702.18359375,
+      "min": 701.9140625,
+      "max": 713.4609375,
+      "mad": 0.26953125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 418.0,
+      "min": 356.0,
+      "max": 428.0,
+      "mad": 10.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 25.4375,
+      "min": 23.941176470588236,
+      "max": 25.58823529411765,
+      "mad": 0.15073529411764852,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "large-v3",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 32.07818790000056,
+      "min": 28.31333272899974,
+      "max": 38.09768735200123,
+      "mad": 3.764855171000818,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 32.07818790000056,
+      "min": 28.31333272899974,
+      "max": 38.09768735200123,
+      "mad": 3.764855171000818,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 6.338094550001188,
+      "min": 6.244916286999796,
+      "max": 6.703941390000182,
+      "mad": 0.09317826300139131,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 38.459725357000934,
+      "min": 34.76266756400037,
+      "max": 44.91022455900202,
+      "mad": 3.6970577930005675,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.0815923603244231,
+      "min": 0.08039284612512611,
+      "max": 0.08630202613285506,
+      "mad": 0.0011995141992969943,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.058823529411764705,
+      "min": 0.058823529411764705,
+      "max": 0.058823529411764705,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.013888888888888888,
+      "min": 0.013888888888888888,
+      "max": 0.013888888888888888,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 3104.4609375,
+      "min": 3095.25,
+      "max": 3142.85546875,
+      "mad": 9.2109375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 4297.0,
+      "min": 4245.0,
+      "max": 4339.0,
+      "mad": 42.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 23.405594405594407,
+      "min": 20.197674418604652,
+      "max": 24.712230215827336,
+      "mad": 1.3066358102329296,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "large-v3",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 32.07818790000056,
+      "min": 28.31333272899974,
+      "max": 38.09768735200123,
+      "mad": 3.764855171000818,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 32.07818790000056,
+      "min": 28.31333272899974,
+      "max": 38.09768735200123,
+      "mad": 3.764855171000818,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 5.781466852999074,
+      "min": 5.702975680000236,
+      "max": 5.863379671000075,
+      "mad": 0.07849117299883801,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 5.892707137998514,
+      "min": 5.839596850000817,
+      "max": 5.97197548800068,
+      "mad": 0.053110287997697014,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.07442671026002927,
+      "min": 0.07341626776519355,
+      "max": 0.07548120070803392,
+      "mad": 0.0010104424948357144,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.058823529411764705,
+      "min": 0.058823529411764705,
+      "max": 0.058823529411764705,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.013888888888888888,
+      "min": 0.013888888888888888,
+      "max": 0.013888888888888888,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 3104.4609375,
+      "min": 3095.25,
+      "max": 3142.85546875,
+      "mad": 9.2109375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 4297.0,
+      "min": 4245.0,
+      "max": 4339.0,
+      "mad": 42.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 23.405594405594407,
+      "min": 20.197674418604652,
+      "max": 24.712230215827336,
+      "mad": 1.3066358102329296,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "medium",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 17.083817404,
+      "min": 15.405799590998868,
+      "max": 21.5239556180004,
+      "mad": 1.6780178130011336,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 17.083817404,
+      "min": 15.405799590998868,
+      "max": 21.5239556180004,
+      "mad": 1.6780178130011336,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 37.231092858999546,
+      "min": 33.058294505999584,
+      "max": 39.089367765000134,
+      "mad": 1.858274906000588,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 56.268158750999646,
+      "min": 48.555310974998065,
+      "max": 58.84111621000011,
+      "mad": 2.572957459000463,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.4792880131179138,
+      "min": 0.42557021763645186,
+      "max": 0.5032101926493323,
+      "mad": 0.023922179531418508,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.04411764705882353,
+      "min": 0.04411764705882353,
+      "max": 0.04411764705882353,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.008333333333333333,
+      "min": 0.008333333333333333,
+      "max": 0.008333333333333333,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 1696.1796875,
+      "min": 1670.88671875,
+      "max": 1764.078125,
+      "mad": 25.29296875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 107.0,
+      "min": 15.0,
+      "max": 125.0,
+      "mad": 18.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 3.430817610062893,
+      "min": 3.3811188811188813,
+      "max": 4.161290322580645,
+      "mad": 0.049698728944011616,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "medium",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 17.083817404,
+      "min": 15.405799590998868,
+      "max": 21.5239556180004,
+      "mad": 1.6780178130011336,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 17.083817404,
+      "min": 15.405799590998868,
+      "max": 21.5239556180004,
+      "mad": 1.6780178130011336,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 34.6818206909993,
+      "min": 29.09949845600022,
+      "max": 39.64097933899939,
+      "mad": 4.959158648000084,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 34.773037568998916,
+      "min": 29.19447203799973,
+      "max": 39.72704707199955,
+      "mad": 4.954009503000634,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.4464704002445842,
+      "min": 0.37460734366632614,
+      "max": 0.5103112685247089,
+      "mad": 0.0638408682801247,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.04411764705882353,
+      "min": 0.04411764705882353,
+      "max": 0.04411764705882353,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.008333333333333333,
+      "min": 0.008333333333333333,
+      "max": 0.008333333333333333,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 1696.1796875,
+      "min": 1670.88671875,
+      "max": 1764.078125,
+      "mad": 25.29296875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 107.0,
+      "min": 15.0,
+      "max": 125.0,
+      "mad": 18.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 3.430817610062893,
+      "min": 3.3811188811188813,
+      "max": 4.161290322580645,
+      "mad": 0.049698728944011616,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "medium",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 18.824646843000664,
+      "min": 16.391960762000963,
+      "max": 19.4579163110011,
+      "mad": 0.6332694680004352,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 18.824646843000664,
+      "min": 16.391960762000963,
+      "max": 19.4579163110011,
+      "mad": 0.6332694680004352,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 4.628383431001566,
+      "min": 4.493168441998932,
+      "max": 4.764401993001229,
+      "mad": 0.13521498900263396,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 23.672330559002148,
+      "min": 20.966624659000445,
+      "max": 24.180201883002155,
+      "mad": 0.507871324000007,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.059582690924325,
+      "min": 0.057842024227586664,
+      "max": 0.0613337022785946,
+      "mad": 0.0017406666967383355,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.051470588235294115,
+      "min": 0.051470588235294115,
+      "max": 0.051470588235294115,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0125,
+      "min": 0.0125,
+      "max": 0.0125,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 1618.44140625,
+      "min": 1611.8984375,
+      "max": 1644.83984375,
+      "mad": 6.54296875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2249.0,
+      "min": 2244.0,
+      "max": 2302.0,
+      "mad": 5.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 24.895833333333332,
+      "min": 23.78125,
+      "max": 25.942528735632184,
+      "mad": 1.0466954022988517,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "medium",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 18.824646843000664,
+      "min": 16.391960762000963,
+      "max": 19.4579163110011,
+      "mad": 0.6332694680004352,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 18.824646843000664,
+      "min": 16.391960762000963,
+      "max": 19.4579163110011,
+      "mad": 0.6332694680004352,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 4.429430617999969,
+      "min": 4.247757633000219,
+      "max": 4.728083067000625,
+      "mad": 0.18167298499975004,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 4.510926073000519,
+      "min": 4.341659773999709,
+      "max": 4.81136479000088,
+      "mad": 0.16926629900081025,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.05702150641091618,
+      "min": 0.05468277076467841,
+      "max": 0.060866156887237705,
+      "mad": 0.002338735646237773,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.051470588235294115,
+      "min": 0.051470588235294115,
+      "max": 0.051470588235294115,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0125,
+      "min": 0.0125,
+      "max": 0.0125,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 1618.44140625,
+      "min": 1611.8984375,
+      "max": 1644.83984375,
+      "mad": 6.54296875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2249.0,
+      "min": 2244.0,
+      "max": 2302.0,
+      "mad": 5.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 24.895833333333332,
+      "min": 23.78125,
+      "max": 25.942528735632184,
+      "mad": 1.0466954022988517,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 5.807226859000366,
+      "min": 5.081628406998789,
+      "max": 7.110945439000716,
+      "mad": 0.7255984520015772,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 5.807226859000366,
+      "min": 5.081628406998789,
+      "max": 7.110945439000716,
+      "mad": 0.7255984520015772,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 11.638647439000124,
+      "min": 11.079833435000182,
+      "max": 15.952567569000166,
+      "mad": 0.5588140039999416,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 18.844948367001052,
+      "min": 16.243369604999316,
+      "max": 21.822917172001326,
+      "mad": 2.6015787620017363,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.1498281081230706,
+      "min": 0.1426343130149354,
+      "max": 0.20536261031153663,
+      "mad": 0.007193795108135198,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.03676470588235294,
+      "min": 0.03676470588235294,
+      "max": 0.03676470588235294,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.006944444444444444,
+      "min": 0.006944444444444444,
+      "max": 0.006944444444444444,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 796.8984375,
+      "min": 729.76953125,
+      "max": 803.8828125,
+      "mad": 6.984375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 40.0,
+      "min": 22.0,
+      "max": 83.0,
+      "mad": 18.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 3.5656565656565657,
+      "min": 3.13265306122449,
+      "max": 3.764705882352941,
+      "mad": 0.19904931669637538,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 5.807226859000366,
+      "min": 5.081628406998789,
+      "max": 7.110945439000716,
+      "mad": 0.7255984520015772,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 5.807226859000366,
+      "min": 5.081628406998789,
+      "max": 7.110945439000716,
+      "mad": 0.7255984520015772,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 12.756617692000873,
+      "min": 10.442799026001012,
+      "max": 14.553011714000604,
+      "mad": 1.7963940219997312,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 12.838525455001218,
+      "min": 10.538154515001224,
+      "max": 14.616134458001397,
+      "mad": 1.7776090030001797,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.164220104170969,
+      "min": 0.13443356109682042,
+      "max": 0.1873456708805433,
+      "mad": 0.023125566709574302,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.03676470588235294,
+      "min": 0.03676470588235294,
+      "max": 0.03676470588235294,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.006944444444444444,
+      "min": 0.006944444444444444,
+      "max": 0.006944444444444444,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 796.8984375,
+      "min": 729.76953125,
+      "max": 803.8828125,
+      "mad": 6.984375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 40.0,
+      "min": 22.0,
+      "max": 83.0,
+      "mad": 18.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 3.5656565656565657,
+      "min": 3.13265306122449,
+      "max": 3.764705882352941,
+      "mad": 0.19904931669637538,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 2.800385667000228,
+      "min": 2.553629895000995,
+      "max": 6.199045373999979,
+      "mad": 0.24675577199923282,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 2.800385667000228,
+      "min": 2.553629895000995,
+      "max": 6.199045373999979,
+      "mad": 0.24675577199923282,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 2.9150994770006946,
+      "min": 2.701155585999004,
+      "max": 2.9729846219997853,
+      "mad": 0.0578851449990907,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 5.797038196000358,
+      "min": 5.605341625001529,
+      "max": 8.980116404,
+      "mad": 0.19169657099882897,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.03752702725284107,
+      "min": 0.034772857698236403,
+      "max": 0.038272201622036366,
+      "mad": 0.0007451743691952936,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.058823529411764705,
+      "min": 0.058823529411764705,
+      "max": 0.058823529411764705,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0125,
+      "min": 0.0125,
+      "max": 0.0125,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 689.484375,
+      "min": 689.4375,
+      "max": 689.8515625,
+      "mad": 0.046875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 858.0,
+      "min": 856.0,
+      "max": 862.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 31.551724137931036,
+      "min": 24.384615384615383,
+      "max": 33.51724137931034,
+      "mad": 1.965517241379306,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 2.800385667000228,
+      "min": 2.553629895000995,
+      "max": 6.199045373999979,
+      "mad": 0.24675577199923282,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 2.800385667000228,
+      "min": 2.553629895000995,
+      "max": 6.199045373999979,
+      "mad": 0.24675577199923282,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 2.486397668999416,
+      "min": 2.224853660000008,
+      "max": 2.5456326080002327,
+      "mad": 0.059234939000816667,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 2.5679507209988515,
+      "min": 2.304769104001025,
+      "max": 2.6243597160009813,
+      "mad": 0.056408995002129814,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.032008208921207724,
+      "min": 0.028641267507724097,
+      "max": 0.03277075962925119,
+      "mad": 0.0007625507080434649,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.058823529411764705,
+      "min": 0.058823529411764705,
+      "max": 0.058823529411764705,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0125,
+      "min": 0.0125,
+      "max": 0.0125,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 689.484375,
+      "min": 689.4375,
+      "max": 689.8515625,
+      "mad": 0.046875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 858.0,
+      "min": 856.0,
+      "max": 862.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 31.551724137931036,
+      "min": 24.384615384615383,
+      "max": 33.51724137931034,
+      "mad": 1.965517241379306,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "tiny",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 0.6836215310013358,
+      "min": 0.6774715940009628,
+      "max": 1.1980954480004584,
+      "mad": 0.006149937000373029,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 0.6836215310013358,
+      "min": 0.6774715940009628,
+      "max": 1.1980954480004584,
+      "mad": 0.006149937000373029,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 2.1754420079996635,
+      "min": 1.8173463830007677,
+      "max": 2.340573499999664,
+      "mad": 0.16513149200000043,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 3.100566516000981,
+      "min": 2.576286825002171,
+      "max": 3.5354251749995456,
+      "mad": 0.43485865899856435,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.028005175180222237,
+      "min": 0.02339529329300679,
+      "max": 0.030130966786813384,
+      "mad": 0.0021257916065911472,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.17647058823529413,
+      "min": 0.17647058823529413,
+      "max": 0.17647058823529413,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.05416666666666667,
+      "min": 0.05416666666666667,
+      "max": 0.05416666666666667,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 328.04296875,
+      "min": 327.28125,
+      "max": 331.953125,
+      "mad": 0.76171875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 5.0,
+      "min": 0.0,
+      "max": 84.0,
+      "mad": 5.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 2.5555555555555554,
+      "min": 2.4375,
+      "max": 3.8823529411764706,
+      "mad": 0.11805555555555536,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "tiny",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 0.6836215310013358,
+      "min": 0.6774715940009628,
+      "max": 1.1980954480004584,
+      "mad": 0.006149937000373029,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 0.6836215310013358,
+      "min": 0.6774715940009628,
+      "max": 1.1980954480004584,
+      "mad": 0.006149937000373029,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 1.7498789060009585,
+      "min": 1.7453796270001476,
+      "max": 1.7546854240008543,
+      "mad": 0.00449927900081093,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 1.8300043350009219,
+      "min": 1.827901049000502,
+      "max": 1.9117666250003822,
+      "mad": 0.0021032860004197573,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.022526762435645706,
+      "min": 0.022468841748199634,
+      "max": 0.022588638311030564,
+      "mad": 5.792068744607179e-05,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.17647058823529413,
+      "min": 0.17647058823529413,
+      "max": 0.17647058823529413,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.05416666666666667,
+      "min": 0.05416666666666667,
+      "max": 0.05416666666666667,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 328.04296875,
+      "min": 327.28125,
+      "max": 331.953125,
+      "mad": 0.76171875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 5.0,
+      "min": 0.0,
+      "max": 84.0,
+      "mad": 5.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 2.5555555555555554,
+      "min": 2.4375,
+      "max": 3.8823529411764706,
+      "mad": 0.11805555555555536,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "tiny",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 0.9178618829992047,
+      "min": 0.9145331500003522,
+      "max": 3.4226086100006796,
+      "mad": 0.0033287329988525016,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 0.9178618829992047,
+      "min": 0.9145331500003522,
+      "max": 3.4226086100006796,
+      "mad": 0.0033287329988525016,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 1.6807003230005648,
+      "min": 1.5553305389985326,
+      "max": 4.341735347999929,
+      "mad": 0.12536978400203225,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 2.684525972001211,
+      "min": 2.616009306999331,
+      "max": 8.402289611000015,
+      "mad": 0.06851666500188003,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.021636203952118495,
+      "min": 0.02002227779349295,
+      "max": 0.055892576570544916,
+      "mad": 0.001613926158625545,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.16176470588235295,
+      "min": 0.16176470588235295,
+      "max": 0.16176470588235295,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.05,
+      "min": 0.05,
+      "max": 0.05,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 647.6484375,
+      "min": 647.47265625,
+      "max": 666.01171875,
+      "mad": 0.17578125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 280.5,
+      "min": 280.0,
+      "max": 281.0,
+      "mad": 0.5,
+      "n": 2
+    },
+    "gpu_percent_mean": {
+      "median": 18.428571428571427,
+      "min": 15.633333333333333,
+      "max": 21.142857142857142,
+      "mad": 2.7142857142857153,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "faster-whisper",
+    "model": "tiny",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 0.9178618829992047,
+      "min": 0.9145331500003522,
+      "max": 3.4226086100006796,
+      "mad": 0.0033287329988525016,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 0.9178618829992047,
+      "min": 0.9145331500003522,
+      "max": 3.4226086100006796,
+      "mad": 0.0033287329988525016,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 1.318727335999938,
+      "min": 1.2930398270000296,
+      "max": 1.830772387998877,
+      "mad": 0.02568750899990846,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 1.4391854450004757,
+      "min": 1.4046911020013795,
+      "max": 2.468718040998283,
+      "mad": 0.03449434299909626,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.016976407518021857,
+      "min": 0.01664572382852767,
+      "max": 0.023568130638502535,
+      "mad": 0.0003306836894941857,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.16176470588235295,
+      "min": 0.16176470588235295,
+      "max": 0.16176470588235295,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.05,
+      "min": 0.05,
+      "max": 0.05,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 647.6484375,
+      "min": 647.47265625,
+      "max": 666.01171875,
+      "mad": 0.17578125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 280.5,
+      "min": 280.0,
+      "max": 281.0,
+      "mad": 0.5,
+      "n": 2
+    },
+    "gpu_percent_mean": {
+      "median": 18.428571428571427,
+      "min": 15.633333333333333,
+      "max": 21.142857142857142,
+      "mad": 2.7142857142857153,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "base",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 7.819214900000588,
+      "min": 1.2479553000011947,
+      "max": 9.069243500000084,
+      "mad": 1.2500285999994958,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 7.819214900000588,
+      "min": 1.2479553000011947,
+      "max": 9.069243500000084,
+      "mad": 1.2500285999994958,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 7.7547469000001,
+      "min": 7.039784599999621,
+      "max": 8.81815640000059,
+      "mad": 0.7149623000004794,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 17.38771060000181,
+      "min": 9.87584650000099,
+      "max": 21.58387070000026,
+      "mad": 4.196160099998451,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.09982938851699408,
+      "min": 0.09062544541709089,
+      "max": 0.11351900617920428,
+      "mad": 0.009203943099903189,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.125,
+      "min": 0.125,
+      "max": 0.125,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.022222222222222223,
+      "min": 0.022222222222222223,
+      "max": 0.022222222222222223,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 593.65625,
+      "min": 593.421875,
+      "max": 594.25390625,
+      "mad": 0.234375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 11.0,
+      "min": 0.0,
+      "max": 15.0,
+      "mad": 4.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 17.97142857142857,
+      "min": 17.365853658536587,
+      "max": 18.532258064516128,
+      "mad": 0.5608294930875566,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "base",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 7.819214900000588,
+      "min": 1.2479553000011947,
+      "max": 9.069243500000084,
+      "mad": 1.2500285999994958,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 7.819214900000588,
+      "min": 1.2479553000011947,
+      "max": 9.069243500000084,
+      "mad": 1.2500285999994958,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 7.629476899999645,
+      "min": 7.019171500000084,
+      "max": 8.704207500000848,
+      "mad": 0.6103053999995609,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 9.443225700000767,
+      "min": 8.607278100000258,
+      "max": 12.400678300000436,
+      "mad": 0.8359476000005088,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.09821674691039707,
+      "min": 0.09036008625128841,
+      "max": 0.11205210478888836,
+      "mad": 0.007856660659108658,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.125,
+      "min": 0.125,
+      "max": 0.125,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.022222222222222223,
+      "min": 0.022222222222222223,
+      "max": 0.022222222222222223,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 593.65625,
+      "min": 593.421875,
+      "max": 594.25390625,
+      "mad": 0.234375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 11.0,
+      "min": 0.0,
+      "max": 15.0,
+      "mad": 4.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 17.97142857142857,
+      "min": 17.365853658536587,
+      "max": 18.532258064516128,
+      "mad": 0.5608294930875566,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "base",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.2375273999987257,
+      "min": 0.5488648999998986,
+      "max": 1.2510463000016898,
+      "mad": 0.013518900002964074,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.2375273999987257,
+      "min": 0.5488648999998986,
+      "max": 1.2510463000016898,
+      "mad": 0.013518900002964074,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 2.2454463000012765,
+      "min": 2.082025599998815,
+      "max": 2.5497018999994907,
+      "mad": 0.16342070000246167,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 5.0335246000031475,
+      "min": 3.750740899999073,
+      "max": 5.212994499997876,
+      "mad": 0.17946989999472862,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.028906363285289345,
+      "min": 0.0268025952626006,
+      "max": 0.032823144953649463,
+      "mad": 0.0021037680226887456,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.11029411764705882,
+      "min": 0.11029411764705882,
+      "max": 0.11029411764705882,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.02638888888888889,
+      "min": 0.02638888888888889,
+      "max": 0.02638888888888889,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 599.9453125,
+      "min": 599.75,
+      "max": 601.62890625,
+      "mad": 0.1953125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 492.0,
+      "min": 482.0,
+      "max": 493.0,
+      "mad": 1.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 37.75,
+      "min": 36.529411764705884,
+      "max": 41.214285714285715,
+      "mad": 1.220588235294116,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "base",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.2375273999987257,
+      "min": 0.5488648999998986,
+      "max": 1.2510463000016898,
+      "mad": 0.013518900002964074,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.2375273999987257,
+      "min": 0.5488648999998986,
+      "max": 1.2510463000016898,
+      "mad": 0.013518900002964074,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 1.9900987000000896,
+      "min": 1.9893790999994962,
+      "max": 2.0745741999999154,
+      "mad": 0.0007196000005933456,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 3.500339399999575,
+      "min": 3.109949100000449,
+      "max": 3.5264110999996774,
+      "mad": 0.026071700000102283,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.02561919026776634,
+      "min": 0.02560992662203265,
+      "max": 0.0267066709577744,
+      "mad": 9.26364573369115e-06,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.11029411764705882,
+      "min": 0.11029411764705882,
+      "max": 0.11029411764705882,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.02638888888888889,
+      "min": 0.02638888888888889,
+      "max": 0.02638888888888889,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 599.9453125,
+      "min": 599.75,
+      "max": 601.62890625,
+      "mad": 0.1953125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 492.0,
+      "min": 482.0,
+      "max": 493.0,
+      "mad": 1.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 37.75,
+      "min": 36.529411764705884,
+      "max": 41.214285714285715,
+      "mad": 1.220588235294116,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "medium",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 7.800664800000959,
+      "min": 7.426627400000143,
+      "max": 11.515209400000458,
+      "mad": 0.374037400000816,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 7.800664800000959,
+      "min": 7.426627400000143,
+      "max": 11.515209400000458,
+      "mad": 0.374037400000816,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 57.58062450000034,
+      "min": 54.29598510000142,
+      "max": 82.08318549999967,
+      "mad": 3.284639399998923,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 65.77668960000119,
+      "min": 62.933530000002065,
+      "max": 95.53256859999965,
+      "mad": 2.843159599999126,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.741254177394443,
+      "min": 0.698969942070049,
+      "max": 1.0566836444387186,
+      "mad": 0.04228423532439396,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.051470588235294115,
+      "min": 0.051470588235294115,
+      "max": 0.051470588235294115,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.004166666666666667,
+      "min": 0.004166666666666667,
+      "max": 0.004166666666666667,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 2379.27734375,
+      "min": 2347.71484375,
+      "max": 2382.4296875,
+      "mad": 3.15234375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 147.0,
+      "min": 95.0,
+      "max": 155.0,
+      "mad": 8.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 2.005899705014749,
+      "min": 1.7925696594427245,
+      "max": 4.6040100250626566,
+      "mad": 0.21333004557202462,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "medium",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 7.800664800000959,
+      "min": 7.426627400000143,
+      "max": 11.515209400000458,
+      "mad": 0.374037400000816,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 7.800664800000959,
+      "min": 7.426627400000143,
+      "max": 11.515209400000458,
+      "mad": 0.374037400000816,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 67.92743969999901,
+      "min": 55.713764099999025,
+      "max": 71.60891959999935,
+      "mad": 3.6814799000003404,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 68.7643197999987,
+      "min": 56.48320179999973,
+      "max": 73.54309329999887,
+      "mad": 4.77877350000017,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.87445210736353,
+      "min": 0.7172214739958679,
+      "max": 0.9218449999999916,
+      "mad": 0.047392892636461625,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.051470588235294115,
+      "min": 0.051470588235294115,
+      "max": 0.051470588235294115,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.004166666666666667,
+      "min": 0.004166666666666667,
+      "max": 0.004166666666666667,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 2379.27734375,
+      "min": 2347.71484375,
+      "max": 2382.4296875,
+      "mad": 3.15234375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 147.0,
+      "min": 95.0,
+      "max": 155.0,
+      "mad": 8.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 2.005899705014749,
+      "min": 1.7925696594427245,
+      "max": 4.6040100250626566,
+      "mad": 0.21333004557202462,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "medium",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 8.630662600000505,
+      "min": 3.7593199999992066,
+      "max": 10.96788639999977,
+      "mad": 2.337223799999265,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 8.630662600000505,
+      "min": 3.7593199999992066,
+      "max": 10.96788639999977,
+      "mad": 2.337223799999265,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 5.557186100000763,
+      "min": 4.260184400000071,
+      "max": 7.271816200000103,
+      "mad": 1.297001700000692,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 16.687506599999324,
+      "min": 8.880572199999733,
+      "max": 19.3756441000005,
+      "mad": 2.688137500001176,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.071539470906292,
+      "min": 0.05484274459320379,
+      "max": 0.09361246395468721,
+      "mad": 0.016696726313088203,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.051470588235294115,
+      "min": 0.051470588235294115,
+      "max": 0.051470588235294115,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.004166666666666667,
+      "min": 0.004166666666666667,
+      "max": 0.004166666666666667,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 603.80859375,
+      "min": 602.62109375,
+      "max": 605.359375,
+      "mad": 1.1875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2308.0,
+      "min": 2271.0,
+      "max": 2309.0,
+      "mad": 1.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 27.087719298245613,
+      "min": 24.79245283018868,
+      "max": 47.303030303030305,
+      "mad": 2.2952664680569335,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "medium",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 8.630662600000505,
+      "min": 3.7593199999992066,
+      "max": 10.96788639999977,
+      "mad": 2.337223799999265,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 8.630662600000505,
+      "min": 3.7593199999992066,
+      "max": 10.96788639999977,
+      "mad": 2.337223799999265,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 5.888651499999469,
+      "min": 4.087989200001175,
+      "max": 6.197006300000794,
+      "mad": 0.3083548000013252,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 6.98203409999951,
+      "min": 4.9490570000016305,
+      "max": 8.739223099999435,
+      "mad": 1.7571889999999257,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.07580653321317544,
+      "min": 0.05262601956747135,
+      "max": 0.07977608522143143,
+      "mad": 0.00396955200825598,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.051470588235294115,
+      "min": 0.051470588235294115,
+      "max": 0.051470588235294115,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.004166666666666667,
+      "min": 0.004166666666666667,
+      "max": 0.004166666666666667,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 603.80859375,
+      "min": 602.62109375,
+      "max": 605.359375,
+      "mad": 1.1875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2308.0,
+      "min": 2271.0,
+      "max": 2309.0,
+      "mad": 1.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 27.087719298245613,
+      "min": 24.79245283018868,
+      "max": 47.303030303030305,
+      "mad": 2.2952664680569335,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "small",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 2.9640956000002916,
+      "min": 2.9639188000001013,
+      "max": 3.6607774999993126,
+      "mad": 0.0001768000001902692,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 2.9640956000002916,
+      "min": 2.9639188000001013,
+      "max": 3.6607774999993126,
+      "mad": 0.0001768000001902692,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 20.24052970000048,
+      "min": 18.787209999998595,
+      "max": 21.28582819999974,
+      "mad": 1.0452984999992623,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 24.162124600001334,
+      "min": 23.944194499998048,
+      "max": 25.77980419999949,
+      "mad": 0.2179301000032865,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.2605629467044346,
+      "min": 0.24185388774457509,
+      "max": 0.27401941555097503,
+      "mad": 0.013456468846540448,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.0661764705882353,
+      "min": 0.0661764705882353,
+      "max": 0.0661764705882353,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0125,
+      "min": 0.0125,
+      "max": 0.0125,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 1054.42578125,
+      "min": 1053.2734375,
+      "max": 1055.91796875,
+      "mad": 1.15234375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 39.0,
+      "min": 36.0,
+      "max": 125.0,
+      "mad": 3.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 11.553030303030303,
+      "min": 3.7964601769911503,
+      "max": 18.105263157894736,
+      "mad": 6.5522328548644335,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "small",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 2.9640956000002916,
+      "min": 2.9639188000001013,
+      "max": 3.6607774999993126,
+      "mad": 0.0001768000001902692,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 2.9640956000002916,
+      "min": 2.9639188000001013,
+      "max": 3.6607774999993126,
+      "mad": 0.0001768000001902692,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 20.4414842999995,
+      "min": 19.616244699998788,
+      "max": 26.436930999998367,
+      "mad": 0.8252396000007138,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 21.399160400000255,
+      "min": 21.11245169999893,
+      "max": 27.966811399997823,
+      "mad": 0.2867087000013271,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.26314990087537976,
+      "min": 0.2525263220906126,
+      "max": 0.34033124356331573,
+      "mad": 0.010623578784767163,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.0661764705882353,
+      "min": 0.0661764705882353,
+      "max": 0.0661764705882353,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0125,
+      "min": 0.0125,
+      "max": 0.0125,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 1054.42578125,
+      "min": 1053.2734375,
+      "max": 1055.91796875,
+      "mad": 1.15234375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 39.0,
+      "min": 36.0,
+      "max": 125.0,
+      "mad": 3.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 11.553030303030303,
+      "min": 3.7964601769911503,
+      "max": 18.105263157894736,
+      "mad": 6.5522328548644335,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "small",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.2516555000001972,
+      "min": 1.2319323000010627,
+      "max": 1.78271549999954,
+      "mad": 0.019723199999134522,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.2516555000001972,
+      "min": 1.2319323000010627,
+      "max": 1.78271549999954,
+      "mad": 0.019723199999134522,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 2.5295850000002247,
+      "min": 2.486080000000584,
+      "max": 2.8280996000012237,
+      "mad": 0.04350499999964086,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 4.542242200001056,
+      "min": 4.540813100000378,
+      "max": 6.0125251000008575,
+      "mad": 0.0014291000006778631,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.032564173532443674,
+      "min": 0.032004119464477135,
+      "max": 0.036407049433589384,
+      "mad": 0.0005600540679665394,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.0661764705882353,
+      "min": 0.0661764705882353,
+      "max": 0.0661764705882353,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0125,
+      "min": 0.0125,
+      "max": 0.0125,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 589.4609375,
+      "min": 588.75390625,
+      "max": 589.67578125,
+      "mad": 0.21484375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 943.0,
+      "min": 923.0,
+      "max": 951.0,
+      "mad": 8.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 33.5,
+      "min": 26.523809523809526,
+      "max": 35.0,
+      "mad": 1.5,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "small",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.2516555000001972,
+      "min": 1.2319323000010627,
+      "max": 1.78271549999954,
+      "mad": 0.019723199999134522,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.2516555000001972,
+      "min": 1.2319323000010627,
+      "max": 1.78271549999954,
+      "mad": 0.019723199999134522,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 2.4382826000000932,
+      "min": 2.3170638000010513,
+      "max": 2.480893699999797,
+      "mad": 0.04261109999970358,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 3.2839712999993935,
+      "min": 3.0977887000008195,
+      "max": 3.839992600000187,
+      "mad": 0.186182599998574,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.0313888079299703,
+      "min": 0.029828318743576866,
+      "max": 0.0319373545314083,
+      "mad": 0.0005485466014380005,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.0661764705882353,
+      "min": 0.0661764705882353,
+      "max": 0.0661764705882353,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0125,
+      "min": 0.0125,
+      "max": 0.0125,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 589.4609375,
+      "min": 588.75390625,
+      "max": 589.67578125,
+      "mad": 0.21484375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 943.0,
+      "min": 923.0,
+      "max": 951.0,
+      "mad": 8.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 33.5,
+      "min": 26.523809523809526,
+      "max": 35.0,
+      "mad": 1.5,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "tiny",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 0.5455599999986589,
+      "min": 0.5256088999994972,
+      "max": 2.4963562000011734,
+      "mad": 0.01995109999916167,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 0.5455599999986589,
+      "min": 0.5256088999994972,
+      "max": 2.4963562000011734,
+      "mad": 0.01995109999916167,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 3.878169400000843,
+      "min": 3.682070599999861,
+      "max": 4.031516900000497,
+      "mad": 0.15334749999965425,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 5.373583900000085,
+      "min": 5.192454600000929,
+      "max": 7.764708300001075,
+      "mad": 0.1811292999991565,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.04992494078270909,
+      "min": 0.04740049691039985,
+      "max": 0.05189903321318868,
+      "mad": 0.001974092430479586,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.19117647058823528,
+      "min": 0.19117647058823528,
+      "max": 0.19117647058823528,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.059722222222222225,
+      "min": 0.059722222222222225,
+      "max": 0.059722222222222225,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 486.78125,
+      "min": 485.55859375,
+      "max": 488.390625,
+      "mad": 1.22265625,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 11.0,
+      "min": 7.0,
+      "max": 13.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 4.0,
+      "min": 3.7857142857142856,
+      "max": 4.96,
+      "mad": 0.2142857142857144,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "tiny",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 0.5455599999986589,
+      "min": 0.5256088999994972,
+      "max": 2.4963562000011734,
+      "mad": 0.01995109999916167,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 0.5455599999986589,
+      "min": 0.5256088999994972,
+      "max": 2.4963562000011734,
+      "mad": 0.01995109999916167,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 3.7479944999995496,
+      "min": 3.628949800000555,
+      "max": 4.5661536999996315,
+      "mad": 0.11904469999899447,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 5.215231300000596,
+      "min": 4.544501500000479,
+      "max": 5.35483000000022,
+      "mad": 0.13959869999962393,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.04824915679711057,
+      "min": 0.04671665550979087,
+      "max": 0.0587815872811487,
+      "mad": 0.0015325012873197014,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.19117647058823528,
+      "min": 0.19117647058823528,
+      "max": 0.19117647058823528,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.059722222222222225,
+      "min": 0.059722222222222225,
+      "max": 0.059722222222222225,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 486.78125,
+      "min": 485.55859375,
+      "max": 488.390625,
+      "mad": 1.22265625,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 11.0,
+      "min": 7.0,
+      "max": 13.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 4.0,
+      "min": 3.7857142857142856,
+      "max": 4.96,
+      "mad": 0.2142857142857144,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "tiny",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.2363843999992241,
+      "min": 0.5405608000000939,
+      "max": 3.6542510999988735,
+      "mad": 0.6958235999991302,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.2363843999992241,
+      "min": 0.5405608000000939,
+      "max": 3.6542510999988735,
+      "mad": 0.6958235999991302,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 2.4612963999989006,
+      "min": 2.3092361999988498,
+      "max": 3.671933400000853,
+      "mad": 0.15206020000005083,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 5.1044741999976395,
+      "min": 3.7403516999984276,
+      "max": 9.462162499999977,
+      "mad": 1.3641224999992119,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.03168507209061406,
+      "min": 0.02972755149329106,
+      "max": 0.04726999742534568,
+      "mad": 0.001957520597323001,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.16176470588235295,
+      "min": 0.16176470588235295,
+      "max": 0.16176470588235295,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.05416666666666667,
+      "min": 0.05416666666666667,
+      "max": 0.05416666666666667,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 598.296875,
+      "min": 597.9609375,
+      "max": 598.78125,
+      "mad": 0.3359375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 406.0,
+      "min": 360.0,
+      "max": 438.0,
+      "mad": 32.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 21.76923076923077,
+      "min": 18.166666666666668,
+      "max": 23.714285714285715,
+      "mad": 1.9450549450549453,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-quality",
+    "engine": "whisper.cpp",
+    "model": "tiny",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 77.68,
+      "min": 77.68,
+      "max": 77.68,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.2363843999992241,
+      "min": 0.5405608000000939,
+      "max": 3.6542510999988735,
+      "mad": 0.6958235999991302,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.2363843999992241,
+      "min": 0.5405608000000939,
+      "max": 3.6542510999988735,
+      "mad": 0.6958235999991302,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 2.0867188000011083,
+      "min": 2.043231300000116,
+      "max": 2.760610799999995,
+      "mad": 0.04348750000099244,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 4.16740419999951,
+      "min": 2.9337859999996,
+      "max": 4.2226968000013585,
+      "mad": 0.05529260000184877,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.026863012358407674,
+      "min": 0.026303183573636917,
+      "max": 0.035538244078269755,
+      "mad": 0.0005598287847707571,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.16176470588235295,
+      "min": 0.16176470588235295,
+      "max": 0.16176470588235295,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.05416666666666667,
+      "min": 0.05416666666666667,
+      "max": 0.05416666666666667,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 598.296875,
+      "min": 597.9609375,
+      "max": 598.78125,
+      "mad": 0.3359375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 406.0,
+      "min": 360.0,
+      "max": 438.0,
+      "mad": 32.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 21.76923076923077,
+      "min": 18.166666666666668,
+      "max": 23.714285714285715,
+      "mad": 1.9450549450549453,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-six-minute",
+    "engine": "faster-whisper",
+    "model": "medium",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 368.89,
+      "min": 368.89,
+      "max": 368.89,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 26.14591657100027,
+      "min": 17.913902619999135,
+      "max": 26.577531233999252,
+      "mad": 0.43161466299898166,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 26.14591657100027,
+      "min": 17.913902619999135,
+      "max": 26.577531233999252,
+      "mad": 0.43161466299898166,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 19.913340844999766,
+      "min": 19.78028988999904,
+      "max": 26.23692596500041,
+      "mad": 0.1330509550007264,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 46.78857454299941,
+      "min": 37.95246042099825,
+      "max": 52.58124932500141,
+      "mad": 5.7926747820019955,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.053981785478055155,
+      "min": 0.05362110626473757,
+      "max": 0.07112398266420995,
+      "mad": 0.00036067921331758845,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.08567208271787297,
+      "min": 0.08567208271787297,
+      "max": 0.08567208271787297,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.047453703703703706,
+      "min": 0.047453703703703706,
+      "max": 0.047453703703703706,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 2261.3359375,
+      "min": 2165.08203125,
+      "max": 2296.56640625,
+      "mad": 35.23046875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2313.0,
+      "min": 2304.0,
+      "max": 2481.0,
+      "mad": 9.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 43.2034632034632,
+      "min": 40.96052631578947,
+      "max": 43.96534653465346,
+      "mad": 0.761883331190262,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-six-minute",
+    "engine": "faster-whisper",
+    "model": "medium",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 368.89,
+      "min": 368.89,
+      "max": 368.89,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 26.14591657100027,
+      "min": 17.913902619999135,
+      "max": 26.577531233999252,
+      "mad": 0.43161466299898166,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 26.14591657100027,
+      "min": 17.913902619999135,
+      "max": 26.577531233999252,
+      "mad": 0.43161466299898166,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 21.442244667001432,
+      "min": 19.288232752000113,
+      "max": 21.911721980999573,
+      "mad": 0.46947731399814074,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 21.739947131001827,
+      "min": 19.546500663000188,
+      "max": 22.1101287700003,
+      "mad": 0.3701816389984742,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.05812639178888404,
+      "min": 0.05228722045054112,
+      "max": 0.05939906742118131,
+      "mad": 0.001272675632297271,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.08567208271787297,
+      "min": 0.08567208271787297,
+      "max": 0.08567208271787297,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.047453703703703706,
+      "min": 0.047453703703703706,
+      "max": 0.047453703703703706,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 2261.3359375,
+      "min": 2165.08203125,
+      "max": 2296.56640625,
+      "mad": 35.23046875,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2313.0,
+      "min": 2304.0,
+      "max": 2481.0,
+      "mad": 9.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 43.2034632034632,
+      "min": 40.96052631578947,
+      "max": 43.96534653465346,
+      "mad": 0.761883331190262,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-six-minute",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 368.89,
+      "min": 368.89,
+      "max": 368.89,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 6.569418379000126,
+      "min": 5.064171621001151,
+      "max": 8.31244114600122,
+      "mad": 1.5052467579989752,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 6.569418379000126,
+      "min": 5.064171621001151,
+      "max": 8.31244114600122,
+      "mad": 1.5052467579989752,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 65.04366872300125,
+      "min": 62.869975530999,
+      "max": 68.26526610399924,
+      "mad": 2.173693192002247,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 74.01314949500193,
+      "min": 68.19557316600003,
+      "max": 75.10212433799825,
+      "mad": 1.088974842996322,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.17632266725311407,
+      "min": 0.17043014321613217,
+      "max": 0.1850558868605797,
+      "mad": 0.0058925240369819,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.06351550960118169,
+      "min": 0.06351550960118169,
+      "max": 0.06351550960118169,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.025752314814814815,
+      "min": 0.025752314814814815,
+      "max": 0.025752314814814815,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 1142.47265625,
+      "min": 944.74609375,
+      "max": 1248.68359375,
+      "mad": 106.2109375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 129.0,
+      "min": 43.0,
+      "max": 236.0,
+      "mad": 86.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 4.604651162790698,
+      "min": 3.253303964757709,
+      "max": 6.366525423728813,
+      "mad": 1.3513471980329888,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-six-minute",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 368.89,
+      "min": 368.89,
+      "max": 368.89,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 6.569418379000126,
+      "min": 5.064171621001151,
+      "max": 8.31244114600122,
+      "mad": 1.5052467579989752,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 6.569418379000126,
+      "min": 5.064171621001151,
+      "max": 8.31244114600122,
+      "mad": 1.5052467579989752,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 67.04011455600084,
+      "min": 64.78755439899942,
+      "max": 73.44550333699954,
+      "mad": 2.252560157001426,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 67.30755441099973,
+      "min": 65.44459402499888,
+      "max": 73.70692935099942,
+      "mad": 1.8629603860008501,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.18173470290872848,
+      "min": 0.17562838352625287,
+      "max": 0.1990986563392869,
+      "mad": 0.006106319382475606,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.06351550960118169,
+      "min": 0.06351550960118169,
+      "max": 0.06351550960118169,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.025752314814814815,
+      "min": 0.025752314814814815,
+      "max": 0.025752314814814815,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 1142.47265625,
+      "min": 944.74609375,
+      "max": 1248.68359375,
+      "mad": 106.2109375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 129.0,
+      "min": 43.0,
+      "max": 236.0,
+      "mad": 86.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 4.604651162790698,
+      "min": 3.253303964757709,
+      "max": 6.366525423728813,
+      "mad": 1.3513471980329888,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-six-minute",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 368.89,
+      "min": 368.89,
+      "max": 368.89,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 2.440424750000602,
+      "min": 2.3526927040002192,
+      "max": 2.515408060000482,
+      "mad": 0.07498330999987957,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 2.440424750000602,
+      "min": 2.3526927040002192,
+      "max": 2.515408060000482,
+      "mad": 0.07498330999987957,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 12.361497328000041,
+      "min": 12.312580267000158,
+      "max": 14.410922636998293,
+      "mad": 0.04891706099988369,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 14.88392740800009,
+      "min": 14.839655093999681,
+      "max": 17.072487970997827,
+      "mad": 0.044272314000409096,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.03350998218439112,
+      "min": 0.03337737609314473,
+      "max": 0.03906563646886143,
+      "mad": 0.00013260609124639278,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.07090103397341212,
+      "min": 0.07090103397341212,
+      "max": 0.07090103397341212,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.027777777777777776,
+      "min": 0.027777777777777776,
+      "max": 0.027777777777777776,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 1266.04296875,
+      "min": 1241.1171875,
+      "max": 1292.0390625,
+      "mad": 24.92578125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 939.0,
+      "min": 913.0,
+      "max": 966.0,
+      "mad": 26.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 45.16,
+      "min": 42.801886792452834,
+      "max": 45.62244897959184,
+      "mad": 0.4624489795918407,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-six-minute",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 368.89,
+      "min": 368.89,
+      "max": 368.89,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 2.440424750000602,
+      "min": 2.3526927040002192,
+      "max": 2.515408060000482,
+      "mad": 0.07498330999987957,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 2.440424750000602,
+      "min": 2.3526927040002192,
+      "max": 2.515408060000482,
+      "mad": 0.07498330999987957,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 11.545085166000717,
+      "min": 11.507667301000765,
+      "max": 11.705379430000903,
+      "mad": 0.037417864999952144,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 11.676007557000048,
+      "min": 11.633132363000186,
+      "max": 11.851536703999955,
+      "mad": 0.04287519399986195,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.031296823351136434,
+      "min": 0.03119538968527411,
+      "max": 0.031731354685681105,
+      "mad": 0.00010143366586232508,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.07090103397341212,
+      "min": 0.07090103397341212,
+      "max": 0.07090103397341212,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.027777777777777776,
+      "min": 0.027777777777777776,
+      "max": 0.027777777777777776,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 1266.04296875,
+      "min": 1241.1171875,
+      "max": 1292.0390625,
+      "mad": 24.92578125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 939.0,
+      "min": 913.0,
+      "max": 966.0,
+      "mad": 26.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 45.16,
+      "min": 42.801886792452834,
+      "max": 45.62244897959184,
+      "mad": 0.4624489795918407,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-six-minute",
+    "engine": "whisper.cpp",
+    "model": "medium",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 368.89,
+      "min": 368.89,
+      "max": 368.89,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 7.295177600000898,
+      "min": 7.290474800000084,
+      "max": 7.7982357000000775,
+      "mad": 0.0047028000008140225,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 7.295177600000898,
+      "min": 7.290474800000084,
+      "max": 7.7982357000000775,
+      "mad": 0.0047028000008140225,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 17.56554899999901,
+      "min": 17.544254000000365,
+      "max": 17.836427000000185,
+      "mad": 0.021294999998644926,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 26.248937799999112,
+      "min": 25.63959210000212,
+      "max": 27.11662719999913,
+      "mad": 0.6093456999969931,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.04761730868280249,
+      "min": 0.04755958144704482,
+      "max": 0.04835161430236706,
+      "mad": 5.77272357576708e-05,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.08567208271787297,
+      "min": 0.08567208271787297,
+      "max": 0.08567208271787297,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.04600694444444445,
+      "min": 0.04600694444444445,
+      "max": 0.04600694444444445,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 691.30078125,
+      "min": 671.26171875,
+      "max": 691.6640625,
+      "mad": 0.36328125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2364.0,
+      "min": 2269.0,
+      "max": 2372.0,
+      "mad": 8.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 52.04761904761905,
+      "min": 48.68503937007874,
+      "max": 53.384,
+      "mad": 1.3363809523809493,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-six-minute",
+    "engine": "whisper.cpp",
+    "model": "medium",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 368.89,
+      "min": 368.89,
+      "max": 368.89,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 7.295177600000898,
+      "min": 7.290474800000084,
+      "max": 7.7982357000000775,
+      "mad": 0.0047028000008140225,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 7.295177600000898,
+      "min": 7.290474800000084,
+      "max": 7.7982357000000775,
+      "mad": 0.0047028000008140225,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 16.934075900000607,
+      "min": 16.707537700000103,
+      "max": 17.231210199999623,
+      "mad": 0.22653820000050473,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 18.18950219999897,
+      "min": 17.734236400001464,
+      "max": 18.624124199999642,
+      "mad": 0.4346220000006724,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.04590548917021499,
+      "min": 0.045291381441622446,
+      "max": 0.04671097129225412,
+      "mad": 0.0006141077285925431,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.08567208271787297,
+      "min": 0.08567208271787297,
+      "max": 0.08567208271787297,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.04600694444444445,
+      "min": 0.04600694444444445,
+      "max": 0.04600694444444445,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 691.30078125,
+      "min": 671.26171875,
+      "max": 691.6640625,
+      "mad": 0.36328125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 2364.0,
+      "min": 2269.0,
+      "max": 2372.0,
+      "mad": 8.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 52.04761904761905,
+      "min": 48.68503937007874,
+      "max": 53.384,
+      "mad": 1.3363809523809493,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-six-minute",
+    "engine": "whisper.cpp",
+    "model": "small",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 368.89,
+      "min": 368.89,
+      "max": 368.89,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.258237600000939,
+      "min": 1.2555868999988888,
+      "max": 4.180410399998436,
+      "mad": 0.0026507000020501437,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.258237600000939,
+      "min": 1.2555868999988888,
+      "max": 4.180410399998436,
+      "mad": 0.0026507000020501437,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 9.595378099998925,
+      "min": 9.569736499999635,
+      "max": 10.005948599999101,
+      "mad": 0.02564159999928961,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 11.646672799999578,
+      "min": 11.644533200000296,
+      "max": 15.843071599998439,
+      "mad": 0.002139599999281927,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.0260114887906935,
+      "min": 0.02594197863861757,
+      "max": 0.02712447775759468,
+      "mad": 6.951015207593003e-05,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.06794682422451995,
+      "min": 0.06794682422451995,
+      "max": 0.06794682422451995,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.026909722222222224,
+      "min": 0.026909722222222224,
+      "max": 0.026909722222222224,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 690.4609375,
+      "min": 688.34375,
+      "max": 690.9921875,
+      "mad": 0.53125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 973.0,
+      "min": 952.0,
+      "max": 975.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 41.63076923076923,
+      "min": 36.351351351351354,
+      "max": 42.28125,
+      "mad": 0.6504807692307679,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-six-minute",
+    "engine": "whisper.cpp",
+    "model": "small",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 368.89,
+      "min": 368.89,
+      "max": 368.89,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 1.258237600000939,
+      "min": 1.2555868999988888,
+      "max": 4.180410399998436,
+      "mad": 0.0026507000020501437,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 1.258237600000939,
+      "min": 1.2555868999988888,
+      "max": 4.180410399998436,
+      "mad": 0.0026507000020501437,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 9.50411030000032,
+      "min": 9.406713200000013,
+      "max": 9.69927380000081,
+      "mad": 0.09739710000030755,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 10.490191300001243,
+      "min": 10.228062600001067,
+      "max": 11.160822900001222,
+      "mad": 0.26212870000017574,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.025764076825070672,
+      "min": 0.025500049337200827,
+      "max": 0.02629313291225246,
+      "mad": 0.00026402748786984523,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.06794682422451995,
+      "min": 0.06794682422451995,
+      "max": 0.06794682422451995,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.026909722222222224,
+      "min": 0.026909722222222224,
+      "max": 0.026909722222222224,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 690.4609375,
+      "min": 688.34375,
+      "max": 690.9921875,
+      "mad": 0.53125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 973.0,
+      "min": 952.0,
+      "max": 975.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 41.63076923076923,
+      "min": 36.351351351351354,
+      "max": 42.28125,
+      "mad": 0.6504807692307679,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "portuguese"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-two-speaker",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cpu",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 62.54,
+      "min": 62.54,
+      "max": 62.54,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 2.382701435999479,
+      "min": 2.2711963530000503,
+      "max": 5.002253253998788,
+      "mad": 0.11150508299942885,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 2.382701435999479,
+      "min": 2.2711963530000503,
+      "max": 5.002253253998788,
+      "mad": 0.11150508299942885,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 6.920891839001342,
+      "min": 6.907573410999248,
+      "max": 7.570208401000855,
+      "mad": 0.013318428002094151,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 9.506032633000359,
+      "min": 9.24913973999901,
+      "max": 12.673927779000223,
+      "mad": 0.2568928930013499,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.1106634448193371,
+      "min": 0.11045048626477852,
+      "max": 0.12104586506237376,
+      "mad": 0.00021295855455857882,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 694.0078125,
+      "min": 693.875,
+      "max": 700.0390625,
+      "mad": 0.1328125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 4.0,
+      "min": 0.0,
+      "max": 6.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 2.1363636363636362,
+      "min": 2.0,
+      "max": 2.1403508771929824,
+      "mad": 0.003987240829346206,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-two-speaker",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cpu",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 62.54,
+      "min": 62.54,
+      "max": 62.54,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 2.382701435999479,
+      "min": 2.2711963530000503,
+      "max": 5.002253253998788,
+      "mad": 0.11150508299942885,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 2.382701435999479,
+      "min": 2.2711963530000503,
+      "max": 5.002253253998788,
+      "mad": 0.11150508299942885,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 6.913927243998842,
+      "min": 6.812995614000101,
+      "max": 7.668126313001267,
+      "mad": 0.10093162999874039,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 7.116366601998379,
+      "min": 6.914461738000682,
+      "max": 7.738496289000977,
+      "mad": 0.20190486399769725,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.11055208257113594,
+      "min": 0.10893820937000483,
+      "max": 0.12261154961626586,
+      "mad": 0.0016138732011311135,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 694.0078125,
+      "min": 693.875,
+      "max": 700.0390625,
+      "mad": 0.1328125,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 4.0,
+      "min": 0.0,
+      "max": 6.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 2.1363636363636362,
+      "min": 2.0,
+      "max": 2.1403508771929824,
+      "mad": 0.003987240829346206,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-two-speaker",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cuda",
+    "phase": "cold",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 62.54,
+      "min": 62.54,
+      "max": 62.54,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 2.310229603001062,
+      "min": 2.239145356001245,
+      "max": 2.4410978969990538,
+      "mad": 0.07108424699981697,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 2.310229603001062,
+      "min": 2.239145356001245,
+      "max": 2.4410978969990538,
+      "mad": 0.07108424699981697,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 1.9187291719990753,
+      "min": 1.7309152159996302,
+      "max": 1.9373945130009815,
+      "mad": 0.0186653410019062,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 4.223408484000174,
+      "min": 4.098453613001766,
+      "max": 4.446522981001181,
+      "mad": 0.1249548709984083,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.03068003153180485,
+      "min": 0.027676930220652866,
+      "max": 0.03097848597699043,
+      "mad": 0.00029845444518557945,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 650.625,
+      "min": 650.15234375,
+      "max": 650.74609375,
+      "mad": 0.12109375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 858.0,
+      "min": 856.0,
+      "max": 872.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 27.2,
+      "min": 25.318181818181817,
+      "max": 28.952380952380953,
+      "mad": 1.7523809523809533,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  },
+  {
+    "fixture_id": "fleurs-two-speaker",
+    "engine": "faster-whisper",
+    "model": "small",
+    "device": "cuda",
+    "phase": "warm",
+    "sessions": 3,
+    "repeated_enough": true,
+    "audio_seconds": {
+      "median": 62.54,
+      "min": 62.54,
+      "max": 62.54,
+      "mad": 0.0,
+      "n": 3
+    },
+    "model_load_seconds": {
+      "median": 2.310229603001062,
+      "min": 2.239145356001245,
+      "max": 2.4410978969990538,
+      "mad": 0.07108424699981697,
+      "n": 3
+    },
+    "startup_seconds": {
+      "median": 2.310229603001062,
+      "min": 2.239145356001245,
+      "max": 2.4410978969990538,
+      "mad": 0.07108424699981697,
+      "n": 3
+    },
+    "inference_seconds": {
+      "median": 1.604458682000768,
+      "min": 1.5059508360009204,
+      "max": 1.7534684380007093,
+      "mad": 0.09850784599984763,
+      "n": 3
+    },
+    "total_seconds": {
+      "median": 1.6724892530019133,
+      "min": 1.563259630001994,
+      "max": 1.819002394000563,
+      "mad": 0.10922962299991923,
+      "n": 3
+    },
+    "rtf": {
+      "median": 0.025654919763363735,
+      "min": 0.0240798023025411,
+      "max": 0.028037550975387102,
+      "mad": 0.0015751174608226344,
+      "n": 3
+    },
+    "wer": {
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "cer": {
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "mad": 0.0,
+      "n": 3
+    },
+    "der": null,
+    "ram_peak_mib": {
+      "median": 650.625,
+      "min": 650.15234375,
+      "max": 650.74609375,
+      "mad": 0.12109375,
+      "n": 3
+    },
+    "gpu_total_vram_delta_mib": {
+      "median": 858.0,
+      "min": 856.0,
+      "max": 872.0,
+      "mad": 2.0,
+      "n": 3
+    },
+    "gpu_percent_mean": {
+      "median": 27.2,
+      "min": 25.318181818181817,
+      "max": 28.952380952380953,
+      "mad": 1.7523809523809533,
+      "n": 3
+    },
+    "torch_peak_allocated_mib": null,
+    "languages": [
+      "pt"
+    ]
+  }
+]
