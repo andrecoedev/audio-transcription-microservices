@@ -9,6 +9,10 @@ from .utils.upload_formats import DEFAULT_ALLOWED_EXTENSIONS, SUPPORTED_UPLOAD_E
 
 
 class Settings(BaseSettings):
+    # Empty policies deny new processing; no invented commercial allowance.
+    PLAN_POLICIES_JSON: str = "{}"
+    LOCAL_TRANSCRIPTION_ENABLED: bool = False
+    LOCAL_TRANSCRIPTION_HOMOLOGATED: bool = False
     """Configurações da aplicação."""
     model_config = SettingsConfigDict(
         env_file=".env",
