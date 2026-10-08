@@ -27,7 +27,8 @@ foreach ($model in $Models) {
             }
             if ($Engine -eq 'faster-whisper') {
                 $compute = if ($device -eq 'cpu') { 'int8' } else { 'float16' }
-                docker run --rm --network none --gpus all --entrypoint python --mount "type=bind,source=$repo,target=/repo,readonly" --mount "type=bind,source=$artifact\results,target=/results" $WorkerImage /repo/experiments/transcription_benchmark/run.py --audio "/repo/modules/backend/benchmarks/fixtures/$Fixture.wav" --reference "/repo/modules/backend/benchmarks/fixtures/$Fixture.reference.txt" --fixture-id $FixtureId --engine $Engine --model $model --model-path "/repo/.local-artifacts/cpu-gpu-benchmark/models/faster-$model" --device $device --compute-type $compute --session $session --output /results
+                # Mount only this experiment, media and models, never the repository/.env.
+                docker run --rm --network none --gpus all --entrypoint python --mount "type=bind,source=$PSScriptRoot,target=/benchmark,readonly" --mount "type=bind,source=$fixtureDir,target=/fixtures,readonly" --mount "type=bind,source=$artifact\models,target=/models,readonly" --mount "type=bind,source=$artifact\results,target=/results" $WorkerImage /benchmark/run.py --audio "/fixtures/$Fixture.wav" --reference "/fixtures/$Fixture.reference.txt" --fixture-id $FixtureId --engine $Engine --model $model --model-path "/models/faster-$model" --device $device --compute-type $compute --session $session --output /results
             } else {
                 if (-not $server) { throw 'whisper-server.exe missing' }
                 & $python "$PSScriptRoot\run.py" --audio "$fixtureDir\$Fixture.wav" --reference "$fixtureDir\$Fixture.reference.txt" --fixture-id $FixtureId --engine $Engine --model $model --model-path "$artifact\models\ggml-$model.bin" --device $device --compute-type ggml-f16 --cpp-server $server.FullName --session $session --output "$artifact\results"

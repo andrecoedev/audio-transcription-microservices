@@ -12,7 +12,7 @@ if (Test-Path "$artifact\models\faster-large-v3\model.bin") {
 & "$PSScriptRoot\matrix.ps1" -WorkerImage $WorkerImage -Engine faster-whisper -Models @('small') -Devices @('cpu','cuda') -Fixture 'fleurs-ptbr-two-speaker-1m' -FixtureId 'fleurs-two-speaker'
 if (Test-Path "$artifact\local-video-001.wav") {
     foreach ($session in 1..3) {
-        docker run --rm --network none --gpus all --entrypoint python --mount "type=bind,source=$repo,target=/repo,readonly" --mount "type=bind,source=$artifact\results,target=/results" $WorkerImage /repo/experiments/transcription_benchmark/run.py --audio /repo/.local-artifacts/cpu-gpu-benchmark/local-video-001.wav --fixture-id local-video-001 --engine faster-whisper --model small --model-path /repo/.local-artifacts/cpu-gpu-benchmark/models/faster-small --device cuda --compute-type float16 --session $session --output /results
+            docker run --rm --network none --gpus all --entrypoint python --mount "type=bind,source=$PSScriptRoot,target=/benchmark,readonly" --mount "type=bind,source=$artifact\local-video-001.wav,target=/input/audio.wav,readonly" --mount "type=bind,source=$artifact\models\faster-small,target=/models/faster-small,readonly" --mount "type=bind,source=$artifact\results,target=/results" $WorkerImage /benchmark/run.py --audio /input/audio.wav --fixture-id local-video-001 --engine faster-whisper --model small --model-path /models/faster-small --device cuda --compute-type float16 --session $session --output /results
         if ($LASTEXITCODE -ne 0) { Write-Warning 'Private local benchmark failed; no private source published' }
     }
 }
@@ -20,7 +20,7 @@ if (Test-Path "$artifact\local-video-001.wav") {
 foreach ($fixture in @('ami-clean-2spk','ami-four-speakers')) {
     foreach ($device in @('cpu','cuda')) {
         foreach ($session in 1..3) {
-            docker run --rm --network none --gpus all --entrypoint python --mount "type=bind,source=$repo,target=/repo,readonly" --mount "type=bind,source=$artifact\models\pyannote,target=/models/pyannote,readonly" --mount "type=bind,source=$artifact\results,target=/results" $WorkerImage /repo/experiments/transcription_benchmark/diarization.py --audio "/repo/modules/backend/benchmarks/fixtures/p1c-ami/$fixture.wav" --reference-rttm "/repo/modules/backend/benchmarks/fixtures/p1c-ami/$fixture.reference.rttm" --fixture-id $fixture --device $device --session $session --output /results
+            docker run --rm --network none --gpus all --entrypoint python --mount "type=bind,source=$PSScriptRoot,target=/benchmark,readonly" --mount "type=bind,source=$repo\modules\backend\benchmarks\fixtures\p1c-ami,target=/fixtures,readonly" --mount "type=bind,source=$artifact\models\pyannote,target=/models/pyannote,readonly" --mount "type=bind,source=$artifact\results,target=/results" $WorkerImage /benchmark/diarization.py --audio "/fixtures/$fixture.wav" --reference-rttm "/fixtures/$fixture.reference.rttm" --fixture-id $fixture --device $device --session $session --output /results
             if ($LASTEXITCODE -ne 0) { Write-Warning "Diarization failed: $fixture/$device/$session" }
         }
     }

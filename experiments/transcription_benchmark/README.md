@@ -46,6 +46,8 @@ Pré-requisitos locais: FFmpeg/ffprobe, Python, Docker Desktop com GPU e uma ima
 Worker já existente. Não instala drivers ou altera WSL/configuração global.
 O venv de instrumentação instala somente psutil; ML usa container descartável
 da imagem informada, sem `.env`, volumes de dados, rede ou acesso à fila.
+Os scripts montam apenas código do experimento, fixtures e modelos; nunca a
+raiz do repositório ou a configuração do produto.
 
 ```powershell
 ./experiments/transcription_benchmark/prepare.ps1 -WorkerImage usagidev-worker:latest
