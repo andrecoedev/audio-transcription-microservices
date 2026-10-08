@@ -30,6 +30,8 @@ def seed(factory):
         db.flush()
         db.add(Meeting(id=transcription.id, title="Fixture", language="pt"))
         db.add(TranscriptionOwnership(transcription_id=transcription.id, user_id=user.id, owner_sub=user.username))
+        from tests.entitlement_helpers import grant_test_beta
+        grant_test_beta(db, user.id)
         db.commit()
         return transcription.id, user.id
     finally:

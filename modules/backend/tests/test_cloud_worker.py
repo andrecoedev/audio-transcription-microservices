@@ -1,7 +1,7 @@
 import pytest
 
 from src.config import settings
-from src.models import Transcription, TranscriptionJob, PlatformProviderCall
+from src.models import Transcription, TranscriptionJob, TranscriptionOwnership, PlatformProviderCall
 from src.services.assemblyai_engine import AssemblyAIProcessingError
 from src.services.platform_budget import reserve_platform_call
 from src.services.transcription_processing_service import ProcessingResult
@@ -24,13 +24,18 @@ def test_cloud_worker_preserves_native_result_and_never_repeats_attempt(db_conte
     tid = row.id
     db.add(TranscriptionJob(transcription_id=tid, input_path=str(source), use_diarization=True,
         transcription_model="assemblyai", max_duration_seconds=600, status="queued"))
+    db.add(TranscriptionOwnership(transcription_id=tid, owner_sub="alice", user_id=1))
     reserve_platform_call(db, tid, "local")
+    db.flush()
+    from .entitlement_helpers import reserve_test_job
+    reserve_test_job(db, db.query(TranscriptionJob).filter_by(transcription_id=tid).one())
     db.commit()
     calls = []
 
     class CloudService:
         def process_transcription(self, **kwargs):
             calls.append(kwargs)
+            kwargs["before_inference"](2)
             if failure:
                 raise AssemblyAIProcessingError(failure)
             return ProcessingResult(segments=[

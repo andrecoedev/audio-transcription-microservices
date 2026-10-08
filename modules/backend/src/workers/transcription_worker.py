@@ -6,6 +6,7 @@ from contextlib import ExitStack
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from fastapi import HTTPException
 from rq.exceptions import NoSuchJobError
 from rq.job import Job
 
@@ -15,6 +16,12 @@ from ..models import Meeting, MeetingSpeaker, Transcription, TranscriptionJob, T
 from ..services.processing_engines import initialize_processing_engines
 from ..services.audit import append_audit_event
 from ..services.platform_budget import begin_platform_call
+from ..services.transcription_entitlements import (
+    claim_reservation,
+    authorize_inference,
+    finish_reservation,
+    recover_reservation,
+)
 from ..services.usage_metering import UsageRecorder
 from ..services.provider_credentials import decrypt_credential
 from ..services.meeting_projection import ordered_segments, speaker_ids
@@ -111,9 +118,11 @@ def recover_pending_jobs(queue) -> int:
                 )
                 continue
 
+            owner = db.query(TranscriptionOwnership).filter_by(
+                transcription_id=db_job.transcription_id
+            ).first()
             interrupted_usage = None
             if db_job.status == "processing" and db_job.usage_attempt_id:
-                owner = db.query(TranscriptionOwnership).filter_by(transcription_id=db_job.transcription_id).first()
                 interrupted_usage = UsageRecorder(operation_id=db_job.usage_attempt_id,
                     user_id=owner.user_id if owner else None, guest_session_id=owner.guest_session_id if owner else None,
                     resource_type="transcription", resource_id=db_job.transcription_id, operation="transcription",
@@ -121,6 +130,29 @@ def recover_pending_jobs(queue) -> int:
                     credential_source="local" if db_job.transcription_model == "whisper" else db_job.credential_source,
                     model="universal-2" if db_job.transcription_model == "assemblyai" else settings.WHISPER_MODEL,
                     session_factory=SessionLocal)
+            # A missing reservation is not grandfathered, and Guest jobs are
+            # never recovered into a provider call.
+            try:
+                reservation_recoverable = recover_reservation(db, db_job.transcription_id)
+            except HTTPException:
+                # Revoked/deactivated accounts cannot resume work. Keep the
+                # reservation conservative and make this job terminal below.
+                reservation_recoverable = False
+            can_recover = bool(owner and owner.user_id and not owner.guest_session_id) and reservation_recoverable
+            if not can_recover:
+                finish_reservation(db, db_job.transcription_id, success=False)
+                db_job.status = "failed"
+                db_job.error_message = "Transcription processing could not be safely resumed"
+                db_job.failed_at = datetime.now(timezone.utc)
+                db_job.completed_at = None
+                transcription.status = "failed"
+                transcription.error_message = db_job.error_message
+                schedule_audio_cleanup(db, input_reference(db_job))
+                db.commit()
+                if interrupted_usage:
+                    interrupted_usage.record("attempt_status", "state", phase="terminal", status="unknown")
+                continue
+
             db_job.status = "queued"
             db_job.error_message = None
             db_job.started_at = None
@@ -170,6 +202,8 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
         if job.status in {"completed", "done"}:
             logger.info("Transcription job %s was already completed", transcription_id)
             return {"claim_status": "already_done"}
+        if job.status == "failed":
+            return {"claim_status": "denied"}
 
         now = datetime.now(timezone.utc)
         attempt_id = str(uuid4())
@@ -196,6 +230,23 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
             logger.info("Transcription job %s is already being processed", transcription_id)
             return {"claim_status": "already_processing"}
 
+        owner = db.query(TranscriptionOwnership).filter_by(
+            transcription_id=transcription_id
+        ).first()
+        guest_context = bool(owner and owner.guest_session_id)
+        if not guest_context:
+            try:
+                # Reservation and queued->processing transition share this
+                # transaction, so a job cannot start without its hold.
+                claim_reservation(db, transcription_id)
+            except HTTPException:
+                db.rollback()
+                _persist_failed_job(
+                    transcription_id,
+                    "This transcription is not authorized for processing",
+                )
+                return {"claim_status": "denied"}
+
         db.query(Transcription).filter(Transcription.id == transcription_id).update(
             {
                 Transcription.status: "processing",
@@ -218,10 +269,7 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
             "credential_source": job.credential_source,
             "credential_id": job.credential_id,
             "credential_user_id": job.credential_user_id,
-            "guest_context": db.query(TranscriptionOwnership.id).filter(
-                TranscriptionOwnership.transcription_id == transcription_id,
-                TranscriptionOwnership.guest_session_id.isnot(None),
-            ).first() is not None,
+            "guest_context": guest_context,
         }
     except Exception:
         db.rollback()
@@ -269,6 +317,7 @@ def _persist_completed_job(transcription_id: int, result, processing_time: float
         job.error_message = None
         job.completed_at = datetime.now(timezone.utc)
         job.failed_at = None
+        finish_reservation(db, transcription_id, success=True)
         schedule_audio_cleanup(db, input_reference(job))
         append_audit_event(
             db,
@@ -311,6 +360,7 @@ def _persist_failed_job(transcription_id: int, public_error: str) -> None:
             job.error_message = public_error
             job.failed_at = datetime.now(timezone.utc)
             job.completed_at = None
+            finish_reservation(db, transcription_id, success=False)
             schedule_audio_cleanup(db, input_reference(job))
         append_audit_event(
             db,
@@ -351,6 +401,8 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             return {"status": "already_done"}
         if claim["claim_status"] == "already_processing":
             return {"status": "already_processing"}
+        if claim["claim_status"] == "denied":
+            raise RuntimeError("Transcription is not authorized for processing")
 
         claimed = True
         usage = UsageRecorder(operation_id=claim["usage_attempt_id"],
@@ -375,22 +427,9 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             try:
                 byok_secret = decrypt_credential(credential_db, claim["credential_id"],
                                                  claim["credential_user_id"], "assemblyai")
-                attempted = credential_db.query(TranscriptionJob).filter(
-                    TranscriptionJob.transcription_id == transcription_id,
-                    TranscriptionJob.provider_attempted_at.is_(None),
-                ).update({TranscriptionJob.provider_attempted_at: datetime.now(timezone.utc)}, synchronize_session=False)
-                if attempted != 1:
-                    raise TranscriptionProcessingError("User provider call cannot be repeated automatically")
-                credential_db.commit()
             finally:
                 credential_db.close()
-        elif claim["transcription_model"] == "assemblyai" and claim["credential_source"] == "platform":
-            reservation_db = SessionLocal()
-            try:
-                begin_platform_call(reservation_db, transcription_id)
-            finally:
-                reservation_db.close()
-        elif claim["transcription_model"] == "assemblyai":
+        elif claim["transcription_model"] == "assemblyai" and claim["credential_source"] != "platform":
             raise TranscriptionProcessingError("Invalid provider credential source")
         logger.info("Transcription job %s started", transcription_id)
         started_at = time.monotonic()
@@ -413,10 +452,42 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
         if claim["transcription_model"] == "assemblyai":
             claim["max_duration_seconds"] = min(claim["max_duration_seconds"] or settings.AAI_MAX_AUDIO_SECONDS,
                                                 settings.AAI_MAX_AUDIO_SECONDS)
+
+        def authorize_before_inference(duration_seconds):
+            authorization_db = SessionLocal()
+            try:
+                authorize_inference(authorization_db, transcription_id, duration_seconds)
+                if claim["transcription_model"] == "assemblyai":
+                    if claim["credential_source"] == "user":
+                        attempted = authorization_db.query(TranscriptionJob).filter(
+                            TranscriptionJob.transcription_id == transcription_id,
+                            TranscriptionJob.provider_attempted_at.is_(None),
+                        ).update(
+                            {TranscriptionJob.provider_attempted_at: datetime.now(timezone.utc)},
+                            synchronize_session=False,
+                        )
+                        if attempted != 1:
+                            raise TranscriptionProcessingError(
+                                "User provider call cannot be repeated automatically"
+                            )
+                    else:
+                        # This also commits the reservation authorization and
+                        # provider attempt marker before AssemblyAI is called.
+                        begin_platform_call(authorization_db, transcription_id)
+                # BYOK/local authorization and the no-repeat marker must be
+                # durable before inference just like the platform marker.
+                authorization_db.commit()
+            except Exception:
+                authorization_db.rollback()
+                raise
+            finally:
+                authorization_db.close()
+
         result = service.process_transcription(
             file_path=str(audio_path),
             use_diarization=claim["use_diarization"],
             transcription_model=claim["transcription_model"],
+            before_inference=authorize_before_inference,
             **({"max_duration_seconds": claim["max_duration_seconds"]} if claim["max_duration_seconds"] else {}),
         )
         processing_time = time.monotonic() - started_at

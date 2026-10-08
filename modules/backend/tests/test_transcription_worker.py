@@ -3,12 +3,12 @@ from rq.exceptions import NoSuchJobError
 
 from sqlalchemy import event
 
-from src.models import AuditEvent, Meeting, MeetingSpeaker, Transcription, TranscriptionJob
+from src.models import AuditEvent, Meeting, MeetingSpeaker, Transcription, TranscriptionJob, TranscriptionOwnership
 from src.services.transcription_processing_service import ProcessingResult
 from src.workers import transcription_worker
 
 
-def _seed_worker_job(session_factory, input_path):
+def _seed_worker_job(session_factory, input_path, *, authorized=True):
     db = session_factory()
     try:
         transcription = Transcription(
@@ -23,15 +23,21 @@ def _seed_worker_job(session_factory, input_path):
         )
         db.add(transcription)
         db.flush()
-        db.add(
-            TranscriptionJob(
-                transcription_id=transcription.id,
-                input_path=str(input_path),
-                use_diarization=False,
-                transcription_model="whisper",
-                status="queued",
-            )
+        job = TranscriptionJob(
+            transcription_id=transcription.id,
+            input_path=str(input_path),
+            use_diarization=False,
+            transcription_model="whisper",
+            status="queued",
         )
+        db.add(job)
+        if authorized:
+            from .entitlement_helpers import reserve_test_job
+            db.add(TranscriptionOwnership(
+                transcription_id=transcription.id, owner_sub="alice", user_id=1,
+            ))
+            db.flush()
+            reserve_test_job(db, job)
         db.commit()
         return transcription.id
     finally:
@@ -57,6 +63,29 @@ def test_audio_decode_failure_persists_safe_actionable_reason(db_context, monkey
         transcription = db.get(Transcription, tid)
         assert transcription.status == transcription.job.status == "failed"
         assert transcription.error_message == transcription.job.error_message == "Audio could not be decoded"
+
+
+def test_missing_reservation_fails_job_and_rq_attempt(db_context, monkeypatch, tmp_path):
+    source = tmp_path / "legacy-user.wav"
+    source.write_bytes(b"synthetic audio")
+    tid = _seed_worker_job(db_context["session_factory"], source, authorized=False)
+    db = db_context["session_factory"]()
+    db.add(TranscriptionOwnership(transcription_id=tid, owner_sub="alice", user_id=1))
+    db.commit()
+    db.close()
+    monkeypatch.setattr(transcription_worker, "SessionLocal", db_context["session_factory"])
+    monkeypatch.setattr(
+        transcription_worker,
+        "get_processing_service",
+        lambda: pytest.fail("a legacy job without a reservation must not infer"),
+    )
+
+    with pytest.raises(RuntimeError, match="^Transcription processing failed$"):
+        transcription_worker.process_transcription_job_sync(tid)
+
+    with db_context["session_factory"]() as db:
+        job = db.get(TranscriptionJob, tid)
+        assert job.status == db.get(Transcription, tid).status == "failed"
 
 
 class RecordingSession:
@@ -86,7 +115,7 @@ def test_legacy_guest_job_never_loads_local_or_paid_engines(db_context, monkeypa
 
     input_path = tmp_path / "legacy-guest.wav"
     input_path.write_bytes(b"synthetic audio")
-    tid = _seed_worker_job(db_context["session_factory"], input_path)
+    tid = _seed_worker_job(db_context["session_factory"], input_path, authorized=False)
     db = db_context["session_factory"]()
     guest = GuestSession(id=str(uuid4()), expires_at=datetime.now(timezone.utc) + timedelta(hours=1))
     db.add(guest)
@@ -121,7 +150,9 @@ def test_worker_persists_queued_processing_completed(
         _recording_factory(db_context["session_factory"], snapshots),
     )
     class SuccessfulProcessingService:
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from .entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 12.5)
             return ProcessingResult(
                 segments=[
                     {
@@ -148,6 +179,7 @@ def test_worker_persists_queued_processing_completed(
     assert snapshots == [
         ("queued", "queued"),
         ("processing", "processing"),
+        ("processing", "processing"),  # Authorized inference is durable before engine entry.
         ("completed", "completed"),
         ("completed", "completed"),  # Independent durable cleanup transaction.
     ]
@@ -174,6 +206,8 @@ def test_worker_preserves_manually_edited_meeting_title(db_context, monkeypatch,
         db_context["session_factory"], input_path
     )
     db = db_context["session_factory"]()
+    from .entitlement_helpers import start_test_reservation
+    start_test_reservation(db, transcription_id, 1)
     db.add(Meeting(id=transcription_id, title="Título escolhido manualmente"))
     db.commit()
     db.close()
@@ -212,7 +246,9 @@ def test_worker_persists_queued_processing_failed(
         _recording_factory(db_context["session_factory"], snapshots),
     )
     class FailingProcessingService:
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from .entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 1)
             raise RuntimeError("internal detail")
 
     monkeypatch.setattr(
@@ -227,6 +263,7 @@ def test_worker_persists_queued_processing_failed(
     assert snapshots == [
         ("queued", "queued"),
         ("processing", "processing"),
+        ("processing", "processing"),  # Reservation becomes started before simulated inference.
         ("failed", "failed"),
         ("failed", "failed"),  # Independent durable cleanup transaction.
     ]
@@ -254,7 +291,9 @@ def test_meeting_persistence_rolls_back_with_completed_status(
     )
 
     class SuccessfulService:
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from .entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 1)
             return ProcessingResult(
                 segments=[{"start": 0, "end": 1, "speaker": "SPEAKER_00", "text": "olá"}],
                 duration_seconds=1,
@@ -296,7 +335,9 @@ def test_worker_keeps_rq_failure_public_when_failure_persistence_breaks(
     )
 
     class FailingProcessingService:
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from .entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 1)
             raise RuntimeError("private processing detail")
 
     monkeypatch.setattr(

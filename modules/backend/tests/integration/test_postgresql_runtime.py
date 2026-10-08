@@ -24,6 +24,13 @@ from src.workers import transcription_worker
 pytestmark = pytest.mark.postgres
 
 
+@pytest.fixture(autouse=True)
+def _test_entitlement_policy(monkeypatch):
+    from tests.entitlement_helpers import enable_test_policy
+
+    enable_test_policy(monkeypatch)
+
+
 def _seed_job(factory, *, status="queued", owner="alice", input_path="input.wav"):
     db = factory()
     try:
@@ -39,21 +46,30 @@ def _seed_job(factory, *, status="queued", owner="alice", input_path="input.wav"
         )
         db.add(transcription)
         db.flush()
-        db.add(
-            TranscriptionJob(
-                transcription_id=transcription.id,
-                input_path=input_path,
-                use_diarization=False,
-                transcription_model="whisper",
-                status=status,
-            )
+        job = TranscriptionJob(
+            transcription_id=transcription.id,
+            input_path=input_path,
+            use_diarization=False,
+            transcription_model="whisper",
+            status=status,
         )
+        db.add(job)
+        user = db.query(User).filter_by(username=owner).one_or_none()
+        if user is None:
+            user = User(username=owner, email=f"{owner}@integration.test", hashed_password="unused")
+            db.add(user)
+            db.flush()
         db.add(
             TranscriptionOwnership(
                 transcription_id=transcription.id,
                 owner_sub=owner,
+                user_id=user.id,
             )
         )
+        db.flush()
+        from tests.entitlement_helpers import grant_test_beta, reserve_test_job
+        grant_test_beta(db, user.id)
+        reserve_test_job(db, job, user.id)
         db.commit()
         return transcription.id
     finally:
@@ -147,7 +163,9 @@ def test_worker_completed_and_failed_are_atomic(
     )
 
     class SuccessfulService:
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from tests.entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 1)
             return ProcessingResult(
                 segments=[{"speaker": "SPEAKER_00", "text": "olá", "start": 0, "end": 1}],
                 duration_seconds=1,
@@ -179,7 +197,9 @@ def test_worker_completed_and_failed_are_atomic(
     failed_id = _seed_job(postgres_session_factory, input_path=str(failed_input))
 
     class FailingService:
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from tests.entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 1)
             raise RuntimeError("private internal detail")
 
     monkeypatch.setattr(
@@ -322,9 +342,11 @@ def test_real_rq_worker_persists_result_in_postgresql(
     monkeypatch.setattr(transcription_worker, "SessionLocal", postgres_session_factory)
 
     class SuccessfulService:
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from tests.entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 2)
             from pathlib import Path
-            assert Path(_kwargs["file_path"]).read_bytes() == b"audio"
+            assert Path(kwargs["file_path"]).read_bytes() == b"audio"
             return ProcessingResult(
                 segments=[{"speaker": "SPEAKER_00", "text": "via RQ", "start": 0, "end": 2}],
                 duration_seconds=2,
@@ -381,7 +403,9 @@ def test_real_rq_failure_matches_postgresql_status(
     monkeypatch.setattr(transcription_worker, "SessionLocal", postgres_session_factory)
 
     class FailingService:
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from tests.entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 1)
             raise RuntimeError("private processing detail")
 
     monkeypatch.setattr(
@@ -514,7 +538,9 @@ def test_api_worker_status_flow_uses_same_postgresql_records(
     monkeypatch.setattr(transcription_worker, "SessionLocal", postgres_session_factory)
 
     class SuccessfulService:
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from tests.entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 1)
             return ProcessingResult(
                 segments=[{"speaker": "SPEAKER_00", "text": "fluxo completo", "start": 0, "end": 1}],
                 duration_seconds=1,

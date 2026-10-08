@@ -38,7 +38,8 @@ def _stored_job(db_context, transcription_id):
 
 def _mock_successful_processing(monkeypatch, observed=None):
     class SuccessfulService:
-        def process_transcription(self, *, file_path, **_kwargs):
+        def process_transcription(self, *, file_path, **kwargs):
+            kwargs["before_inference"](1.25)
             audio = Path(file_path).read_bytes()
             if observed is not None:
                 observed.append(audio)

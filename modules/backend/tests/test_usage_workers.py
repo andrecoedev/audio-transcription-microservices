@@ -15,6 +15,7 @@ from src.models import (
     Transcription,
     TranscriptionJob,
     TranscriptionOwnership,
+    TranscriptionReservation,
     UsageEvent,
     UserProviderCredential,
 )
@@ -35,13 +36,17 @@ def _seed_local_job(factory, path):
         )
         db.add(transcription)
         db.flush()
-        db.add(TranscriptionJob(
+        job = TranscriptionJob(
             transcription_id=transcription.id, input_path=str(path), use_diarization=False,
             transcription_model="whisper", status="queued",
-        ))
+        )
+        db.add(job)
         db.add(TranscriptionOwnership(
             transcription_id=transcription.id, owner_sub="alice", user_id=1,
         ))
+        db.flush()
+        from .entitlement_helpers import reserve_test_job
+        reserve_test_job(db, job)
         db.commit()
         return transcription.id
     finally:
@@ -55,7 +60,9 @@ class _FakeProcessingService:
             duration_seconds=12.5, num_speakers=1, word_count=1,
         )
 
-    def process_transcription(self, **_kwargs):
+    def process_transcription(self, **kwargs):
+        from .entitlement_helpers import authorize_mock
+        authorize_mock(kwargs, self.result.duration_seconds)
         return self.result
 
 
@@ -104,7 +111,7 @@ def test_duplicate_completed_job_does_not_create_a_second_attempt(db_context, mo
         db.close()
 
 
-def test_manually_requeued_local_job_gets_a_new_usage_attempt_id(db_context, monkeypatch, tmp_path):
+def test_manually_requeued_local_job_with_consumed_reservation_is_denied(db_context, monkeypatch, tmp_path):
     path = tmp_path / "reprocess.wav"
     path.write_bytes(b"fixture audio")
     transcription_id = _seed_local_job(db_context["session_factory"], path)
@@ -123,13 +130,15 @@ def test_manually_requeued_local_job_gets_a_new_usage_attempt_id(db_context, mon
         db.close()
 
     path.write_bytes(b"fixture audio")
-    assert transcription_worker.process_transcription_job_sync(transcription_id)["status"] == "completed"
+    with pytest.raises(RuntimeError, match="^Transcription processing failed$"):
+        transcription_worker.process_transcription_job_sync(transcription_id)
     db = db_context["session_factory"]()
     try:
         job = db.query(TranscriptionJob).one()
-        assert job.usage_attempt_id != first_attempt
+        assert job.status == "failed"
+        assert job.usage_attempt_id == first_attempt
         attempts = db.query(UsageEvent).filter_by(metric="attempt", resource_id=str(transcription_id)).all()
-        assert {event.operation_id for event in attempts} == {first_attempt, job.usage_attempt_id}
+        assert {event.operation_id for event in attempts} == {first_attempt}
     finally:
         db.close()
 
@@ -156,6 +165,10 @@ def test_interrupted_platform_attempt_recovery_marks_old_cancelled_and_blocks_se
             usage_attempt_id=old_attempt_id,
         ))
         db.add(TranscriptionOwnership(transcription_id=transcription.id, owner_sub="alice", user_id=1))
+        db.flush()
+        from .entitlement_helpers import reserve_test_job, start_test_reservation
+        reserve_test_job(db, db.query(TranscriptionJob).filter_by(transcription_id=transcription.id).one())
+        start_test_reservation(db, transcription.id, 10)
         db.add(PlatformProviderBudget(provider="assemblyai", limit_cents=100, reserved_cents=10))
         db.add(PlatformProviderCall(
             transcription_id=transcription.id, provider="assemblyai", context="local",
@@ -182,14 +195,14 @@ def test_interrupted_platform_attempt_recovery_marks_old_cancelled_and_blocks_se
             return None
 
     monkeypatch.setattr(transcription_worker.Job, "fetch", lambda *_args, **_kwargs: ExistingRQJob())
-    assert transcription_worker.recover_pending_jobs(db_context["queue"]) == 1
+    assert transcription_worker.recover_pending_jobs(db_context["queue"]) == 0
 
     db = factory()
     try:
-        old_terminal = db.query(UsageEvent).filter_by(
-            operation_id=old_attempt_id, metric="attempt_status",
+        reservation = db.query(TranscriptionReservation).filter_by(
+            transcription_id=transcription_id,
         ).one()
-        assert old_terminal.status == "cancelled"
+        assert reservation.state == "unknown"
     finally:
         db.close()
 
@@ -197,17 +210,19 @@ def test_interrupted_platform_attempt_recovery_marks_old_cancelled_and_blocks_se
         transcription_worker, "get_cloud_processing_service",
         lambda: pytest.fail("an attempted platform provider call must not execute again"),
     )
-    with pytest.raises(RuntimeError, match="Transcription processing failed"):
+    with pytest.raises(RuntimeError, match="^Transcription processing failed$"):
         transcription_worker.process_transcription_job_sync(transcription_id)
 
     db = factory()
     try:
         job = db.query(TranscriptionJob).one()
-        assert job.usage_attempt_id != old_attempt_id
+        assert job.status == "failed"
+        assert job.usage_attempt_id == old_attempt_id
         attempts = db.query(UsageEvent).filter_by(
             resource_id=str(transcription_id), metric="attempt_status",
         ).all()
-        assert {event.operation_id for event in attempts} == {old_attempt_id, job.usage_attempt_id}
+        assert len(attempts) == 1
+        assert attempts[0].status == "unknown"
         external_calls = db.query(UsageEvent).filter_by(
             resource_id=str(transcription_id), metric="external_call",
         ).all()
@@ -304,12 +319,16 @@ def test_assemblyai_byok_records_usage_without_platform_budget_debit(db_context,
         )
         db.add_all([credential, transcription])
         db.flush()
-        db.add(TranscriptionJob(
+        job = TranscriptionJob(
             transcription_id=transcription.id, input_path=str(path), use_diarization=False,
             transcription_model="assemblyai", status="queued", credential_source="user",
             credential_id=credential.id, credential_user_id=1,
-        ))
+        )
+        db.add(job)
         db.add(TranscriptionOwnership(transcription_id=transcription.id, owner_sub="alice", user_id=1))
+        db.flush()
+        from .entitlement_helpers import reserve_test_job
+        reserve_test_job(db, job)
         db.commit()
         transcription_id = transcription.id
     finally:
@@ -326,7 +345,9 @@ def test_assemblyai_byok_records_usage_without_platform_budget_debit(db_context,
         def __init__(self, cloud_engine=None):
             self.cloud_engine = cloud_engine
 
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from .entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 10)
             return ProcessingResult(segments=[], duration_seconds=10, num_speakers=0, word_count=0)
 
         def _get_engine(self, _provider):

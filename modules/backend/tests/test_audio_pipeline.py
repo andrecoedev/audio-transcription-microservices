@@ -169,6 +169,26 @@ def test_public_duration_limit_rejects_before_inference_and_cleans(monkeypatch, 
     assert list(tmp_path.iterdir()) == []
 
 
+def test_inference_admission_receives_decoded_duration_before_engine_call(monkeypatch, tmp_path):
+    engine = RecordingWhisper()
+    monkeypatch.setattr(engine_registry, "whisper_engine", engine)
+    monkeypatch.setattr(processing_module, "_TEMP_DIRECTORY", tmp_path)
+    monkeypatch.setattr(processing_module, "convert_to_wav", _fake_conversion)
+    admitted = []
+
+    def before_inference(duration):
+        admitted.append(duration)
+        assert engine.calls == []
+
+    result = TranscriptionProcessingService().process_transcription(
+        "input.wav", False, "whisper", before_inference=before_inference,
+    )
+
+    assert admitted == [10.0]
+    assert len(engine.calls) == 1
+    assert result.duration_seconds == 10.0
+
+
 def test_assemblyai_diarization_uses_one_full_file_call_without_local_diarization(
     monkeypatch, tmp_path
 ):

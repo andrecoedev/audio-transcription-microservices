@@ -12,6 +12,7 @@ from ..models import ObjectDeletion, TranscriptionJob
 from .object_storage import LocalObjectStorage, StorageError
 from .usage_storage import deletion_context, record_object_delete
 from .usage_metering import reconcile_usage
+from .transcription_entitlements import release_storage
 from sqlalchemy.orm import sessionmaker
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,9 @@ def retry_audio_cleanup(db, *, reference=None, apply=False, storage=None, limit=
             logger.warning("Audio cleanup deferred; durable retry retained")
             result["failed"] += 1
         else:
+            # Storage accounting follows the successful deletion itself. A
+            # failed usage journal must not keep deleted bytes reserved.
+            release_storage(db, row.reference)
             # Capture a durable measurement before discarding the retry intent.
             # On journal failure, the missing object succeeds on the next retry.
             if record_object_delete(db, usage_context, datetime.now(timezone.utc)):

@@ -8,6 +8,7 @@ from ..database import SessionLocal
 from ..models import Transcription, TranscriptionOwnership
 from ..config import settings
 from ..services.usage_metering import UsageRecorder
+from ..services.transcription_entitlements import require_execution
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,8 @@ def process_meeting_minutes_sync(
     generator = None
     terminal_status = "failed"
     try:
+        owner = db.query(TranscriptionOwnership).filter_by(transcription_id=transcription_id).first()
+        require_execution(db, context.get("actor_user_id") or (owner.user_id if owner else None), "gemini", "platform")
         generator = engine_registry.meeting_minutes_generator
         if generator is None:
             from ..services.intelligence_provider import get_provider
@@ -51,7 +54,7 @@ def process_meeting_minutes_sync(
         logger.info("Meeting minutes processing started for %s", transcription_id)
         minutes = generator.generate_minutes(
             transcription=transcript,
-            meeting_context={key: value for key, value in context.items() if value},
+            meeting_context={key: value for key, value in context.items() if value and key != "actor_user_id"},
         )
         logger.info("Meeting minutes processing completed for %s", transcription_id)
         terminal_status = "completed"

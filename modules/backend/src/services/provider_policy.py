@@ -1,7 +1,7 @@
 """Permission and credential origin are separate from provider availability.
 
-BYOK is resolved separately by provider_credentials. Operator-provisioned local
-identities retain explicit platform contracts; public identities never inherit credentials.
+BYOK is resolved separately by provider_credentials. Every account requires an
+explicit plan or beta capability; neither registration source nor admin role grants usage.
 """
 
 from fastapi import HTTPException
@@ -26,7 +26,7 @@ def require_provider_credential(user: TokenData, provider: str, *, credential_so
         return
     if credential_source != "platform":
         raise HTTPException(403, "User provider credentials are not supported yet")
-    if user.registration_source != "local":
-        raise HTTPException(403, "Connect your own provider credential when BYOK becomes available")
+    # Account permission is checked by transcription_entitlements at every
+    # caller. Registration source and admin role are not processing entitlements.
     if provider == "assemblyai":
         require_platform_processing()

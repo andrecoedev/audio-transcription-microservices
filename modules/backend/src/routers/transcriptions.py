@@ -18,6 +18,7 @@ from ..services.rate_limit import enforce_rate_limit
 from ..services.provider_policy import require_guest_processing
 from ..services.platform_budget import reserve_platform_call
 from ..services.provider_credentials import preferences_for, resolve_transcription
+from ..services.transcription_entitlements import reserve_transcription
 from ..services.storage_lifecycle import upload_directory
 from ..services.audio_storage import get_audio_storage, schedule_audio_cleanup, cleanup_after_commit
 from ..services.object_storage import StorageError
@@ -260,6 +261,11 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
                 owner_sub=current_user.username,
                 user_id=current_user.user_id,
             ))
+        if guest_session is None:
+            reservation = reserve_transcription(db, current_user.user_id, transcription.id, selection,
+                saved_upload.size_bytes, "object:" + saved_upload.key)
+            job.max_duration_seconds = min(job.max_duration_seconds or int(reservation.reserved_seconds),
+                                           int(reservation.reserved_seconds))
         append_audit_event(
             db,
             event="transcription.created",
@@ -295,6 +301,10 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
             transcription.error_message = "Job queue is temporarily unavailable"
             job.status = "failed"
             job.error_message = transcription.error_message
+            # Enqueue failure can be ambiguous; never refund automatically. A
+            # published message still must pass the atomic terminal DB claim.
+            from ..services.transcription_entitlements import reservation_for
+            reservation_for(db, transcription.id).state = "unknown"
             append_audit_event(
                 db,
                 event="transcription.failed",

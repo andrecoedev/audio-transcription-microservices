@@ -6,8 +6,30 @@ from cryptography.fernet import Fernet
 import pytest
 
 from src.config import settings
-from src.models import PlatformProviderBudget, Transcription, TranscriptionJob, User, UserProviderCredential, UserProviderPreferences
+from src.models import BetaAccessGrant, PlatformProviderBudget, Transcription, TranscriptionJob, TranscriptionOwnership, User, UserProviderCredential, UserProviderPreferences
 from src.services.provider_credentials import decrypt_credential, resolve_transcription
+from src.services.transcription_entitlements import now_utc
+
+
+@pytest.fixture
+def beta_provider_accounts(db_context, monkeypatch):
+    """Make positive provider tests opt in to explicit synthetic beta access."""
+    from tests.entitlement_helpers import enable_test_policy, grant_test_beta
+
+    enable_test_policy(monkeypatch)
+    db = db_context["session_factory"]()
+    try:
+        for user_id in (1, 2):
+            grant = db.query(BetaAccessGrant).filter(
+                BetaAccessGrant.user_id == user_id,
+                BetaAccessGrant.revoked_at.is_(None),
+                BetaAccessGrant.expires_at > now_utc(),
+            ).first()
+            if grant is None:
+                grant_test_beta(db, user_id)
+        db.commit()
+    finally:
+        db.close()
 
 
 @pytest.fixture
@@ -29,7 +51,7 @@ def _save(client, headers, provider="assemblyai", secret=None):
 
 
 def test_settings_are_account_scoped_and_credentials_are_write_only(
-    db_context, auth_headers, credential_cipher
+    db_context, auth_headers, credential_cipher, beta_provider_accounts
 ):
     client = db_context["client"]
     alice_headers, bob_headers = auth_headers(), auth_headers(username="bob")
@@ -66,7 +88,7 @@ def test_settings_are_account_scoped_and_credentials_are_write_only(
 
 
 def test_preferences_persist_across_requests_and_invalid_values_are_rejected(
-    db_context, auth_headers, credential_cipher
+    db_context, auth_headers, credential_cipher, beta_provider_accounts
 ):
     client = db_context["client"]
     headers = auth_headers()
@@ -98,7 +120,7 @@ def test_preferences_persist_across_requests_and_invalid_values_are_rejected(
 
 
 def test_rotation_revokes_queued_reference_and_delete_is_owner_scoped_and_idempotent(
-    db_context, auth_headers, credential_cipher
+    db_context, auth_headers, credential_cipher, beta_provider_accounts
 ):
     client = db_context["client"]
     headers = auth_headers()
@@ -142,7 +164,7 @@ def test_rotation_revokes_queued_reference_and_delete_is_owner_scoped_and_idempo
 
 
 def test_credential_configuration_and_provider_inputs_fail_closed(
-    db_context, auth_headers, monkeypatch
+    db_context, auth_headers, monkeypatch, beta_provider_accounts
 ):
     client, headers = db_context["client"], auth_headers()
     secret = secrets.token_urlsafe(32)
@@ -187,7 +209,7 @@ def test_main_validation_handler_never_echoes_rejected_secret():
 
 
 def test_ciphertext_swap_between_accounts_or_providers_cannot_decrypt(
-    db_context, auth_headers, credential_cipher
+    db_context, auth_headers, credential_cipher, beta_provider_accounts
 ):
     client = db_context["client"]
     assert _save(client, auth_headers()).status_code == 200
@@ -218,7 +240,7 @@ def test_ciphertext_swap_between_accounts_or_providers_cannot_decrypt(
 
 
 def test_automatic_transcription_uses_own_assemblyai_else_whisper_without_fallback(
-    db_context, auth_headers, credential_cipher, monkeypatch
+    db_context, auth_headers, credential_cipher, monkeypatch, beta_provider_accounts
 ):
     from src.models import User
 
@@ -240,7 +262,7 @@ def test_automatic_transcription_uses_own_assemblyai_else_whisper_without_fallba
 
 
 def test_public_account_upload_queues_byok_reference_without_platform_reservation(
-    db_context, auth_headers, credential_cipher, monkeypatch, wav_bytes
+    db_context, auth_headers, credential_cipher, monkeypatch, wav_bytes, beta_provider_accounts
 ):
     from src.models import User
     from src.routers import transcriptions
@@ -273,7 +295,7 @@ def test_public_account_upload_queues_byok_reference_without_platform_reservatio
 
 
 def test_platform_access_is_separate_from_byok_and_storage_capability(
-    db_context, auth_headers, credential_cipher, monkeypatch
+    db_context, auth_headers, credential_cipher, monkeypatch, beta_provider_accounts
 ):
     from src.services.platform_budget import platform_reservation_amount_cents
 
@@ -287,7 +309,8 @@ def test_platform_access_is_separate_from_byok_and_storage_capability(
     monkeypatch.setattr(settings, "GEMINI_API_KEY_CONFIGURED", True)
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
 
-    # Public accounts cannot inherit configured platform credentials.
+    # Registration origin does not grant or revoke capability; this account's
+    # explicit beta grant permits configured platform access.
     db = db_context["session_factory"]()
     try:
         db.get(User, 1).registration_source = "public"
@@ -295,8 +318,8 @@ def test_platform_access_is_separate_from_byok_and_storage_capability(
     finally:
         db.close()
     public_view = client.get("/settings/providers", headers=headers).json()
-    assert public_view["providers"]["assemblyai"]["platform_access"] is False
-    assert public_view["providers"]["assemblyai"]["allowed"] is False
+    assert public_view["providers"]["assemblyai"]["platform_access"] is True
+    assert public_view["providers"]["assemblyai"]["allowed"] is True
 
     # A user credential remains usable when platform access is off.
     monkeypatch.setattr(settings, "AAI_PLATFORM_ENABLED", False)
@@ -342,3 +365,82 @@ def test_platform_access_is_separate_from_byok_and_storage_capability(
     assert exhausted_view["providers"]["assemblyai"]["allowed"] is False
     assert "reserved_cents" not in str(exhausted_view)
     assert "limit_cents" not in str(exhausted_view)
+
+
+def test_starter_plan_allows_byok_without_a_beta_grant(
+    db_context, auth_headers, credential_cipher, monkeypatch
+):
+    from tests.entitlement_helpers import enable_test_policy
+
+    enable_test_policy(monkeypatch)
+    client, headers = db_context["client"], auth_headers()
+    db = db_context["session_factory"]()
+    try:
+        user = db.get(User, 1)
+        user.plan = "starter"
+        db.query(BetaAccessGrant).filter_by(user_id=1).delete(synchronize_session=False)
+        db.commit()
+        assert db.query(BetaAccessGrant).filter_by(user_id=1).count() == 0
+    finally:
+        db.close()
+
+    monkeypatch.setattr(settings, "AAI_PLATFORM_ENABLED", False)
+    monkeypatch.setattr(settings, "AAI_API_KEY_CONFIGURED", False)
+    secret = secrets.token_urlsafe(32)
+    saved = _save(client, headers, secret=secret)
+    assert saved.status_code == 200
+    assert secret not in saved.text
+    assert saved.json()["providers"]["assemblyai"]["platform_access"] is False
+    assert saved.json()["providers"]["assemblyai"]["allowed"] is True
+    assert saved.json()["providers"]["assemblyai"]["byok_allowed"] is True
+    assert saved.json()["providers"]["assemblyai"]["credential_source"] == "user"
+
+
+def test_free_account_keeps_own_history_and_can_remove_historical_key_but_cannot_write(
+    db_context, auth_headers, credential_cipher, beta_provider_accounts
+):
+    client, headers = db_context["client"], auth_headers()
+    old_secret = secrets.token_urlsafe(32)
+    saved = _save(client, headers, secret=old_secret)
+    assert saved.status_code == 200
+    assert old_secret not in saved.text
+
+    db = db_context["session_factory"]()
+    transcription = Transcription(
+        filename="history.wav", original_filename="history.wav", file_size_mb=0.1,
+        duration_seconds=1, transcription_model="whisper", status="completed", segments=[],
+    )
+    db.add(transcription)
+    db.flush()
+    db.add(TranscriptionOwnership(
+        transcription_id=transcription.id, owner_sub="alice", user_id=1,
+    ))
+    db.query(BetaAccessGrant).filter_by(user_id=1).delete(synchronize_session=False)
+    db.commit()
+    transcription_id = transcription.id
+    db.close()
+
+    view = client.get("/settings/providers", headers=headers).json()
+    assert view["credentials"]["assemblyai"]["configured"] is True
+    assert view["providers"]["assemblyai"]["allowed"] is False
+    assert view["providers"]["assemblyai"]["byok_allowed"] is False
+    assert view["providers"]["assemblyai"]["credential_source"] == "user"
+
+    rejected_secret = secrets.token_urlsafe(32)
+    rejected = _save(client, headers, secret=rejected_secret)
+    assert rejected.status_code == 403
+    assert rejected_secret not in rejected.text
+    db = db_context["session_factory"]()
+    try:
+        assert db.query(UserProviderCredential).filter_by(user_id=1, provider="assemblyai").count() == 1
+    finally:
+        db.close()
+
+    assert client.get(f"/transcriptions/{transcription_id}", headers=headers).status_code == 200
+    assert client.delete("/settings/providers/assemblyai/credential", headers=headers).status_code == 200
+    assert client.get(f"/transcriptions/{transcription_id}", headers=headers).status_code == 200
+    db = db_context["session_factory"]()
+    try:
+        assert db.query(UserProviderCredential).filter_by(user_id=1, provider="assemblyai").count() == 0
+    finally:
+        db.close()

@@ -250,3 +250,83 @@ def test_plan_api_private_admin_grants_expire_revoke_and_audit(account, db_conte
         policy.require_execution(account, 2, "assemblyai", "user")
     from src.models import AuditEvent
     assert account.query(AuditEvent).filter(AuditEvent.event.in_(["account.beta_granted", "account.beta_revoked"])).count() == 2
+
+
+def test_admin_plan_assignment_is_explicit_and_bad_beta_input_is_rejected(account, db_context, auth_headers):
+    account.get(User, 1).is_superuser = True
+    account.commit()
+    client, headers = db_context["client"], auth_headers()
+    assert client.patch("/admin/accounts/2/plan", headers=headers,
+        json={"plan": "starter", "reason": "user_request"}).status_code == 200
+    assert client.get("/account/plan", headers=auth_headers("bob")).json()["plan"] == "starter"
+    with pytest.raises(HTTPException):
+        policy.require_execution(account, 1, "assemblyai", "user")
+    policy.require_execution(account, 2, "assemblyai", "user")
+    for payload in (
+        {"capabilities": ["bypass_budget"], "expires_at": (policy.now_utc() + timedelta(hours=1)).isoformat()},
+        {"capabilities": ["transcription.byok"], "expires_at": "2020-01-01T00:00:00Z"},
+        {"capabilities": ["transcription.byok"], "expires_at": "2099-01-01T00:00:00"},
+    ):
+        assert client.post("/admin/accounts/2/beta", headers=headers, json=payload).status_code == 422
+
+
+def test_revoked_beta_is_rechecked_before_byok_inference(account, monkeypatch):
+    from .entitlement_helpers import grant_test_beta
+    grant_test_beta(account, 1)
+    account.commit()
+    limits(monkeypatch)
+    row = job(account, provider="assemblyai", source="user")
+    hold = reserve(account, row, provider="assemblyai", source="user")
+    account.commit()
+    policy.claim_reservation(account, row.id)
+    account.commit()
+    account.query(BetaAccessGrant).filter_by(user_id=1).update({"revoked_at": policy.now_utc()})
+    account.commit()
+    with pytest.raises(HTTPException) as error:
+        policy.authorize_inference(account, row.id, 10)
+    assert error.value.status_code == 403
+    assert hold.state == "processing"
+    policy.finish_reservation(account, row.id)
+    account.commit()
+    assert hold.state == "released"
+
+
+def test_reconciliation_requires_admin_terminal_jobs_and_available_redis(account, monkeypatch, db_context, auth_headers):
+    from rq.exceptions import NoSuchJobError
+    from src.routers import account_plans
+    limits(monkeypatch)
+    local_ready(monkeypatch)
+    row = job(account)
+    hold = reserve(account, row)
+    account.commit()
+    policy.claim_reservation(account, row.id)
+    account.commit()
+    policy.authorize_inference(account, row.id, 8)
+    account.commit()
+    policy.finish_reservation(account, row.id)
+    account.commit()
+    url = f"/admin/transcription-reservations/{hold.id}/reconcile"
+    body = {"decision": "consumed", "reason": "processing_verified"}
+    client, headers = db_context["client"], auth_headers()
+    assert client.post(url, headers=headers, json=body).status_code == 403
+    account.get(User, 1).is_superuser = True
+    account.commit()
+    assert client.post(url, headers=headers, json=body).status_code == 409
+    account.query(TranscriptionJob).filter_by(transcription_id=row.id).update({"status": "failed"})
+    account.commit()
+    monkeypatch.setattr(account_plans, "get_transcription_queue", lambda: (_ for _ in ()).throw(ConnectionError()))
+    assert client.post(url, headers=headers, json=body).status_code == 503
+    monkeypatch.setattr(account_plans, "get_transcription_queue", lambda: db_context["queue"])
+    class ActiveJob:
+        def get_status(self):
+            return "started"
+    monkeypatch.setattr(account_plans.Job, "fetch", lambda *_args, **_kwargs: ActiveJob())
+    assert client.post(url, headers=headers, json=body).status_code == 409
+    def missing(*_args, **_kwargs):
+        raise NoSuchJobError()
+    monkeypatch.setattr(account_plans.Job, "fetch", missing)
+    assert client.post(url, headers=headers, json=body).status_code == 200
+    account.expire_all()
+    assert account.get(type(hold), hold.id).state == "consumed"
+    assert Decimal(policy.plan_view(account, 1)["quota"]["consumed_seconds"]) == 8
+    assert client.post(url, headers=headers, json=body).status_code == 409

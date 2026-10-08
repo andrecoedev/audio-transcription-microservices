@@ -17,6 +17,7 @@ from ..models import Transcription
 from ..schemas import MeetingMinutesRequest
 from ..security import TokenData, require_scope_when
 from ..services.provider_policy import require_provider_credential
+from ..services.transcription_entitlements import require_execution
 from ..workers.config import get_transcription_queue, is_redis_available
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ async def generate_meeting_minutes(
     ),
 ):
     """Preserva o contrato síncrono, mas executa Gemini no processo worker."""
+    require_execution(db, current_user.user_id, "gemini", "platform")
     require_provider_credential(current_user, "gemini")
     if not (settings.GEMINI_API_KEY_CONFIGURED or settings.GEMINI_API_KEY):
         raise HTTPException(
@@ -93,6 +95,7 @@ async def generate_meeting_minutes(
                 "title": request.title,
                 "date": request.date,
                 "participants": request.participants,
+                "actor_user_id": current_user.user_id,
             },
             job_id=f"meeting_minutes_{request.transcription_id}_{uuid.uuid4().hex}",
             job_timeout=settings.MEETING_MINUTES_TIMEOUT_SECONDS,
@@ -118,6 +121,7 @@ async def generate_meeting_minutes(
 
 @router.get("/meeting-minutes/status")
 async def get_meeting_minutes_status(
+    db: Session = Depends(get_db),
     current_user: Optional[TokenData] = Depends(
         require_scope_when("meeting_minutes", settings.AUTH_PROTECT_READS)
     ),
@@ -133,8 +137,13 @@ async def get_meeting_minutes_status(
         except Exception:
             logger.warning("Unable to inspect meeting minutes worker")
 
+    try:
+        require_execution(db, current_user.user_id, "gemini", "platform")
+        allowed = True
+    except HTTPException:
+        allowed = False
     return {
-        "available": configured and worker_available and current_user.registration_source == "local",
+        "available": configured and worker_available and allowed,
         "configured": configured,
         "worker_available": worker_available,
         "config": {"provider": "gemini", "execution": "rq-worker"},
