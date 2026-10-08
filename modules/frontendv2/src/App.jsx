@@ -12,6 +12,7 @@ import MeetingMinutes from './pages/MeetingMinutes'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
 import Guest from './pages/Guest'
+import GuestDemo from './pages/GuestDemo'
 import Tasks from './pages/Tasks'
 import Card, { CardContent, CardHeader, CardTitle } from './components/Card'
 import { restoreSession } from './services/sessionService'
@@ -127,7 +128,7 @@ function App() {
           <Route path="meetings" element={<AccountRequired><Meetings /></AccountRequired>} />
           <Route path="meetings/:id" element={<AccountRequired><MeetingDetail /></AccountRequired>} />
           <Route path="tasks" element={<AccountRequired><Tasks /></AccountRequired>} />
-          <Route path="new-transcription" element={isAuthenticated ? <><Guest showUpload={false} /><NewTranscription /></> : <Guest />} />
+          <Route path="new-transcription" element={isAuthenticated ? <><Guest /><NewTranscription /></> : <><Guest /><GuestDemo /></>} />
           <Route path="meeting-minutes" element={<AccountRequired><MeetingMinutes /></AccountRequired>} />
           <Route path="settings" element={<AccountRequired><Settings /></AccountRequired>} />
           <Route path="*" element={<Navigate to="/" replace />} />

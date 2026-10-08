@@ -3,6 +3,9 @@ import api from './api'
 const proof = (token) => ({ headers: { Authorization: `Bearer ${token}` } })
 
 export const guestService = {
+  async demo() {
+    return (await api.get('/guest/demo')).data
+  },
   async policy() {
     return (await api.get('/guest/policy')).data
   },

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { FileAudio } from 'lucide-react'
+import { FileAudio, Play } from 'lucide-react'
 import Card, { CardContent } from '../components/Card'
 import PageHeader from '../components/PageHeader'
 import { useAuthStore } from '../stores/authStore'
@@ -15,15 +15,17 @@ export default function Home() {
         <div className="flex min-w-0 items-start gap-4">
           <FileAudio aria-hidden="true" className="h-10 w-10 shrink-0 rounded-lg bg-primary-50 p-2 text-primary-700" />
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Transforme seu áudio em texto</h2>
-            <p className="mt-1 max-w-xl text-sm text-gray-600">Envie um arquivo em Nova Transcrição e acompanhe o processamento.</p>
-            {!authenticated && <p className="mt-2 text-sm text-gray-500">Experimente como visitante. Entre ou crie uma conta quando quiser salvar seu trabalho.</p>}
+            <h2 className="text-lg font-semibold text-gray-900">{authenticated ? 'Transforme seu áudio em texto' : 'Conheça a experiência de transcrição'}</h2>
+            <p className="mt-1 max-w-xl text-sm text-gray-600">{authenticated ? 'Envie um arquivo em Nova Transcrição e acompanhe o processamento.' : 'Explore uma reunião de exemplo com transcrição e análise sintéticas.'}</p>
           </div>
         </div>
-        <Link to="/new-transcription" className="btn btn-primary">Iniciar uma transcrição</Link>
+        <div className="flex flex-wrap gap-3">
+          <Link to="/new-transcription" className="btn-primary inline-flex items-center gap-2">{authenticated ? 'Nova transcrição' : <><Play aria-hidden="true" className="h-4 w-4" />Ver demonstração</>}</Link>
+          {!authenticated && <Link to="/login?returnTo=%2Fnew-transcription" className="btn-secondary">Entrar ou criar conta</Link>}
+        </div>
       </CardContent>
     </Card>
-    <Guest showUpload={false} />
+    <Guest />
     {authenticated && <Dashboard />}
   </div>
 }
