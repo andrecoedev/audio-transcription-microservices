@@ -212,6 +212,37 @@ def test_enqueue_failure_is_persisted_and_audited(
         db.close()
 
 
+def test_enqueue_ack_failure_does_not_overwrite_claimed_worker_or_remove_audio(
+    db_context, auth_headers, wav_bytes, monkeypatch
+):
+    from src.models import TranscriptionReservation
+    from src.services.transcription_entitlements import authorize_inference
+    from src.workers import transcription_worker
+    monkeypatch.setattr(transcription_worker, "SessionLocal", db_context["session_factory"])
+    def delivered_but_ack_failed(_function, transcription_id, **_kwargs):
+        assert transcription_worker._claim_transcription_job(transcription_id)["claim_status"] == "claimed"
+        db = db_context["session_factory"]()
+        try:
+            authorize_inference(db, transcription_id, 1)
+            db.commit()
+        finally:
+            db.close()
+        raise ConnectionError("synthetic lost acknowledgement")
+    monkeypatch.setattr(db_context["queue"], "enqueue", delivered_but_ack_failed)
+    response = db_context["client"].post("/transcriptions/jobs",
+        files={"file": ("meeting.wav", wav_bytes, "audio/wav")}, headers=auth_headers())
+    assert response.status_code == 202
+    db = db_context["session_factory"]()
+    try:
+        row = db.query(Transcription).one()
+        assert row.status == row.job.status == "processing"
+        assert db.query(TranscriptionReservation).one().state == "started"
+        assert (db_context["tmp_path"] / "uploads" / row.job.input_object_key).exists()
+        assert db.query(AuditEvent).filter_by(event="transcription.failed").count() == 0
+    finally:
+        db.close()
+
+
 def test_strict_mode_denies_access_to_another_users_job(
     db_context, auth_headers
 ):
