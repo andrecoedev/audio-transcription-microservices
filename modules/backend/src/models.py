@@ -138,10 +138,12 @@ class User(Base):
         UniqueConstraint("username", name="uq_users_username"),
         UniqueConstraint("email", name="uq_users_email"),
         CheckConstraint("registration_source IN ('local', 'public')", name="ck_users_registration_source"),
+        CheckConstraint("plan IN ('free', 'starter', 'business')", name="ck_users_plan"),
     )
 
     id = Column(Integer, primary_key=True)
     username = Column(String(50), nullable=False)
+    plan = Column(String(16), nullable=False, default="free", server_default="free")
     email = Column(String(255), nullable=False)
     hashed_password = Column(String(255), nullable=True)
     registration_source = Column(String(16), nullable=False, default="local", server_default=text("'local'"))
@@ -164,6 +166,46 @@ class User(Base):
 
     def __repr__(self):
         return f"<User(id={self.id}, username={self.username})>"
+
+
+class BetaAccessGrant(Base):
+    __tablename__ = "beta_access_grants"
+    id = Column(String(36), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    granted_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    capabilities = Column(JSON().with_variant(JSONB, "postgresql"), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class TranscriptionReservation(Base):
+    """Durable authorization, not a best-effort metric or provider invoice."""
+    __tablename__ = "transcription_reservations"
+    __table_args__ = (
+        UniqueConstraint("operation_key", name="uq_transcription_reservation_operation"),
+        UniqueConstraint("transcription_id", name="uq_transcription_reservation_resource"),
+        CheckConstraint("source IN ('usagi', 'byok')", name="ck_reservation_source"),
+        CheckConstraint("state IN ('queued', 'processing', 'started', 'consumed', 'released', 'unknown')", name="ck_reservation_state"),
+        CheckConstraint("reserved_seconds >= 0 AND stored_bytes >= 0", name="ck_reservation_amounts"),
+        Index("ix_reservation_owner_period", "user_id", "period_start"),
+    )
+    id = Column(String(36), primary_key=True)
+    operation_key = Column(String(100), nullable=False)
+    transcription_id = Column(Integer, ForeignKey("transcriptions.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    period_start = Column(Date, nullable=False)
+    source = Column(String(16), nullable=False)
+    provider = Column(String(32), nullable=False)
+    credential_source = Column(String(16), nullable=False)
+    state = Column(String(16), nullable=False)
+    reserved_seconds = Column(Numeric(20, 3), nullable=False)
+    measured_seconds = Column(Numeric(20, 3), nullable=True)
+    stored_bytes = Column(Integer, nullable=False)
+    input_reference = Column(String(500), nullable=False)
+    storage_released_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class FirebaseIdentity(Base):

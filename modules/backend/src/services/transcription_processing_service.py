@@ -58,6 +58,7 @@ class TranscriptionProcessingService:
         use_diarization: bool,
         transcription_model: str,
         max_duration_seconds: int | None = None,
+        before_inference=None,
     ) -> ProcessingResult:
         _TEMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
         wav_path = _TEMP_DIRECTORY / f"wav_{uuid.uuid4()}.wav"
@@ -72,6 +73,12 @@ class TranscriptionProcessingService:
             conversion_seconds = time.perf_counter() - conversion_started
             self._observe("audio_seconds", duration)
             temporary_bytes = wav_path.stat().st_size
+
+            # Admission must be based on the decoded duration and committed
+            # before any provider or local inference starts. Usage observers
+            # are deliberately best-effort and cannot authorize processing.
+            if before_inference is not None:
+                before_inference(duration)
 
             if transcription_model == "assemblyai":
                 transcription_started = time.perf_counter()

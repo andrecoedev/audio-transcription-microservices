@@ -9,7 +9,7 @@ from rq.exceptions import NoSuchJobError
 from src.config import settings
 from src.models import (
     Meeting, MeetingIntelligence, MeetingSpeaker, Transcription, TranscriptionJob,
-    TranscriptionOwnership, UserProviderCredential,
+    TranscriptionOwnership, TranscriptionReservation, UserProviderCredential,
 )
 from src.services.provider_credentials import encrypt_credential
 from src.services.transcription_processing_service import ProcessingResult
@@ -42,6 +42,9 @@ def _seed_aai_job(factory, path, secret):
         )
         db.add(job)
         db.add(TranscriptionOwnership(transcription_id=transcription.id, owner_sub="alice", user_id=1))
+        from .entitlement_helpers import reserve_test_job
+        db.flush()
+        reserve_test_job(db, job)
         db.commit()
         return transcription.id
     finally:
@@ -64,7 +67,16 @@ def test_assemblyai_byok_worker_uses_per_job_secret_without_platform_engine(
     class FakeProcessingService:
         def __init__(self, cloud_engine=None):
             assert cloud_engine is not None
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            kwargs["before_inference"](1)
+            # A separate session represents the provider call process: both
+            # quota admission and the no-repeat marker must already be durable.
+            observer = db_context["session_factory"]()
+            try:
+                assert observer.query(TranscriptionReservation).one().state == "started"
+                assert observer.query(TranscriptionJob).one().provider_attempted_at is not None
+            finally:
+                observer.close()
             return ProcessingResult(segments=[], duration_seconds=1, num_speakers=0, word_count=0)
 
     from src.services import assemblyai_engine
@@ -94,9 +106,8 @@ def test_assemblyai_byok_worker_uses_per_job_secret_without_platform_engine(
     finally:
         db.close()
     monkeypatch.setattr(transcription_worker.Job, "fetch", lambda *_args, **_kwargs: _raise_missing_rq_job())
-    assert transcription_worker.recover_pending_jobs(db_context["queue"]) == 1
-    with pytest.raises(RuntimeError, match="Transcription processing failed"):
-        transcription_worker.process_transcription_job_sync(transcription_id)
+    assert transcription_worker.recover_pending_jobs(db_context["queue"]) == 0
+    assert db_context["queue"].enqueued == []
     assert constructed == [secret]
     db = db_context["session_factory"]()
     try:
@@ -129,7 +140,9 @@ def test_aai_byok_provider_failure_is_sanitized_and_never_falls_back(
     class FailingService:
         def __init__(self, cloud_engine=None):
             assert cloud_engine is not None
-        def process_transcription(self, **_kwargs):
+        def process_transcription(self, **kwargs):
+            from .entitlement_helpers import authorize_mock
+            authorize_mock(kwargs, 1)
             raise AssemblyAIProcessingError("quota")
 
     monkeypatch.setattr(assemblyai_engine, "AssemblyAIEngine", FakeAssemblyAIEngine)

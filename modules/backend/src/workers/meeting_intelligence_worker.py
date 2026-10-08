@@ -17,6 +17,7 @@ from ..services.intelligence_provider import get_provider
 from ..services.meeting_intelligence import fingerprint
 from ..services.meeting_projection import ordered_segments
 from ..services.provider_credentials import decrypt_credential
+from ..services.transcription_entitlements import require_execution
 
 logger = logging.getLogger(__name__)
 PUBLIC_FAILURE = "Meeting analysis failed; a new attempt can be requested"
@@ -111,6 +112,13 @@ def process_intelligence_job(intelligence_id: int) -> dict:
         usage.record("attempt", "attempt", 1, phase="started", status="started")
         if execution["provider"] != "gemini":
             raise RuntimeError("Unsupported intelligence provider")
+        authorization_db = SessionLocal()
+        try:
+            require_execution(authorization_db,
+                execution["credential_user_id"] if execution["credential_source"] == "user" else execution["usage_user_id"],
+                execution["provider"], execution["credential_source"])
+        finally:
+            authorization_db.close()
         if execution["credential_source"] == "user":
             credential_db = SessionLocal()
             try:

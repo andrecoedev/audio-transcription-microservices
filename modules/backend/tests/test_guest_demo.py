@@ -73,7 +73,8 @@ def test_recovered_guest_job_cannot_initialize_or_call_engines(db_context, monke
     row = db.get(Transcription, tid)
     assert row.status == row.job.status == "failed"
     # Re-delivery cannot turn a terminal denied job into a provider call.
-    transcription_worker.process_transcription_job_sync(tid)
+    with pytest.raises(RuntimeError):
+        transcription_worker.process_transcription_job_sync(tid)
     db.close()
 
 

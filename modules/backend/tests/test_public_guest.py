@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from src.config import settings
-from src.models import GuestSession, Transcription, TranscriptionJob, TranscriptionOwnership, User
+from src.models import GuestSession, Meeting, Transcription, TranscriptionJob, TranscriptionOwnership, User, UserProviderCredential
 from src.security import create_access_token
 from src.services.guest_retention import apply_guest_retention
 from src.services import rate_limit
@@ -123,24 +123,45 @@ def test_public_registration_fields_cannot_grant_platform_credentials(db_context
     client = db_context["client"]
     registered = client.post("/auth/signup", json={"username": "visitor", "email": "visitor@example.test",
         "password": "safe test password", "roles": ["admin"], "registration_source": "local"})
+    assert registered.status_code == 201
     headers = {"Authorization": "Bearer " + registered.json()["access_token"]}
+    user_id = registered.json()["user"]["id"]
+    # Test readiness is enabled for legacy positive fixtures, but must not turn
+    # local infrastructure into a Free-plan entitlement for a new account.
+    monkeypatch.setattr(settings, "LOCAL_TRANSCRIPTION_ENABLED", False)
+    monkeypatch.setattr(settings, "LOCAL_TRANSCRIPTION_HOMOLOGATED", False)
+    providers = client.get("/settings/providers", headers=headers).json()["providers"]
+    assert providers["whisper"]["allowed"] is False
+    assert providers["assemblyai"]["allowed"] is False
+    assert providers["gemini"]["allowed"] is False
+    secret = "synthetic-provider-secret"
+    byok = client.post("/settings/providers/assemblyai/credential", headers=headers, json={"secret": secret})
+    assert byok.status_code == 403
+    assert secret not in byok.text
     assert client.post("/transcriptions/jobs", headers=headers,
         files={"file": ("audio.wav", wav_bytes)}, data={"transcription_model": "assemblyai"}).status_code == 403
     local = client.post("/transcriptions/jobs", headers=headers, files={"file": ("audio.wav", wav_bytes)})
-    assert local.status_code == 202
+    assert local.status_code == 403
+
+    # Existing completed data can still be read, while processing new AI work
+    # remains denied for a Free account without an explicit beta grant.
     db = db_context["session_factory"]()
-    row = db.get(Transcription, local.json()["id"])
-    row.status = row.job.status = "completed"
-    row.segments = [{"start": 0, "end": 1, "speaker": "SPEAKER_00", "text": "teste"}]
-    from src.models import Meeting
-    db.add(Meeting(id=row.id, title="test"))
+    row = Transcription(filename="fixture.wav", original_filename="fixture.wav", file_size_mb=0.1,
+        duration_seconds=1, transcription_model="whisper", status="completed",
+        segments=[{"start": 0, "end": 1, "speaker": "SPEAKER_00", "text": "teste"}])
+    db.add(row)
+    db.flush()
+    db.add_all([Meeting(id=row.id, title="test"),
+        TranscriptionOwnership(transcription_id=row.id, owner_sub="visitor", user_id=user_id)])
     db.commit()
     monkeypatch.setattr(settings, "GEMINI_API_KEY_CONFIGURED", True)
     assert client.post(f"/meetings/{row.id}/intelligence", headers=headers).status_code == 403
     assert client.post("/meeting-minutes/generate", headers=headers,
         json={"transcription_id": row.id, "title": "test"}).status_code == 403
-    assert row.job.max_duration_seconds == settings.PUBLIC_MAX_AUDIO_SECONDS
-    assert db_context["queue"].enqueued[0][2]["job_timeout"] == settings.PUBLIC_JOB_TIMEOUT_SECONDS
+    assert db.query(Transcription).count() == 1
+    assert db.query(TranscriptionJob).count() == 0
+    assert db.query(UserProviderCredential).filter_by(user_id=user_id).count() == 0
+    assert db_context["queue"].enqueued == []
     db.close()
 
 

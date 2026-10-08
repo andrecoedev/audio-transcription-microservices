@@ -15,6 +15,7 @@ from ..services.provider_credentials import (
     SUPPORTED_PROVIDERS, credential_for, encrypt_credential, providers_view, select_provider,
 )
 from ..services.rate_limit import enforce_rate_limit
+from ..services.transcription_entitlements import require_execution
 from ..utils.http_limits import BodyLimitedRoute
 
 router = APIRouter(prefix="/settings/providers", tags=["provider settings"], route_class=BodyLimitedRoute)
@@ -74,6 +75,7 @@ def valid_provider(provider):
 def save_credential(provider: str, body: CredentialInput, request: Request, db: Session = Depends(get_db),
                     user: TokenData = Depends(get_authenticated_user)):
     valid_provider(provider)
+    require_execution(db, user.user_id, provider, "user")
     enforce_rate_limit(request, "provider-settings-user", str(user.user_id))
     ciphertext = encrypt_credential(user.user_id, provider, body.secret.get_secret_value())
     db.query(User).filter_by(id=user.user_id).with_for_update().one()

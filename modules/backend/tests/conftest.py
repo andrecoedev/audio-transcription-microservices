@@ -32,6 +32,7 @@ from sqlalchemy.pool import StaticPool
 from src.database import get_db
 from src.models import Base, User
 from src.routers import auth, guests, meeting_actions, meeting_intelligence, meeting_minutes, meetings, provider_preferences, reviewed_meeting_minutes, transcriptions
+from src.routers import account_plans
 from src.security import create_access_token
 
 
@@ -96,10 +97,16 @@ def db_context(tmp_path, monkeypatch):
         ]
     )
     seed.commit()
+    from .entitlement_helpers import enable_test_policy, grant_test_beta
+    enable_test_policy(monkeypatch)
+    for user_id in (1, 2):
+        grant_test_beta(seed, user_id)
+    seed.commit()
     seed.close()
 
     app = FastAPI()
     app.include_router(auth.router)
+    app.include_router(account_plans.router)
     app.include_router(provider_preferences.router)
     app.include_router(guests.router)
     app.include_router(transcriptions.router)

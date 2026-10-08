@@ -9,6 +9,7 @@ from ..config import settings
 from ..models import UserProviderCredential, UserProviderPreferences
 from .provider_policy import require_provider_credential
 from .platform_budget import platform_budget_has_headroom
+from .transcription_entitlements import require_execution
 
 SUPPORTED_PROVIDERS = {"assemblyai", "gemini"}
 DEFAULT_PREFERENCES = {"transcription_provider": "automatic", "intelligence_provider": "automatic", "use_diarization": False}
@@ -66,15 +67,18 @@ def preferences_for(db, user_id):
 def select_provider(db, user, provider):
     """Return immutable execution provenance, never the secret, to HTTP code."""
     if provider == "whisper":
+        require_execution(db, user.user_id, provider, "none")
         return {"provider": provider, "credential_source": "none", "credential_id": None, "credential_user_id": None}
     if provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(422, "Unsupported provider")
     own = credential_for(db, user.user_id, provider)
     if own:
+        require_execution(db, user.user_id, provider, "user")
         if not credential_storage_available():
             raise HTTPException(503, "User provider credential is unavailable")
         return {"provider": provider, "credential_source": "user", "credential_id": own.id, "credential_user_id": user.user_id}
-    # Compatibility is operator-local only. Public accounts never inherit keys.
+    # Platform credentials require an explicit account capability and infrastructure policy.
+    require_execution(db, user.user_id, provider, "platform")
     require_provider_credential(user, provider)
     if provider == "gemini" and not (settings.GEMINI_API_KEY_CONFIGURED or settings.GEMINI_API_KEY):
         raise HTTPException(503, "Meeting intelligence is not configured")
@@ -99,13 +103,24 @@ def resolve_intelligence(db, user):
 
 
 def providers_view(db, user):
-    providers = {"whisper": {"available": True, "allowed": True, "configured": True, "credential_source": "none"}}
+    try:
+        require_execution(db, user.user_id, "whisper", "none")
+        local_allowed = True
+    except HTTPException:
+        local_allowed = False
+    providers = {"whisper": {"available": local_allowed, "allowed": local_allowed, "configured": local_allowed, "credential_source": "none"}}
     credentials = {}
     for provider in sorted(SUPPORTED_PROVIDERS):
         own = credential_for(db, user.user_id, provider)
         credentials[provider] = {"configured": own is not None, "updated_at": own.updated_at.isoformat() if own else None}
+        try:
+            require_execution(db, user.user_id, provider, "user")
+            byok_allowed = True
+        except HTTPException:
+            byok_allowed = False
         platform_access = False
         try:
+            require_execution(db, user.user_id, provider, "platform")
             require_provider_credential(user, provider)
             if provider == "assemblyai":
                 platform_access = platform_budget_has_headroom(db)
@@ -121,6 +136,7 @@ def providers_view(db, user):
         except HTTPException:
             allowed, source = False, "user" if own else None
         providers[provider] = {"available": True, "allowed": allowed, "configured": allowed,
-                               "credential_source": source, "platform_access": platform_access}
+                               "credential_source": source, "platform_access": platform_access,
+                               "byok_allowed": byok_allowed}
     return {"preferences": preferences_for(db, user.user_id), "providers": providers, "credentials": credentials,
             "credential_storage_available": credential_storage_available()}

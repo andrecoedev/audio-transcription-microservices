@@ -66,8 +66,10 @@ interativa com conversa, falantes e resumo inteiramente sintéticos, sem upload,
 inferência ou chamadas pagas. Novos jobs Guest são negados no backend mesmo com
 flags antigas habilitadas; resultados Guest anteriores continuam acessíveis pelos
 contratos existentes. Veja [operação AssemblyAI](docs/assemblyai.md). Criar conta
-não concede acesso às credenciais externas USAGI. Contas podem configurar BYOK e
-preferências protegidas em Settings; veja [providers](docs/provider_preferences.md)
+não concede acesso às credenciais externas USAGI. Contas começam no Free; BYOK
+exige Starter ou concessão beta explícita. O administrador também segue os limites.
+Preferências e dados existentes são preservados; veja [planos e reservas](docs/account_plans.md),
+[providers](docs/provider_preferences.md)
 e [Guest, contas e limites](docs/guest_and_accounts.md).
 
 ## Fluxos oficiais

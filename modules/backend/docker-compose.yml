@@ -11,6 +11,11 @@ x-assemblyai-policy: &assemblyai-policy
   AAI_HTTP_TIMEOUT_SECONDS: ${AAI_HTTP_TIMEOUT_SECONDS:-30}
   AAI_POLL_INTERVAL_SECONDS: ${AAI_POLL_INTERVAL_SECONDS:-3}
 
+x-account-policy: &account-policy
+  PLAN_POLICIES_JSON: "${PLAN_POLICIES_JSON:-{}}"
+  LOCAL_TRANSCRIPTION_ENABLED: ${LOCAL_TRANSCRIPTION_ENABLED:-false}
+  LOCAL_TRANSCRIPTION_HOMOLOGATED: ${LOCAL_TRANSCRIPTION_HOMOLOGATED:-false}
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -58,7 +63,7 @@ services:
     ports:
       - "2020:2020"
     environment:
-      <<: [*database-environment, *assemblyai-policy]
+      <<: [*database-environment, *assemblyai-policy, *account-policy]
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-dev}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
@@ -137,7 +142,7 @@ services:
     command: ["python", "run_worker.py"]
     working_dir: /app/modules/backend
     environment:
-      <<: [*database-environment, *assemblyai-policy]
+      <<: [*database-environment, *assemblyai-policy, *account-policy]
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-dev}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
