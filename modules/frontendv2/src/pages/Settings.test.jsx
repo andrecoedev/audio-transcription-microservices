@@ -12,7 +12,7 @@ vi.mock('../services/audioService', () => ({ audioService: {
   saveProviderCredential: vi.fn(), deleteProviderCredential: vi.fn(),
 } }))
 vi.mock('../services/authService', () => ({ authService: { me: vi.fn(), getConfig: vi.fn(), linkGoogle: vi.fn() } }))
-vi.mock('../services/usageService', () => ({ usageService: { getOverview: vi.fn() } }))
+vi.mock('../services/usageService', () => ({ usageService: { getOverview: vi.fn(), getPlan: vi.fn() } }))
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() } }))
 
 const settings = (overrides = {}) => ({
@@ -38,6 +38,13 @@ beforeEach(() => {
   authService.me.mockResolvedValue({ authenticated: true, user: { id: 17, display_name: 'Pessoa', username: 'pessoa', email: 'pessoa@example.test', auth_provider: 'local' } })
   authService.getConfig.mockResolvedValue({ firebase_enabled: false })
   usageService.getOverview.mockResolvedValue({ metrics: [] })
+  usageService.getPlan.mockResolvedValue({
+    plan: 'free', beta: null, period_start: null, renews_at: null,
+    quota: { limit_seconds: 0, consumed_seconds: '0', reserved_seconds: '0', available_seconds: '0' },
+    byok: { measured_seconds: '0', pending_seconds: '0' },
+    limits: { max_audio_seconds: 600, max_stored_bytes: 1000000, max_queued_jobs: 1, max_processing_jobs: 1 },
+    local_processing_available: false,
+  })
   useAuthStore.setState({ user: { id: 17, name: 'Pessoa', email: 'pessoa@example.test', registration_source: 'public' }, isAuthenticated: true, updateProfile: vi.fn() })
 })
 afterEach(cleanup)

@@ -15,3 +15,12 @@ it('reads the overview from the safe aggregate endpoint without user or filter p
   expect(api.get).toHaveBeenCalledTimes(1)
   expect(api.get).toHaveBeenCalledWith('/usage/overview')
 })
+
+it('reads the authenticated account plan from its own endpoint', async () => {
+  const plan = { plan: 'free', quota: { limit_seconds: 0 } }
+  api.get.mockResolvedValue({ data: plan })
+
+  await expect(usageService.getPlan()).resolves.toEqual(plan)
+  expect(api.get).toHaveBeenCalledTimes(1)
+  expect(api.get).toHaveBeenCalledWith('/account/plan')
+})

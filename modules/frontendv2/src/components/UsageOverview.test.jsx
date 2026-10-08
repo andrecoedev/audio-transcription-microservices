@@ -7,8 +7,17 @@ import { useAuthStore } from '../stores/authStore'
 import { formatTimestamp } from '../utils/format'
 
 vi.mock('../services/usageService', () => ({
-  usageService: { getOverview: vi.fn() },
+  usageService: { getOverview: vi.fn(), getPlan: vi.fn() },
 }))
+
+const plan = (overrides = {}) => ({
+  plan: 'starter', beta: null, period_start: '2026-01-01T00:00:00Z', renews_at: '2026-02-01T00:00:00Z',
+  quota: { limit_seconds: 3600, consumed_seconds: '900', reserved_seconds: '60', available_seconds: '2640' },
+  byok: { measured_seconds: '90.5', pending_seconds: '30' },
+  limits: { max_audio_seconds: 7200, max_stored_bytes: 10485760, max_queued_jobs: 3, max_processing_jobs: 1 },
+  local_processing_available: true,
+  ...overrides,
+})
 
 afterEach(() => {
   cleanup()
@@ -18,6 +27,7 @@ afterEach(() => {
 beforeEach(() => {
   vi.clearAllMocks()
   useAuthStore.setState({ user: { id: 'user-1' }, isAuthenticated: true })
+  usageService.getPlan.mockResolvedValue(plan())
 })
 
 it('shows exact aggregate duration and adds attempts across operations as operation counts', async () => {
@@ -39,6 +49,53 @@ it('shows exact aggregate duration and adds attempts across operations as operat
   expect(screen.getByRole('tooltip').textContent).toMatch(/inclusive as que falharam/)
   expect(screen.getByText('Contratação de planos ainda não disponível.')).toBeTruthy()
   expect(document.body.textContent).not.toMatch(/R\$|preço|custo/i)
+})
+
+it('shows account plan values, renewal, beta access, and BYOK separately from USAGI quota', async () => {
+  usageService.getPlan.mockResolvedValue(plan({ plan: 'business', beta: {
+    capabilities: ['transcription.byok', 'intelligence.byok'], expires_at: '2026-03-01T00:00:00Z',
+  } }))
+  usageService.getOverview.mockResolvedValue({ metrics: [] })
+
+  render(<UsageOverview />)
+
+  expect(await screen.findByText('Plano atual: Business')).toBeTruthy()
+  expect(screen.getByText('Fonte: plano efetivo da conta, informado pela API da USAGI.')).toBeTruthy()
+  expect(screen.getByText('Cota USAGI').parentElement.textContent).toContain('60 min de áudio')
+  expect(screen.getByText('Consumido pela USAGI').parentElement.textContent).toContain('15 min de áudio')
+  expect(screen.getByText(/Medido: 1,51 min/)).toBeTruthy()
+  expect(screen.getByText(/não é deduzido da cota USAGI/)).toBeTruthy()
+  expect(screen.getByText(/Acesso beta até/)).toBeTruthy()
+  expect(screen.getByText('Recursos: Transcrição com sua conta, Resumos com sua conta')).toBeTruthy()
+  expect(screen.getByText(`Período: ${formatTimestamp('2026-01-01T00:00:00Z')} · Renovação: ${formatTimestamp('2026-02-01T00:00:00Z')}`)).toBeTruthy()
+})
+
+it('identifies the real Free plan as unavailable when the account has no quota', async () => {
+  usageService.getPlan.mockResolvedValue(plan({ plan: 'free', quota: {
+    limit_seconds: 0, consumed_seconds: '0', reserved_seconds: '0', available_seconds: '0',
+  }, local_processing_available: false }))
+  usageService.getOverview.mockResolvedValue({ metrics: [] })
+
+  render(<UsageOverview />)
+
+  expect(await screen.findByText('Plano atual: Free')).toBeTruthy()
+  expect(screen.getByText(/A transcrição fornecida pela USAGI ainda não está disponível neste ambiente/)).toBeTruthy()
+  expect(screen.getByText('Cota USAGI').parentElement.textContent).toContain('0 s de áudio')
+  expect(screen.getByText('Processamento local: indisponível.')).toBeTruthy()
+})
+
+it('shows a recoverable plan error and retries the account plan endpoint', async () => {
+  usageService.getPlan.mockRejectedValueOnce(new Error('private plan detail')).mockResolvedValueOnce(plan())
+  usageService.getOverview.mockResolvedValue({ metrics: [] })
+
+  render(<UsageOverview />)
+
+  const alert = await screen.findByRole('alert')
+  expect(alert.textContent).toContain('Não foi possível carregar os dados do plano.')
+  expect(alert.textContent).not.toContain('private plan detail')
+  fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+  expect(await screen.findByText('Plano atual: Starter')).toBeTruthy()
+  expect(usageService.getPlan).toHaveBeenCalledTimes(2)
 })
 
 it('labels unknown quantities and marks known audio totals as partial when observations are missing', async () => {
