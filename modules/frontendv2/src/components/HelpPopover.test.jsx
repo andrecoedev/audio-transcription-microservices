@@ -1,8 +1,8 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import HelpPopover from './HelpPopover'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 it('supports mouse hover, keyboard focus and Escape without submitting forms', () => {
   render(<HelpPopover label="Preferências">Explicação útil</HelpPopover>)
@@ -24,4 +24,20 @@ it('supports tapping and dismisses the explanation on an outside interaction', (
   expect(screen.getByRole('tooltip')).toBeTruthy()
   fireEvent.pointerDown(document.body)
   expect(screen.queryByRole('tooltip')).toBeNull()
+})
+
+it('clamps help inside a narrow viewport and opens above when there is no space below', () => {
+  vi.stubGlobal('innerWidth', 390)
+  vi.stubGlobal('innerHeight', 600)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    return this.getAttribute('role') === 'tooltip'
+      ? { height: 150 }
+      : { left: 360, top: 560, bottom: 584 }
+  })
+  render(<HelpPopover label="Serviço">Ajuda acessível</HelpPopover>)
+  fireEvent.click(screen.getByRole('button'))
+  const tip = screen.getByRole('tooltip')
+  expect(tip.style.left).toBe('118px')
+  expect(tip.style.top).toBe('402px')
+  expect(tip.style.width).toBe('256px')
 })
