@@ -5,6 +5,18 @@ import statistics
 import unicodedata
 
 
+def cpp_transcript(result):
+    """Server verbose JSON inserts display newlines, sometimes inside words.
+
+    Native segment text preserves token whitespace. Concatenate it verbatim;
+    inserting our own spaces/newlines would change words and bias WER.
+    """
+    segments = result.get("segments")
+    if segments:
+        return "".join(segment["text"] for segment in segments)
+    return result.get("text", result.get("transcript", ""))
+
+
 def normalize(text):
     text = unicodedata.normalize("NFC", text).lower()
     return " ".join(re.findall(r"[^\W_]+(?:-[^\W_]+)*", text))

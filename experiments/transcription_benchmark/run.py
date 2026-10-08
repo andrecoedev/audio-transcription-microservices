@@ -21,7 +21,7 @@ import urllib.request
 import uuid
 import wave
 
-from metrics import quality
+from metrics import cpp_transcript, quality
 
 
 class Sampler:
@@ -195,7 +195,7 @@ class Cpp:
                     headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
         with urllib.request.urlopen(request, timeout=1800) as response:
             result = json.load(response)
-        return {"transcript": result.get("text", ""),
+        return {"transcript": cpp_transcript(result),
                 "language": result.get("language"),
                 "segments": result.get("segments", [])}
 
@@ -255,6 +255,8 @@ def run(args):
                            "language": result.get("language"),
                            "segment_count": len(result.get("segments", [])),
                            "wer": None, "cer": None}
+                    if args.engine == "whisper.cpp":
+                        row["text_reconstruction"] = "native_segments_concat_no_display_newlines"
                     if reference:
                         row.update(quality(reference, result["transcript"]))
                     # No private filename is stored. Transcript lives only in ignored output.

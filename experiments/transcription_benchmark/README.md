@@ -34,6 +34,11 @@ Todas as inferências são locais; não usa Groq, Gemini ou AssemblyAI.
 - WER/CER seguem a convenção existente do projeto: NFC, minúsculas, pontuação
   removida, hífens preservados; CER sem espaços. Pontuação/capitalização devem
   ser revisadas separadamente. Referência ausente = métrica desconhecida, nunca zero.
+- Verbose JSON do whisper.cpp pode inserir quebras de apresentação dentro de
+  palavras. O runner concatena os textos dos segmentos nativos sem separadores
+  artificiais. `rescore_cpp.py` corrige escores de respostas antigas preservadas
+  sem repetir inferência, mudar tempos ou inventar texto. Isso protege contra
+  uma regressão do adaptador de benchmark, não altera o modelo nem o produto.
 
 ## Windows: preparar e executar
 

@@ -21,6 +21,8 @@ $zip = "$artifact\bin\whisper.zip"
 if (-not (Test-Path "$artifact\bin\whisper")) {
     curl.exe --fail --location --retry 2 --output $zip $asset.browser_download_url
     if ($LASTEXITCODE -ne 0) { throw 'Binary download failed' }
+    $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+    if (-not $asset.digest -or $asset.digest -ne "sha256:$actual") { throw 'Official binary digest missing or mismatched; do not execute it' }
     Expand-Archive -LiteralPath $zip -DestinationPath "$artifact\bin\whisper"
 }
 foreach ($model in $Models) {
