@@ -35,11 +35,10 @@ class UploadLimitedRoute(BodyLimitedRoute):
         original = super().get_route_handler()
 
         async def limited(request: Request):
-            if request.method == "POST" and request.url.path in {"/transcriptions/jobs", "/guest/transcriptions/jobs"}:
+            if request.method == "POST" and request.url.path == "/guest/transcriptions/jobs":
+                require_guest_processing()  # Reject before Redis, parsing or spooling.
+            if request.method == "POST" and request.url.path == "/transcriptions/jobs":
                 enforce_rate_limit(request, "upload-ip")
-                if request.url.path.startswith("/guest/"):
-                    enforce_rate_limit(request, "public-job")
-                    require_guest_processing()  # Fail before parsing/spooling while P4-04 is blocked.
             return await original(request)
 
         return limited

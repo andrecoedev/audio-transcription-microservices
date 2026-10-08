@@ -2,8 +2,10 @@
 
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+import json
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, SecretStr
 from sqlalchemy.orm import Session
 
@@ -15,30 +17,33 @@ from ..services.guest_sessions import claim_guest_results, get_guest_session, ut
 from ..services.rate_limit import enforce_rate_limit
 from ..services.provider_policy import require_guest_processing
 from ..services.transcription_deletion import ActiveTranscriptionError, delete_transcription_data
-from .transcriptions import UploadLimitedRoute, enqueue_transcription
+from .transcriptions import UploadLimitedRoute
 
 router = APIRouter(prefix="/guest", tags=["guest"], route_class=UploadLimitedRoute)
 
 
 def guest_policy():
-    try:
-        require_guest_processing()
-        available = True
-    except HTTPException:
-        available = False
     return {"max_upload_mb": settings.PUBLIC_MAX_UPLOAD_MB,
             "max_audio_seconds": settings.PUBLIC_MAX_AUDIO_SECONDS,
             "allowed_extensions": settings.allowed_extensions_list,
             "jobs_per_session": settings.GUEST_JOBS_PER_SESSION,
             "retention_hours": settings.GUEST_RETENTION_HOURS,
-            "provider": "assemblyai", "diarization": True,
-            "can_create_job": available, "blocked_by": None if available else "P4-04",
-            "unavailable_reason": "A transcrição para visitantes está temporariamente indisponível enquanto validamos o serviço."}
+            "mode": "demo", "demo_url": "/guest/demo",
+            "provider": None, "diarization": False,
+            "can_create_job": False, "blocked_by": "demo_only",
+            "unavailable_reason": "Explore o exemplo demonstrativo. Entre para consultar os serviços disponíveis para sua conta."}
 
 
 @router.get("/policy")
 def policy():
     return guest_policy()
+
+
+@router.get("/demo")
+def demo():
+    """Public, authored synthetic data only; no DB, queue or provider dependency."""
+    path = Path(__file__).resolve().parents[1] / "data" / "guest_demo.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 @router.post("/sessions", status_code=201)
@@ -58,29 +63,10 @@ def session(guest: GuestSession = Depends(get_guest_session)):
             "policy": guest_policy()}
 
 
-@router.post("/transcriptions/jobs", status_code=202)
-async def create_job(request: Request, file: UploadFile = File(...),
-                     use_diarization: bool = Form(False), transcription_model: str = Form("assemblyai"),
-                     db: Session = Depends(get_db), guest: GuestSession = Depends(get_guest_session)):
-    # Atomic reservation also serializes uploads against conversion/cleanup.
-    reserved = db.query(GuestSession).filter(
-        GuestSession.id == guest.id, GuestSession.claimed_by_user_id.is_(None),
-        GuestSession.expires_at > datetime.now(timezone.utc),
-        GuestSession.jobs_created < settings.GUEST_JOBS_PER_SESSION,
-    ).update({GuestSession.jobs_created: GuestSession.jobs_created + 1}, synchronize_session=False)
-    if reserved != 1:
-        db.rollback()
-        await file.close()
-        raise HTTPException(429, "Guest job limit reached; create an account to continue")
-    try:
-        result = await enqueue_transcription(request, file, use_diarization, transcription_model,
-                                             db, None, guest_session=guest)
-        result.status_url = f"/guest/transcriptions/{result.id}"
-        result.result_url = result.status_url
-        return result
-    except Exception:
-        db.rollback()
-        raise
+@router.post("/transcriptions/jobs", deprecated=True)
+def create_job():
+    # Retire writes, not legacy reads/deletion/claim. No multipart parsing or DB.
+    require_guest_processing()
 
 
 def owned_transcription(db, transcription_id, guest):

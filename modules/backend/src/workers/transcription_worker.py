@@ -362,12 +362,11 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             use_diarization=claim["use_diarization"], session_factory=SessionLocal)
         usage.record("attempt", "attempt", 1, phase="started", status="started")
         reference = ("object:" + claim["input_object_key"]) if claim.get("input_object_key") else claim["input_path"]
+        if claim["guest_context"]:
+            # Also closes the old queued/recovery path, regardless of provider/flags.
+            raise TranscriptionProcessingError("A demonstração não processa arquivos de visitantes")
         # Resolve the object before model loading or irreversible paid admission.
         audio_path = storage_context.enter_context(materialize_input(claim))
-        if claim["guest_context"] and claim["transcription_model"] != "assemblyai":
-            # Also protect previously queued/recovered Guest jobs. P4-04 must
-            # validate provider admission and budget before any engine loading.
-            raise TranscriptionProcessingError("Visitor AssemblyAI processing is not validated")
         byok_secret = None
         if claim["transcription_model"] == "assemblyai" and claim["credential_source"] == "user":
             if claim["guest_context"]:
@@ -388,9 +387,7 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
         elif claim["transcription_model"] == "assemblyai" and claim["credential_source"] == "platform":
             reservation_db = SessionLocal()
             try:
-                context = begin_platform_call(reservation_db, transcription_id)
-                if context == "guest" and not settings.AAI_GUEST_ENABLED:
-                    raise TranscriptionProcessingError("Visitor processing is disabled")
+                begin_platform_call(reservation_db, transcription_id)
             finally:
                 reservation_db.close()
         elif claim["transcription_model"] == "assemblyai":
