@@ -324,7 +324,7 @@ permanecem locais, e escores C++ foram recalculados sem repetir inferência.
 
 ## Validações e limitações operacionais
 
-- 29 testes stdlib do experimento passaram (métricas, privacidade/proveniência,
+- 31 testes stdlib do experimento passaram (métricas, privacidade/proveniência,
   dispositivos, generator lazy, custos, concorrência e filas parametrizadas).
 - Compilação Python do experimento, parsing dos três scripts PowerShell e
   `git diff --check` passaram. Não há linter Python específico no projeto.

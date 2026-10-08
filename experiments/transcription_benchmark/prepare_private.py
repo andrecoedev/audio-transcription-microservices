@@ -20,9 +20,12 @@ def main():
         parser.error("Excerpt must be 1..3600 seconds")
     candidates = []
     for file in args.directory.glob("*.mp4"):
-        completed = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                                    "-of", "default=noprint_wrappers=1:nokey=1", str(file)],
-                                   capture_output=True, text=True, timeout=30)
+        try:
+            completed = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                        "-of", "default=noprint_wrappers=1:nokey=1", str(file)],
+                                       capture_output=True, text=True, timeout=30)
+        except (OSError, subprocess.TimeoutExpired):
+            raise SystemExit("Local media inspection failed; retry with a decodable video") from None
         if completed.returncode == 0:
             try:
                 candidates.append((float(completed.stdout.strip()), file))
@@ -32,9 +35,12 @@ def main():
         raise SystemExit("No decodable MP4 metadata found")
     duration, selected = max(candidates, key=lambda item: item[0])
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    completed = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(selected),
-                                "-t", str(args.seconds), "-vn", "-ac", "1", "-ar", "16000",
-                                "-c:a", "pcm_s16le", str(args.output)], capture_output=True, timeout=300)
+    try:
+        completed = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(selected),
+                                    "-t", str(args.seconds), "-vn", "-ac", "1", "-ar", "16000",
+                                    "-c:a", "pcm_s16le", str(args.output)], capture_output=True, timeout=300)
+    except (OSError, subprocess.TimeoutExpired):
+        raise SystemExit("Local audio extraction failed; try a shorter decodable video") from None
     if completed.returncode != 0:
         raise SystemExit("Cannot extract this video's audio; no filename or stderr disclosed")
     print(json.dumps({"fixture_id": "local-video-001", "duration_seconds": min(args.seconds, duration),
