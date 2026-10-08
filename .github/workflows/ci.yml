@@ -81,6 +81,9 @@ jobs:
         # This module imports the ML stack at collection; see docs/ci.md.
         # All other tests run, including real PostgreSQL/Redis/RQ integration.
         run: python -m pytest -q --ignore=tests/test_diarization_filter.py
+      - name: Test isolated benchmark metrics and cost simulation
+        # Stdlib-only tests: no models, media, credentials or GPU in CI.
+        run: python -m unittest discover -s ../../experiments/transcription_benchmark -v
 
   frontend:
     name: Frontend baseline

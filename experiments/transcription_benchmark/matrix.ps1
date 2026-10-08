@@ -5,7 +5,8 @@ param(
     [string[]]$Devices = @('cpu','cuda'),
     [int]$Sessions = 3,
     [string]$Fixture = 'fleurs-ptbr-quality-1m',
-    [string]$FixtureId = 'fleurs-quality'
+    [string]$FixtureId = 'fleurs-quality',
+    [switch]$Resume
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -20,7 +21,10 @@ foreach ($model in $Models) {
         if ($device -notin @('cpu','cuda')) { throw 'Unsupported device' }
         foreach ($session in 1..$Sessions) {
             $metrics = "$artifact\results\$FixtureId-$Engine-$model-$device-$session.metrics.json"
-            if (Test-Path -LiteralPath $metrics) { Write-Output "Already measured: $FixtureId/$Engine/$model/$device/$session"; continue }
+            if (Test-Path -LiteralPath $metrics) {
+                if (-not $Resume) { throw 'Evidence already exists. Use a new cohort/directory or explicitly -Resume after verifying the same artifacts/configuration.' }
+                Write-Output "Explicitly resumed: $FixtureId/$Engine/$model/$device/$session"; continue
+            }
             if ($Engine -eq 'faster-whisper') {
                 $compute = if ($device -eq 'cpu') { 'int8' } else { 'float16' }
                 docker run --rm --network none --gpus all --entrypoint python --mount "type=bind,source=$repo,target=/repo,readonly" --mount "type=bind,source=$artifact\results,target=/results" $WorkerImage /repo/experiments/transcription_benchmark/run.py --audio "/repo/modules/backend/benchmarks/fixtures/$Fixture.wav" --reference "/repo/modules/backend/benchmarks/fixtures/$Fixture.reference.txt" --fixture-id $FixtureId --engine $Engine --model $model --model-path "/repo/.local-artifacts/cpu-gpu-benchmark/models/faster-$model" --device $device --compute-type $compute --session $session --output /results

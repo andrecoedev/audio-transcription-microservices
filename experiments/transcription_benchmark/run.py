@@ -7,6 +7,7 @@ not imply OS/disk caches were purged. All output is local-only by default.
 
 import argparse
 import hashlib
+import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -155,7 +156,9 @@ class Cpp:
                 if self.process.poll() is not None:
                     raise RuntimeError("whisper.cpp server exited")
                 try:
-                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1):
+                    # Static UI may be absent in release binaries; TCP readiness
+                    # avoids mistaking its HTTP 404 for model startup failure.
+                    with socket.create_connection(("127.0.0.1", port), timeout=1):
                         break
                 except OSError:
                     time.sleep(0.2)
@@ -169,7 +172,11 @@ class Cpp:
             if args.device == "cpu" and gpu_used:
                 raise RuntimeError("Unexpected GPU offload during CPU benchmark")
             self.actual_device = args.device
-            self.actual_compute = args.compute_type
+            ftype = re.search(r"ftype\s*=\s*(\d+)", log)
+            if not ftype or ftype.group(1) != "1":
+                raise RuntimeError("Expected verified GGML F16 weights")
+            # Weight type is observable; kernel accumulation precision is mixed.
+            self.actual_compute = "ggml-f16-weights-mixed-runtime"
             match = re.search(r"load time\s*=\s*([\d.]+) ms", log)
             self.model_load_seconds = float(match.group(1)) / 1000 if match else None
         except BaseException:
@@ -217,7 +224,14 @@ def run(args):
                 "audio_seconds": duration, "conversion_seconds": conversion,
                 "threads": args.threads, "beam_size": 5, "vad": False,
                 "runtime": "windows_native" if os.name == "nt" else "linux_container",
-                "cold_definition": "fresh_process_model_os_cache_uncontrolled"}
+                "cold_definition": "fresh_process_model_os_cache_uncontrolled",
+                "model_load_scope": "engine_and_runtime_initialization_not_disk_only",
+                "resource_scope": "cpp_server_process_tree" if args.engine == "whisper.cpp" else "python_process_tree",
+                "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                "psutil_version": importlib.metadata.version("psutil")}
+        if args.engine == "faster-whisper":
+            base["faster_whisper_version"] = importlib.metadata.version("faster-whisper")
+            base["ctranslate2_version"] = importlib.metadata.version("ctranslate2")
         # Sample model allocation as well as inference.
         with Sampler() as sampler:
             started = time.perf_counter()
@@ -282,6 +296,8 @@ def main():
     parser.add_argument("--warm-runs", type=int, default=1)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if not re.fullmatch(r"[a-z0-9-]{1,64}", args.fixture_id):
+        parser.error("Use an anonymous lowercase fixture ID, not a filename")
     if args.session < 1 or args.warm_runs < 1 or args.threads < 1:
         parser.error("session, warm-runs and threads must be positive")
     if args.engine == "whisper.cpp" and not args.cpp_server:
