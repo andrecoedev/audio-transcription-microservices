@@ -213,6 +213,20 @@ def test_processing_slots_and_revocation_before_inference(account, monkeypatch):
         policy.authorize_inference(account, first.id, 5)
 
 
+def test_lowered_duration_limit_is_rechecked_for_an_already_reserved_job(account, monkeypatch):
+    local_ready(monkeypatch)
+    limits(monkeypatch)
+    row = job(account)
+    hold = reserve(account, row)
+    account.commit()
+    policy.claim_reservation(account, row.id)
+    account.commit()
+    limits(monkeypatch, max_audio_seconds=5)
+    with pytest.raises(HTTPException):
+        policy.authorize_inference(account, row.id, 6)
+    assert hold.state == "processing"
+
+
 @pytest.mark.parametrize("configuration", ["{}", "invalid", '{"unexpected":{}}', '{"free":{"max_audio_seconds":true}}'])
 def test_unconfigured_limits_fail_closed(account, monkeypatch, configuration):
     local_ready(monkeypatch)

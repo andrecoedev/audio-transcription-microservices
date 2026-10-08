@@ -181,7 +181,7 @@ def authorize_inference(db, transcription_id, duration):
     row = reservation_for(db, transcription_id)
     if not row or not row.user_id:
         raise HTTPException(403, "Autorização de processamento ausente.")
-    access(db, row.user_id, lock=True)
+    _, _, limits, _ = access(db, row.user_id, lock=True)
     db.refresh(row)
     require_execution(db, row.user_id, row.provider, row.credential_source)
     # Round only to millisecond precision, always upwards; never trust client metadata.
@@ -189,7 +189,7 @@ def authorize_inference(db, transcription_id, duration):
     if not seconds.is_finite() or seconds <= 0:
         raise HTTPException(422, "Não foi possível verificar a duração do áudio.")
     seconds = seconds.quantize(Decimal("0.001"), rounding=ROUND_CEILING)
-    if row.state != "processing" or seconds > row.reserved_seconds:
+    if row.state != "processing" or seconds > min(row.reserved_seconds, Decimal(limits.max_audio_seconds)):
         raise HTTPException(429, "O áudio excede o tempo disponível para esta transcrição.")
     row.measured_seconds = seconds
     row.reserved_seconds = seconds  # Release unused maximum before irreversible inference.
