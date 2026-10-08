@@ -13,6 +13,8 @@ import { useAuthStore } from '../stores/authStore'
 import { guestService } from '../services/guestService'
 import { formatCount, formatNumber } from '../utils/format'
 
+const EMPTY_EXTENSIONS = []
+
 export default function NewTranscription({ guestPolicy = null, onCreate = null, onCreated = null }) {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
@@ -25,14 +27,17 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   const [policyError, setPolicyError] = useState(false)
   const [policyAttempt, setPolicyAttempt] = useState(0)
   useEffect(() => {
-    if (!publicAccount) return
+    if (guestPolicy) return
     let active = true
     setPolicyError(false)
     guestService.policy().then((policy) => {
-      if (active) setPublicLimits(policy)
+      if (active) {
+        setPublicLimits(policy)
+        setPolicyError(!Array.isArray(policy.allowed_extensions) || policy.allowed_extensions.length === 0)
+      }
     }).catch(() => { if (active) setPolicyError(true) })
     return () => { active = false }
-  }, [publicAccount, policyAttempt])
+  }, [guestPolicy, policyAttempt])
   useEffect(() => {
     if (guestPolicy || !user) return
     let active = true
@@ -49,7 +54,9 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
     return () => { active = false }
   }, [guestPolicy, user, providerAttempt])
   const limits = guestPolicy || (publicAccount ? publicLimits : null)
-  const policyReady = !publicAccount || Boolean(publicLimits)
+  const allowedExtensions = (guestPolicy || publicLimits)?.allowed_extensions || EMPTY_EXTENSIONS
+  const formatsLabel = allowedExtensions.map(extension => extension.toUpperCase()).join(', ')
+  const policyReady = allowedExtensions.length > 0
   const processingAllowed = !guestPolicy || guestPolicy.can_create_job === true
   const maxFileSize = limits ? limits.max_upload_mb * 1024 * 1024 : MAX_FILE_SIZE
   const canUseAssemblyAI = !guestPolicy && providerSettings?.providers.assemblyai.available === true && providerSettings?.providers.assemblyai.allowed === true
@@ -75,6 +82,11 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   const onDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles.length > 0) {
       const selectedFile = acceptedFiles[0]
+      const extension = selectedFile.name.split('.').pop().toLowerCase()
+      if (!allowedExtensions.includes(extension)) {
+        toast.error(`Este formato não está disponível. Envie um arquivo em ${formatsLabel}.`)
+        return
+      }
       
       if (selectedFile.size > maxFileSize) {
         toast.error(`O arquivo é maior que o limite de ${formatNumber(maxFileSize / (1024 * 1024), { maximumFractionDigits: 0 })} MB.`)
@@ -84,14 +96,14 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
       setFile(selectedFile)
       toast.success('Arquivo carregado com sucesso!')
     }
-  }, [maxFileSize])
+  }, [maxFileSize, allowedExtensions, formatsLabel])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    onDropRejected: () => toast.error('Arquivo rejeitado. Selecione um único arquivo em um dos formatos suportados.'),
+    onDropRejected: () => toast.error(`Selecione um único arquivo em um dos formatos disponíveis: ${formatsLabel}.`),
     accept: {
-      'audio/*': ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.opus'],
-      'video/*': ['.mp4']
+      'audio/*': allowedExtensions.map(extension => `.${extension}`),
+      'video/*': allowedExtensions.map(extension => `.${extension}`),
     },
     maxFiles: 1,
     multiple: false,
@@ -153,7 +165,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
         <CardContent>
           {!policyReady ? (
             <div role="status">
-              {policyError ? <><p>Não foi possível consultar os limites de upload.</p><Button onClick={() => setPolicyAttempt((value) => value + 1)}>Tentar novamente</Button></> : <p>Consultando limites de upload...</p>}
+              {policyError || guestPolicy ? <><p>Não foi possível consultar os limites e formatos de upload.</p>{!guestPolicy && <Button onClick={() => setPolicyAttempt((value) => value + 1)}>Tentar novamente</Button>}</> : <p>Consultando limites de upload...</p>}
             </div>
           ) : !file ? (
             <div
@@ -171,7 +183,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                 {isDragActive ? 'Solte o arquivo aqui' : 'Arraste um arquivo ou clique para selecionar'}
               </p>
               <p className="text-sm text-gray-500">
-                Formatos aceitos: MP3, WAV, MP4, M4A, FLAC, OGG e OPUS (máximo de {formatNumber(maxFileSize / (1024 * 1024), { maximumFractionDigits: 0 })} MB)
+                Formatos disponíveis: {formatsLabel || 'consultando…'} (máximo de {formatNumber(maxFileSize / (1024 * 1024), { maximumFractionDigits: 0 })} MB)
               </p>
               </div>
               <span className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium ${processingAllowed ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}`}><Upload className="h-4 w-4" aria-hidden="true" />Escolher arquivo</span>
@@ -208,7 +220,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
       </Card>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Formatos aceitos</p><p className="mt-1 text-sm text-gray-800">MP3, WAV, M4A, FLAC, OGG, OPUS e MP4.</p></Card>
+        <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Formatos disponíveis</p><p className="mt-1 text-sm text-gray-800">{formatsLabel || 'Consultando os formatos disponíveis…'}</p></Card>
         <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Limites de envio</p><p className="mt-1 text-sm text-gray-800">Máximo de {formatNumber(maxFileSize / (1024 * 1024), { maximumFractionDigits: 0 })} MB{limits?.max_audio_seconds ? ` e ${formatCount(Math.floor(limits.max_audio_seconds / 60), 'minuto', 'minutos')} por áudio` : ''}.</p></Card>
         <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Exportação</p><p className="mt-1 text-sm text-gray-800">Transcrição disponível em TXT, SRT, VTT e JSON após a conclusão.</p></Card>
       </div>

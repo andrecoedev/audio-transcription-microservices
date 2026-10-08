@@ -12,6 +12,7 @@ from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from ..services.object_storage import ObjectStorage, StorageError
+from .upload_formats import UPLOAD_EXTENSION_FORMATS
 
 logger = logging.getLogger(__name__)
 
@@ -90,30 +91,47 @@ def sanitize_filename(filename: str | None) -> str:
 
 
 def _detected_format(header: bytes) -> str | None:
-    if len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WAVE":
-        return "wav"
+    if len(header) >= 12 and header[8:12] == b"WAVE":
+        if header[:4] == b"RIFF":
+            return "wav"
+        if len(header) >= 16 and header[:4] == b"RF64" and header[12:16] == b"ds64":
+            return "wav"
     if header.startswith(b"fLaC"):
         return "flac"
-    if header.startswith(b"OggS"):
+    if header.startswith(b"OggS") and len(header) >= 5 and header[4] == 0:
         return "ogg"
-    if header.startswith(b"ID3") or (
-        len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0
-    ):
-        return "mpeg"
+    if header.startswith(b"ID3") and _has_valid_id3_header(header):
+        return "mpeg-audio"
+    if _has_mpeg_audio_frame(header):
+        return "mpeg-audio"
     if len(header) >= 12 and header[4:8] == b"ftyp":
-        return "mp4"
+        return "iso-bmff"
     return None
 
 
+def _has_valid_id3_header(header: bytes) -> bool:
+    if len(header) < 10 or header[3] not in {2, 3, 4} or header[4] == 0xFF:
+        return False
+    return all(byte & 0x80 == 0 for byte in header[6:10])
+
+
+def _has_mpeg_audio_frame(header: bytes) -> bool:
+    if len(header) < 4 or header[0] != 0xFF or (header[1] & 0xE0) != 0xE0:
+        return False
+    version = (header[1] >> 3) & 0x03
+    layer = (header[1] >> 1) & 0x03
+    bitrate_index = (header[2] >> 4) & 0x0F
+    sample_rate_index = (header[2] >> 2) & 0x03
+    return (
+        version != 0x01
+        and layer != 0x00
+        and bitrate_index != 0x0F
+        and sample_rate_index != 0x03
+    )
+
+
 def _format_matches_extension(detected: str, extension: str) -> bool:
-    compatible_extensions = {
-        "wav": {"wav"},
-        "flac": {"flac"},
-        "ogg": {"ogg", "opus"},
-        "mpeg": {"mp3", "mpeg"},
-        "mp4": {"mp4", "m4a"},
-    }
-    return extension in compatible_extensions.get(detected, set())
+    return UPLOAD_EXTENSION_FORMATS.get(extension) == detected
 
 
 async def save_validated_upload(

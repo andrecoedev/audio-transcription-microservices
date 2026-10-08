@@ -12,6 +12,9 @@ it('preserves relevant policy explanations without returning unknown diagnostics
   expect(requestErrorMessage(422, [{ input: 'synthetic-secret' }])).not.toContain('synthetic-secret')
 })
 it('explains size limits, rate limiting, unavailability and connection errors', () => {
+  expect(requestErrorMessage(500, 'Audio could not be decoded')).toContain('Confira se ele contém som')
+  expect(requestErrorMessage(500, 'Audio could not be decoded')).toContain('WAV ou MP3')
+  expect(requestErrorMessage(415, 'File content does not match a supported audio/video format')).toContain('não basta trocar a extensão')
   expect(requestErrorMessage(413)).toContain('limite de envio')
   expect(requestErrorMessage(429)).toContain('Aguarde')
   expect(requestErrorMessage(502)).toContain('temporariamente indisponível')

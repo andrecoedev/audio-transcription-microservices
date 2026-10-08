@@ -28,6 +28,7 @@ def guest_policy():
         available = False
     return {"max_upload_mb": settings.PUBLIC_MAX_UPLOAD_MB,
             "max_audio_seconds": settings.PUBLIC_MAX_AUDIO_SECONDS,
+            "allowed_extensions": settings.allowed_extensions_list,
             "jobs_per_session": settings.GUEST_JOBS_PER_SESSION,
             "retention_hours": settings.GUEST_RETENTION_HOURS,
             "provider": "assemblyai", "diarization": True,

@@ -38,6 +38,27 @@ def _seed_worker_job(session_factory, input_path):
         db.close()
 
 
+def test_audio_decode_failure_persists_safe_actionable_reason(db_context, monkeypatch, tmp_path):
+    from src.utils.audio import AudioProcessingError
+
+    source = tmp_path / "invalid.wav"
+    source.write_bytes(b"invalid audio")
+    tid = _seed_worker_job(db_context["session_factory"], source)
+    monkeypatch.setattr(transcription_worker, "SessionLocal", db_context["session_factory"])
+
+    class InvalidAudioService:
+        def process_transcription(self, **_kwargs):
+            raise AudioProcessingError("synthetic internal decoder diagnostic")
+
+    monkeypatch.setattr(transcription_worker, "get_processing_service", lambda: InvalidAudioService())
+    with pytest.raises(RuntimeError, match="^Audio could not be decoded$"):
+        transcription_worker.process_transcription_job_sync(tid)
+    with db_context["session_factory"]() as db:
+        transcription = db.get(Transcription, tid)
+        assert transcription.status == transcription.job.status == "failed"
+        assert transcription.error_message == transcription.job.error_message == "Audio could not be decoded"
+
+
 class RecordingSession:
     def __init__(self, session, snapshots):
         self._session = session

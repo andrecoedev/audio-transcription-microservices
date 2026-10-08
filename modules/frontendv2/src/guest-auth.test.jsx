@@ -21,7 +21,7 @@ vi.mock('./services/audioService', () => ({ audioService: {
 vi.mock('./pages/Dashboard', () => ({ default: () => <h1>Experiência autenticada</h1> }))
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() }, Toaster: () => null }))
 
-const policy = { max_upload_mb: 100, max_audio_seconds: 600, jobs_per_session: 1, retention_hours: 24,
+const policy = { allowed_extensions: ['wav', 'mp3', 'm4a'], max_upload_mb: 100, max_audio_seconds: 600, jobs_per_session: 1, retention_hours: 24,
   provider: 'assemblyai', diarization: true, can_create_job: false, unavailable_reason: 'Serviço em validação.' }
 beforeEach(() => {
   vi.resetAllMocks()
@@ -80,7 +80,7 @@ describe('Guest and account boundaries', () => {
     guestService.policy.mockRejectedValueOnce(new Error('Unavailable'))
     useAuthStore.setState({ user: { registration_source: 'public' }, token: 'test-user-proof', isAuthenticated: true })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-    expect(await screen.findByText('Não foi possível consultar os limites de upload.')).toBeTruthy()
+    expect(await screen.findByText('Não foi possível consultar os limites e formatos de upload.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
     expect(await screen.findByText((_, element) => element.textContent === 'Máximo de 100 MB por arquivo')).toBeTruthy()

@@ -1,5 +1,6 @@
 // Translate known API failures without changing contracts or exposing diagnostics.
 const messages = {
+  'File content does not match a supported audio/video format': 'O arquivo não corresponde ao formato indicado. Exporte o áudio novamente como WAV ou MP3; não basta trocar a extensão do nome.',
   'Audio exceeds the public duration limit': 'O áudio ultrapassa o limite de duração. Confira o limite e envie um arquivo mais curto.',
   'AssemblyAI credential unavailable or invalid': 'Não foi possível acessar o AssemblyAI. Confira a conexão do serviço em Configurações; visitantes podem tentar novamente mais tarde.',
   'AssemblyAI quota exceeded': 'A cota do AssemblyAI foi atingida. Confira os limites da conta que fornece o serviço antes de tentar novamente.',
@@ -7,6 +8,7 @@ const messages = {
   'AssemblyAI returned an invalid response': 'Não foi possível ler o resultado do AssemblyAI. Tente novamente; se continuar, procure o suporte da USAGI.',
   'AssemblyAI is temporarily unavailable': 'O AssemblyAI está temporariamente indisponível. Tente novamente mais tarde.',
   'Transcription processing failed': 'Não foi possível concluir a transcrição. Tente enviar o áudio novamente.',
+  'Audio could not be decoded': 'Não foi possível ler o áudio deste arquivo. Confira se ele contém som e exporte novamente como WAV ou MP3. Se o problema continuar, procure o suporte da USAGI.',
   'Platform transcription budget exhausted': 'A franquia de transcrição da USAGI está esgotada no momento. Tente novamente mais tarde ou consulte as opções da sua conta.',
   'Visitor transcription is unavailable': 'A transcrição para visitantes está indisponível no momento. Tente novamente mais tarde.',
   'Platform transcription is unavailable': 'A transcrição fornecida pela USAGI está indisponível no momento. Confira outras opções em Configurações.',

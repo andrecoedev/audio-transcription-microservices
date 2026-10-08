@@ -1,9 +1,11 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, field_validator
 import os
 import re
 from pathlib import Path
 from typing import Literal, Optional
+
+from .utils.upload_formats import DEFAULT_ALLOWED_EXTENSIONS, SUPPORTED_UPLOAD_EXTENSIONS
 
 
 class Settings(BaseSettings):
@@ -107,9 +109,23 @@ class Settings(BaseSettings):
         description="Maximum upload size in MB"
     )
     ALLOWED_EXTENSIONS: str = Field(
-        default="mp3,wav,mp4,mpeg,m4a,flac,ogg,opus",
+        default=",".join(DEFAULT_ALLOWED_EXTENSIONS),
         description="Allowed file extensions"
     )
+
+    @field_validator("ALLOWED_EXTENSIONS")
+    @classmethod
+    def validate_allowed_extensions(cls, value: str) -> str:
+        extensions = [item.strip().lower().lstrip(".") for item in value.split(",")]
+        if not extensions or any(not item for item in extensions):
+            raise ValueError("ALLOWED_EXTENSIONS must contain non-empty extensions")
+        unsupported = sorted(set(extensions) - SUPPORTED_UPLOAD_EXTENSIONS)
+        if unsupported:
+            raise ValueError(
+                "ALLOWED_EXTENSIONS contains unsupported upload extension(s): "
+                + ", ".join(unsupported)
+            )
+        return ",".join(dict.fromkeys(extensions))
     
     # Processing
     DEFAULT_TRANSCRIPTION_MODEL: str = Field(

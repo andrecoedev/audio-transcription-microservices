@@ -29,6 +29,7 @@ def test_guest_processing_blocked_by_provider_recovery_without_local_fallback(db
     assert policy["can_create_job"] is False and policy["blocked_by"] == "P4-04"
     assert policy["max_upload_mb"] == settings.PUBLIC_MAX_UPLOAD_MB
     assert policy["max_audio_seconds"] == settings.PUBLIC_MAX_AUDIO_SECONDS
+    assert policy["allowed_extensions"] == settings.allowed_extensions_list
     guest = guest_headers(client)
     response = client.post("/guest/transcriptions/jobs", headers=guest,
         files={"file": ("synthetic.wav", wav_bytes)}, data={"use_diarization": "true"})

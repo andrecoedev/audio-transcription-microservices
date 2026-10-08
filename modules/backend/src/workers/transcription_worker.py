@@ -24,6 +24,7 @@ from ..services.transcription_processing_service import (
     PublicAudioDurationError,
     TranscriptionProcessingError,
 )
+from ..utils.audio import AudioProcessingError
 
 logger = logging.getLogger(__name__)
 _processing_service: TranscriptionProcessingService | None = None
@@ -456,6 +457,8 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
         }
     except Exception as exc:
         public_error = "Audio exceeds the public duration limit" if isinstance(exc, PublicAudioDurationError) else "Transcription processing failed"
+        if isinstance(exc, AudioProcessingError):
+            public_error = "Audio could not be decoded"
         if type(exc).__name__ == "AssemblyAIProcessingError":
             public_error = {
                 "credential": "AssemblyAI credential unavailable or invalid",
