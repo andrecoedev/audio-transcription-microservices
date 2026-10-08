@@ -1,0 +1,96 @@
+{
+  "currency": "USD",
+  "audio_hours_sent": 100,
+  "jobs": 200,
+  "average_job_audio_hours": 0.5,
+  "concurrency": 1,
+  "monthly_hours_available": 720,
+  "target_utilization": "0.75",
+  "max_queue_hours": 24,
+  "arrivals": null,
+  "options": [
+    {
+      "name": "Hetzner CX23 EU cost-optimized VPS",
+      "kind": "self_hosted",
+      "price": {
+        "currency": "USD",
+        "fixed_monthly": "6.49",
+        "setup_fee": "0",
+        "setup_amortization_months": 0,
+        "other_monthly": 0,
+        "variable_per_audio_hour": 0,
+        "hourly_compute_rate": 0
+      },
+      "measurements": { "by_concurrency": {} },
+      "price_checked": "2026-10-08",
+      "price_source": "https://docs.hetzner.com/general/infrastructure-and-availability/price-adjustment/",
+      "notes": "2 vCPU, 4 GB RAM, 40 GB NVMe; shared/older generation; exclude VAT and optional IPv4; availability may vary."
+    },
+    {
+      "name": "Hetzner CPX32 EU regular-performance VPS",
+      "kind": "self_hosted",
+      "price": {
+        "currency": "USD",
+        "fixed_monthly": "41.99",
+        "setup_fee": "0",
+        "setup_amortization_months": 0,
+        "other_monthly": 0,
+        "variable_per_audio_hour": 0,
+        "hourly_compute_rate": 0
+      },
+      "measurements": { "by_concurrency": {} },
+      "price_checked": "2026-10-08",
+      "price_source": "https://docs.hetzner.com/general/infrastructure-and-availability/price-adjustment/",
+      "notes": "4 vCPU, 8 GB RAM, 160 GB NVMe; shared CPU; exclude VAT and optional IPv4."
+    },
+    {
+      "name": "Hetzner GEX44 GPU dedicated server",
+      "kind": "self_hosted",
+      "price": {
+        "currency": "USD",
+        "fixed_monthly": "272.10",
+        "setup_fee": "134.00",
+        "setup_amortization_months": 12,
+        "other_monthly": 0,
+        "variable_per_audio_hour": 0,
+        "hourly_compute_rate": 0
+      },
+      "measurements": { "by_concurrency": {} },
+      "price_checked": "2026-10-08",
+      "price_source": "https://docs.hetzner.com/general/infrastructure-and-availability/price-adjustment/",
+      "notes": "RTX 4000 SFF Ada, 20 GB ECC VRAM; Falkenstein; one-time setup amortized over 12 months; exclude VAT."
+    },
+    {
+      "name": "AssemblyAI Universal-2 plus diarization",
+      "kind": "provider",
+      "price": {
+        "currency": "USD",
+        "fixed_monthly": 0,
+        "setup_fee": 0,
+        "setup_amortization_months": 0,
+        "other_monthly": 0,
+        "variable_per_audio_hour": "0.17",
+        "hourly_compute_rate": 0
+      },
+      "price_checked": "2026-10-08",
+      "price_source": "https://www.assemblyai.com/pricing/",
+      "notes": "USD 0.15/hour transcription plus USD 0.02/hour diarization; billed per channel; taxes not specified in cited price table."
+    },
+    {
+      "name": "AssemblyAI Universal-3.5 Pro plus diarization",
+      "kind": "provider",
+      "price": {
+        "currency": "USD",
+        "fixed_monthly": 0,
+        "setup_fee": 0,
+        "setup_amortization_months": 0,
+        "other_monthly": 0,
+        "variable_per_audio_hour": "0.23",
+        "hourly_compute_rate": 0
+      },
+      "price_checked": "2026-10-08",
+      "price_source": "https://www.assemblyai.com/pricing/",
+      "notes": "USD 0.21/hour transcription plus USD 0.02/hour diarization; billed per channel; taxes not specified in cited price table."
+    }
+  ]
+}
