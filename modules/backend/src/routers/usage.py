@@ -14,7 +14,7 @@ from ..security import TokenData, get_authenticated_user
 router = APIRouter(prefix="/usage", tags=["usage"])
 
 _FILTERS = {"after", "before", "provider", "credential_source", "resource_type", "limit", "offset"}
-_PROVIDERS = Literal["assemblyai", "gemini", "whisper", "object_storage"]
+_PROVIDERS = Literal["assemblyai", "gemini", "groq", "whisper", "object_storage"]
 _CREDENTIAL_SOURCES = Literal["user", "platform", "local", "none"]
 _RESOURCE_TYPES = Literal["meeting", "transcription", "object"]
 _MAX_WINDOW = timedelta(days=366)

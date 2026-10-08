@@ -283,6 +283,18 @@ class UsageRecorder:
             if phase != "submitted":
                 self.record("provider_audio_seconds", "second", event.get("audio_duration_seconds"),
                             status=status, measurement_source="provider_response")
+        elif provider == "groq":
+            status = "completed" if event.get("status") == "response" else "unknown"
+            for key, metric in (("prompt_tokens", "input_tokens"), ("completion_tokens", "output_tokens"),
+                                ("total_tokens", "total_tokens"), ("cached_tokens", "cache_read_tokens"),
+                                ("reasoning_tokens", "reasoning_tokens")):
+                self.record(metric, "token", event.get(key), status=status, measurement_source="provider_response")
+            # Reasoning is a subset of completion tokens, NEVER a second cost.
+            # Cache absence remains unknown; never fabricate zero cached tokens.
+            prompt, cached = event.get("prompt_tokens"), event.get("cached_tokens")
+            uncached = prompt - cached if type(prompt) is int and type(cached) is int and 0 <= cached <= prompt else None
+            self.record("input_uncached_tokens", "token", uncached, status=status, measurement_source="derived_provider_counts")
+            self.record("provider_latency_seconds", "second", event.get("elapsed_seconds"), status=status)
         elif provider == "gemini":
             status = "completed" if event.get("status") == "response" else "unknown"
             for key, metric in (("prompt_tokens", "input_tokens"), ("candidates_tokens", "output_tokens"),
