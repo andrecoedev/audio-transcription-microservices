@@ -172,6 +172,22 @@ period. An occupancy lifetime is recorded at cleanup and may span earlier period
 
 ## Validation scope and remaining work
 
+### Product-facing overview
+
+`GET /usage/overview` is an additive, authenticated owner-only projection for
+Settings → Plano e consumo. Only `after`/`before` are accepted, with the same
+bounded, timezone-aware period (default last 30 days). It returns technical
+`audio_seconds` for transcription and `attempt` for transcription/intelligence/
+legacy minutes, grouped by operation, metric and unit. Missing quantities stay
+explicit; failed attempts are not concealed. Minutes shown in the UI are measured
+audio seconds divided by 60, not a provider invoice or unique delivered minutes.
+
+The projection does not select or return internal costs, prices, currency,
+credential provenance, provider details, resource identifiers or user identifiers.
+The frontend calls this projection, not the cost-bearing events/summary endpoints.
+Guest has no access; administrator status does not grant another user's usage.
+No commercial plan, balance, checkout or subscription is implemented.
+
 Automated tests use synthetic users, mocked providers and a disposable PostgreSQL/
 Redis/RQ stack. They cover concurrency, delivery idempotency, retries/reprocessing,
 result validation/persistence failure, unknown quantities, BYOK budget separation,
