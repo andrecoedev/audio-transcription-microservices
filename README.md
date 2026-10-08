@@ -61,9 +61,11 @@ recriar apenas o serviço que a recebe.
 Firebase Google Sign-In é opcional e permanece desabilitado por padrão. Veja
 [configuração e homologação de autenticação](docs/authentication.md).
 
-A entrada pública compartilha a interface do app. Guest usa somente AssemblyAI,
-com falantes nativos, habilitação explícita e orçamento cumulativo; fica desligado
-por padrão e nunca usa fallback local. Veja [operação AssemblyAI](docs/assemblyai.md). Criar conta
+A entrada pública compartilha a interface do app. Guest explora uma demonstração
+interativa com conversa, falantes e resumo inteiramente sintéticos, sem upload,
+inferência ou chamadas pagas. Novos jobs Guest são negados no backend mesmo com
+flags antigas habilitadas; resultados Guest anteriores continuam acessíveis pelos
+contratos existentes. Veja [operação AssemblyAI](docs/assemblyai.md). Criar conta
 não concede acesso às credenciais externas USAGI. Contas podem configurar BYOK e
 preferências protegidas em Settings; veja [providers](docs/provider_preferences.md)
 e [Guest, contas e limites](docs/guest_and_accounts.md).

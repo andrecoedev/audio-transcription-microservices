@@ -5,8 +5,9 @@
 Configurações → Serviços de IA / Transcrição salva preferências no PostgreSQL, não no JWT nem em
 localStorage. Transcrição: `automatic`, `whisper`, `assemblyai`. Resumo inteligente:
 `automatic`, `gemini`. Detecção de falantes tem default por conta e override por job.
-Guest não acessa este contrato: continua AssemblyAI platform com política/orçamento
-próprios e sem BYOK. Minha conta consulta os dados persistidos em `/auth/me`;
+Guest não acessa este contrato: usa apenas um exemplo sintético read-only, sem
+inferência, credencial ou BYOK. Resultados Guest anteriores preservam seus contratos.
+Minha conta consulta os dados persistidos em `/auth/me`;
 não oferece edição sem suporte de persistência no backend.
 
 `GET/PATCH /settings/providers` consulta/salva preferências e capabilities seguras.
