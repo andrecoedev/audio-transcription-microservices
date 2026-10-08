@@ -5,6 +5,15 @@ import statistics
 import unicodedata
 
 
+def verify_cpp_device(log, requested):
+    cuda = bool(re.search(r"using CUDA\d+ backend|CUDA\d+\s+(?:compute|total|model)\s+(?:size|buffer)", log, re.I))
+    if requested == "cuda" and not cuda:
+        raise RuntimeError("No CUDA allocation evidence; refusing GPU label")
+    if requested == "cpu" and cuda:
+        raise RuntimeError("Unexpected CUDA offload during CPU benchmark")
+    return requested
+
+
 def cpp_transcript(result):
     """Server verbose JSON inserts display newlines, sometimes inside words.
 

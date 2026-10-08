@@ -1,9 +1,20 @@
 import unittest
 
-from metrics import cpp_transcript, dispersion, quality
+from metrics import cpp_transcript, dispersion, quality, verify_cpp_device
 
 
 class MetricsTests(unittest.TestCase):
+    def test_cuda_library_presence_is_not_cuda_execution(self):
+        with self.assertRaises(RuntimeError):
+            verify_cpp_device("loaded CUDA backend; found 1 CUDA devices", "cuda")
+
+    def test_cuda_execution_needs_specific_backend_evidence(self):
+        self.assertEqual(verify_cpp_device("whisper_backend_init_gpu: using CUDA0 backend", "cuda"), "cuda")
+        with self.assertRaises(RuntimeError):
+            verify_cpp_device("using GPU Metal backend", "cuda")
+        with self.assertRaises(RuntimeError):
+            verify_cpp_device("whisper_model_load: CUDA0 total size = 500 MB", "cpu")
+
     def test_cpp_display_wrapping_is_not_a_word_error(self):
         raw = {"text": "fal\nantes", "segments": [{"text": "fal"}, {"text": "antes"}]}
         self.assertEqual(cpp_transcript(raw), "falantes")

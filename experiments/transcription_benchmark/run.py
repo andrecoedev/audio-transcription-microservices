@@ -21,7 +21,7 @@ import urllib.request
 import uuid
 import wave
 
-from metrics import cpp_transcript, quality
+from metrics import cpp_transcript, quality, verify_cpp_device
 
 
 class Sampler:
@@ -166,12 +166,7 @@ class Cpp:
                 raise TimeoutError("whisper.cpp startup timeout")
             log = self.log_path.read_text(encoding="utf-8", errors="replace")
             # Require explicit allocation/backend evidence, not only a CUDA-built binary.
-            gpu_used = bool(re.search(r"using (?:CUDA|GPU)|CUDA\d+ (?:compute|total|model) buffer|using CUDA\d+ backend", log, re.I))
-            if args.device == "cuda" and not gpu_used:
-                raise RuntimeError("No CUDA allocation evidence; refusing GPU label")
-            if args.device == "cpu" and gpu_used:
-                raise RuntimeError("Unexpected GPU offload during CPU benchmark")
-            self.actual_device = args.device
+            self.actual_device = verify_cpp_device(log, args.device)
             ftype = re.search(r"ftype\s*=\s*(\d+)", log)
             if not ftype or ftype.group(1) != "1":
                 raise RuntimeError("Expected verified GGML F16 weights")
