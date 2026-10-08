@@ -66,6 +66,11 @@ reserva-se o máximo permitido por arquivo ou o saldo mensal restante. A duraç�
 confiável só é conhecida após FFmpeg no Worker: esse máximo conservador permite
 autorizar upload sem processamento pesado na API. Saldo reservado não é consumo.
 
+SQLite legado pode continuar consultando dados, mas não admite processamento
+real fora de `APP_ENV=test`: ignora locks de linha e não garante reservas atômicas.
+O runtime oficial de processamento é PostgreSQL; os testes SQLite não alegam
+validar concorrência financeira, que é exercitada separadamente no PostgreSQL.
+
 Depois da conversão, **antes de qualquer inferência**, Worker verifica duração,
 permissão, reserva e persistência do marcador de tentativa. Libera a diferença
 entre máximo e duração real, arredondada para cima ao milissegundo. Nunca usa

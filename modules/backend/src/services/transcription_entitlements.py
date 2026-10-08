@@ -48,6 +48,10 @@ def _aware(value):
 
 def access(db, user_id, *, now=None, lock=False):
     now = now or now_utc()
+    if lock and db.get_bind().dialect.name != "postgresql" and settings.APP_ENV != "test":
+        # SQLite ignores row locks. Keep legacy reads, but never claim atomic
+        # allowance enforcement on an unsupported processing database.
+        raise HTTPException(503, "O banco de processamento precisa ser configurado pelo administrador.")
     query = db.query(User).filter_by(id=user_id)
     # PostgreSQL NO KEY UPDATE serializes admissions without conflicting with
     # FK KEY SHARE locks from concurrent ownership inserts. We never change IDs.

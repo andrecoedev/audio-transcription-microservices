@@ -236,6 +236,16 @@ def test_unconfigured_limits_fail_closed(account, monkeypatch, configuration):
     assert error.value.status_code == 503
 
 
+def test_sqlite_legacy_reads_do_not_authorize_non_atomic_real_processing(account, monkeypatch):
+    local_ready(monkeypatch)
+    limits(monkeypatch)
+    monkeypatch.setattr(settings, "APP_ENV", "dev")
+    assert policy.plan_view(account, 1)["plan"] == "free"
+    with pytest.raises(HTTPException) as error:
+        reserve(account, job(account))
+    assert error.value.status_code == 503
+
+
 def test_plan_api_private_admin_grants_expire_revoke_and_audit(account, db_context, auth_headers):
     client = db_context["client"]
     headers = auth_headers()
