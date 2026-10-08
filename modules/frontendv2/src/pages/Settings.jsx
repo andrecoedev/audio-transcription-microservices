@@ -4,25 +4,17 @@ import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 import Button from '../components/Button'
-import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import PageHeader from '../components/PageHeader'
+import HelpPopover from '../components/HelpPopover'
 import ProviderConnectionCard from '../components/ProviderConnectionCard'
-import ProviderPreferences from '../components/ProviderPreferences'
+import { ProviderPreferenceFields, PreferenceSaveButton } from '../components/ProviderPreferences'
 import GoogleAccountLink from '../components/GoogleAccountLink'
 import { audioService } from '../services/audioService'
 import { useAuthStore } from '../stores/authStore'
 
-const tabs = [
-  { id: 'account', label: 'Conta' },
-  { id: 'transcription', label: 'Transcrição' },
-  { id: 'ai', label: 'Serviços de IA' },
-  { id: 'privacy', label: 'Dados e privacidade' },
-]
-
 export default function Settings() {
   const user = useAuthStore((state) => state.user)
   const updateProfile = useAuthStore((state) => state.updateProfile)
-  const [activeTab, setActiveTab] = useState('ai')
   const [providerSettings, setProviderSettings] = useState(null)
   const [preferences, setPreferences] = useState(null)
   const [health, setHealth] = useState(null)
@@ -37,6 +29,7 @@ export default function Settings() {
   const [errorMessage, setErrorMessage] = useState('')
 
   const refreshProviderSettings = useCallback(async () => {
+    setCredentials({ assemblyai: '', gemini: '' })
     setProviderLoading(true)
     setErrorMessage('')
     try {
@@ -149,51 +142,48 @@ export default function Settings() {
         <Button variant="outline" size="sm" onClick={() => { refreshStatus(); refreshProviderSettings() }} loading={statusLoading || providerLoading} disabled={statusLoading || providerLoading || providerSaving} icon={RefreshCw}>Atualizar</Button>
       </PageHeader>
 
-      <div role="tablist" aria-label="Seções das configurações" className="flex flex-wrap gap-2">
-        {tabs.map((tab) => <button key={tab.id} id={`settings-tab-${tab.id}`} type="button" role="tab"
-          aria-selected={activeTab === tab.id} aria-controls={`settings-panel-${tab.id}`} disabled={providerSaving}
-          onClick={() => {
-            setCredentials({ assemblyai: '', gemini: '' })
-            setActiveTab(tab.id)
-          }}
-          className={`rounded-full border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${activeTab === tab.id ? 'border-primary-100 bg-primary-50 font-semibold text-primary-800' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>
-          {tab.label}
-        </button>)}
-      </div>
       {errorMessage && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>}
 
-      <section role="tabpanel" id={`settings-panel-${activeTab}`} aria-labelledby={`settings-tab-${activeTab}`}>
-        {activeTab === 'account' && <Card>
-          <CardHeader><CardTitle>Conta</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
+      <div className="space-y-8">
+        <SettingsSection id="account" title="Conta" description="Seus dados neste navegador.">
+          <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-medium text-gray-700">Nome
               <input value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} className="input mt-2" />
             </label>
             <label className="block text-sm font-medium text-gray-700">E-mail
               <input type="email" value={profile.email} onChange={(event) => setProfile({ ...profile, email: event.target.value })} className="input mt-2" />
             </label>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button onClick={saveProfileLocally} icon={Save}>Salvar preferências locais</Button>
-            <p className="text-sm text-gray-500">Nome e e-mail são preferências deste navegador e não alteram os dados de acesso da conta.</p>
-            <GoogleAccountLink />
-          </CardContent>
-        </Card>}
+            <HelpPopover label="Dados da conta">Nome e e-mail são preferências deste navegador e não alteram os dados de acesso da conta.</HelpPopover>
+          </div>
+          <GoogleAccountLink />
+          <div className="mt-3 flex items-center justify-between gap-3 text-sm text-gray-600">
+            <p>Seus arquivos ficam associados à sua conta no histórico.</p>
+            <HelpPopover label="Dados e privacidade">Credenciais próprias são guardadas de forma protegida e nunca retornam à interface. Remover uma chave não a revoga no serviço externo. Esta tela não oferece exclusão de conta ou exportação de dados pessoais.</HelpPopover>
+          </div>
+        </SettingsSection>
 
-        {activeTab === 'transcription' && <Card>
-          <CardHeader><CardTitle>Preferências de transcrição</CardTitle></CardHeader>
-          <CardContent>{providerSettings ? <ProviderPreferences settings={providerSettings} preferences={preferences} updatePreference={updatePreference}
-            savePreferences={savePreferences} saving={providerSaving} /> : <LoadingState loading={providerLoading} error={providerError} retry={refreshProviderSettings} />}</CardContent>
-        </Card>}
+        <form onSubmit={savePreferences} className="space-y-8">
+          <SettingsSection id="transcription" title="Transcrição" description="Escolha como transformar seu áudio em texto.">
+            {providerSettings ? <ProviderPreferenceFields kind="transcription" settings={providerSettings} preferences={preferences}
+              updatePreference={updatePreference} saving={providerSaving} /> : <LoadingState loading={providerLoading} error={providerError} retry={refreshProviderSettings} />}
+          </SettingsSection>
+          <SettingsSection id="intelligence" title="Resumos inteligentes" description="Escolha o serviço para resumir suas reuniões.">
+            {providerSettings ? <ProviderPreferenceFields kind="intelligence" settings={providerSettings} preferences={preferences}
+              updatePreference={updatePreference} saving={providerSaving} /> : <p className="text-sm text-gray-600">{providerLoading ? 'Carregando preferências…' : 'As preferências de resumo estão indisponíveis.'}</p>}
+          </SettingsSection>
+          {providerSettings && <PreferenceSaveButton settings={providerSettings} preferences={preferences} saving={providerSaving} />}
+        </form>
 
-        {activeTab === 'ai' && <div className="space-y-6">
+        <SettingsSection id="connections" title="Serviços conectados" description="Conecte suas contas AssemblyAI e Gemini.">
+          <div className="space-y-5">
           {providerLoading && <p role="status" className="text-gray-600">Carregando serviços da sua conta…</p>}
           {providerError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">Não foi possível carregar os serviços de IA.
             <Button variant="outline" className="ml-3" onClick={refreshProviderSettings}>Tentar novamente</Button>
           </div>}
           {providerSettings && <>
-            <div>
-              <h2 className="text-2xl font-semibold text-gray-900">Serviços de IA</h2>
-              <p className="mt-1 text-gray-600">Escolha o processamento nas preferências abaixo. Conectar sua própria conta define quem fornece e paga pelo serviço externo.</p>
-            </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <ProviderCard title="Transcrição de áudio" provider="assemblyai" configuredProvider={providerSettings.providers.assemblyai}
                 credential={providerSettings.credentials.assemblyai} settings={providerSettings} saving={providerSaving} operation={credentialOperation}
@@ -204,11 +194,10 @@ export default function Settings() {
                 value={credentials.gemini} onChange={(value) => setCredentials({ ...credentials, gemini: value })}
                 onSave={() => saveCredential('gemini')} onRemove={() => removeCredential('gemini')} />
             </div>
-            <ProviderPreferences settings={providerSettings} preferences={preferences} updatePreference={updatePreference}
-              savePreferences={savePreferences} saving={providerSaving} />
             <div className="flex gap-3 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary-800" />
-              <p><span className="font-medium text-gray-900">Credenciais protegidas.</span> Depois de salvas, as chaves não são exibidas novamente. “Configurada” indica que foi salva; não confirma validade ou acesso no serviço externo.</p>
+              <p className="flex-1">As chaves são protegidas e não reaparecem após salvar.</p>
+              <HelpPopover label="Segurança das chaves">“Configurada” indica que a chave foi salva; não confirma validade ou acesso no serviço externo. Salvar não realiza uma chamada paga para testar a chave.</HelpPopover>
             </div>
             <details className="rounded-lg border border-gray-200 bg-white p-4">
               <summary className="cursor-pointer font-medium text-gray-900">Diagnóstico do sistema</summary>
@@ -234,22 +223,21 @@ export default function Settings() {
               </div>
             </details>
           </>}
-        </div>}
-
-        {activeTab === 'privacy' && <Card>
-          <CardHeader><CardTitle>Dados e privacidade</CardTitle></CardHeader>
-          <CardContent className="space-y-3 text-sm text-gray-600">
-            <p>As transcrições da conta ficam associadas à sua identidade e aparecem no histórico autenticado.</p>
-            <p>Credenciais próprias são guardadas de forma protegida no serviço e nunca são retornadas à interface após o salvamento.</p>
-            <p>Remover uma credencial da USAGI não a revoga no serviço externo. Para revogá-la, use também as configurações da sua conta nesse serviço.</p>
-            <p>Esta versão não oferece exclusão de conta ou exportação de dados pessoais nesta tela.</p>
-          </CardContent>
-        </Card>}
-      </section>
+          </div>
+        </SettingsSection>
+      </div>
     </div>
   )
 }
 
+
+function SettingsSection({ id, title, description, children }) {
+  return <section aria-labelledby={`settings-${id}`} className="border-b border-gray-200 pb-6 last:border-0">
+    <h2 id={`settings-${id}`} className="text-xl font-semibold text-gray-900">{title}</h2>
+    <p className="mt-1 mb-4 text-sm text-gray-600">{description}</p>
+    {children}
+  </section>
+}
 
 function ProviderCard({ provider, configuredProvider, credential, settings, saving, operation, value, onChange, onSave, onRemove }) {
   return <ProviderConnectionCard provider={provider} details={configuredProvider} credential={credential}

@@ -38,13 +38,15 @@ afterEach(cleanup)
 describe('Settings', () => {
   it('shows accessible sections and the account-specific AI capabilities', async () => {
     renderSettings()
-    expect(await screen.findByRole('heading', { name: 'Serviços de IA' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'Conta' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'Transcrição' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'Dados e privacidade' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Serviços conectados' })).toBeTruthy()
+    for (const name of ['Conta', 'Transcrição', 'Resumos inteligentes', 'Serviços conectados']) {
+      expect(screen.getByRole('heading', { name, level: 2 })).toBeTruthy()
+    }
+    expect(screen.queryByRole('tablist')).toBeNull()
     expect(screen.getAllByText('Transcrição local (Faster-Whisper)').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Não conectado').length).toBeGreaterThan(0)
-    expect(screen.getByText(/não confirma validade ou acesso/i)).toBeTruthy()
+    fireEvent.focus(screen.getByRole('button', { name: 'Ajuda: Segurança das chaves' }))
+    expect(screen.getByRole('tooltip').textContent).toContain('não confirma validade ou acesso')
   })
 
   it('keeps operational health diagnostics available but collapsed by default', async () => {
@@ -110,13 +112,12 @@ describe('Settings', () => {
     expect(transcriptionCard.textContent).not.toContain('Faster-Whisper ativo')
   })
 
-  it('clears unsaved provider credentials when leaving the AI services tab', async () => {
+  it('clears unsaved provider credentials when refreshing settings', async () => {
     renderSettings()
     const input = await screen.findByLabelText('Credencial AssemblyAI')
     fireEvent.change(input, { target: { value: 'temporary-secret' } })
-    fireEvent.click(screen.getByRole('tab', { name: 'Conta' }))
-    fireEvent.click(screen.getByRole('tab', { name: 'Serviços de IA' }))
-    expect(screen.getByLabelText('Credencial AssemblyAI').value).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }))
+    await waitFor(() => expect(screen.getByLabelText('Credencial AssemblyAI').value).toBe(''))
   })
 
   it('replaces a saved key only after explicit editing and never redisplays it', async () => {
@@ -162,13 +163,12 @@ describe('Settings', () => {
     expect(screen.queryByText('sensitive provider response')).toBeNull()
   })
 
-  it('does not claim an edited preference is already active and shows failure on the transcription tab', async () => {
+  it('does not claim an edited preference is already active and shows failure on the single page', async () => {
     audioService.updateProviderPreferences.mockRejectedValue(new Error('private detail'))
     renderSettings()
     await screen.findByLabelText('Como transcrever seu áudio')
-    fireEvent.click(screen.getByRole('tab', { name: 'Transcrição' }))
     fireEvent.change(screen.getByLabelText('Como transcrever seu áudio'), { target: { value: 'whisper' } })
-    expect(screen.getByText(/Rascunho:/)).toBeTruthy()
+    expect(screen.getByText(/Alteração não salva:/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Salvar preferências' }))
     expect((await screen.findByRole('alert')).textContent).toContain('Não foi possível salvar as preferências')
     expect(screen.queryByText('private detail')).toBeNull()

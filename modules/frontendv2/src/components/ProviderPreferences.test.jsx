@@ -78,7 +78,7 @@ it('marks a saved unavailable explicit choice and blocks saving until it is chan
     preferences: { transcription_provider: 'assemblyai' },
   })
   expect(screen.getByRole('option', { name: 'AssemblyAI (indisponível)' }).disabled).toBe(true)
-  expect(screen.getAllByText(/Conecte ou atualize a credencial em Serviços de IA/).length).toBeGreaterThan(0)
+  expect(screen.getAllByText(/Conecte ou atualize a credencial em Serviços conectados/).length).toBeGreaterThan(0)
   expect(screen.getByRole('button', { name: 'Salvar preferências' }).disabled).toBe(true)
   fireEvent.change(screen.getByLabelText('Como transcrever seu áudio'), { target: { value: 'whisper' } })
   expect(updatePreference).toHaveBeenCalledWith('transcription_provider', 'whisper')
@@ -107,8 +107,8 @@ it('explains that explicit AssemblyAI uses the USAGI quota when the platform cre
     },
     preferences: { transcription_provider: 'assemblyai', intelligence_provider: 'automatic' },
   })
-  expect(screen.getByText(/Se salvo, transcrição: AssemblyAI é cobrado da cota da USAGI/)).toBeTruthy()
-  expect(screen.getByText(/Se salvo, resumos: Gemini é cobrado da cota da USAGI/)).toBeTruthy()
+  expect(screen.getByRole('status').textContent).toContain('AssemblyAI é cobrado da cota da USAGI')
+  expect(screen.getByText(/Gemini é cobrado da cota da USAGI/)).toBeTruthy()
 })
 
 it('uses the configured AssemblyAI credential for automatic routing regardless of credential source metadata', () => {
@@ -133,9 +133,10 @@ it('keeps saved active services distinct from draft selections', () => {
   })
   expect(paragraphContaining('Transcrição local (Faster-Whisper)')).toBeTruthy()
   expect(paragraphContaining('Resumos inteligentes: Gemini')).toBeTruthy()
-  expect(screen.getByText(/Rascunho: AssemblyAI para transcrição/)).toBeTruthy()
-  expect(screen.getByText(/só entra em vigor depois de salva/)).toBeTruthy()
-  expect(screen.getByText(/Se salvo, transcrição: AssemblyAI usa sua própria conta/)).toBeTruthy()
+  const drafts = screen.getAllByRole('status').map(element => element.textContent)
+  expect(drafts.some(text => text.includes('Alteração não salva: AssemblyAI'))).toBe(true)
+  expect(drafts.every(text => text.includes('só entra em vigor depois de salva'))).toBe(true)
+  expect(drafts.some(text => text.includes('AssemblyAI usa sua própria conta'))).toBe(true)
 })
 
 it('disables all preference controls while saving', () => {

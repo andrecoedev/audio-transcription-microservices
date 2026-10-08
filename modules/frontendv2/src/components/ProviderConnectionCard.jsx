@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Button from './Button'
 import Card, { CardContent, CardHeader, CardTitle } from './Card'
+import HelpPopover from './HelpPopover'
 
 export default function ProviderConnectionCard({ provider, details, credential, storageAvailable, busy, saving, value, onChange, onSave, onRemove }) {
   const [replacing, setReplacing] = useState(false)
@@ -27,13 +28,15 @@ export default function ProviderConnectionCard({ provider, details, credential, 
     </div></CardHeader>
     <CardContent className="space-y-4">
       <div><h3 className="font-semibold text-gray-900">{connected ? `${name} · Sua própria conta` : name}</h3>
-        <p className="mt-1 text-sm text-gray-600">{provider === 'assemblyai' ? 'Transforme seu áudio em texto, com detecção de falantes quando ativada.' : 'Gere resumos, tópicos, decisões e tarefas a partir da sua reunião.'}</p>
-        <p className="mt-2 text-sm text-gray-600">Conecte uma chave da sua conta {name}. O consumo é cobrado pelo serviço diretamente na sua conta, não usa a franquia da USAGI.</p>
+        <div className="mt-2 flex items-start justify-between gap-3">
+          <p className="text-sm text-gray-600">Sua própria conta paga pelo uso; não consome a franquia da USAGI.</p>
+          <HelpPopover label={`Conectar ${name}`}>{provider === 'assemblyai' ? 'Transforme seu áudio em texto, com detecção de falantes quando ativada.' : 'Gere resumos, tópicos, decisões e tarefas a partir da sua reunião.'} Conecte uma chave da sua conta {name}; o serviço cobra diretamente dessa conta.</HelpPopover>
+        </div>
       </div>
       {details.credential_source === 'platform' && <div className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900">Fornecido pela USAGI está disponível para esta conta. Conectar sua própria chave passa a usar sua conta {name}.</div>}
       {connected && <div className="rounded-lg border border-primary-100 bg-primary-50 p-3 text-sm text-primary-900">
         <p className="font-medium">Credencial própria salva</p>
-        <p>Chave salva com segurança. A validade e o acesso serão verificados ao usar o serviço.</p>
+        <p>Chave salva. A conexão será verificada ao usar o serviço.</p>
         {date && !Number.isNaN(date.getTime()) && <p className="mt-1 text-xs">Atualizada em {date.toLocaleString('pt-BR')}</p>}
       </div>}
       {(!canUse || !storageAvailable) && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{!storageAvailable ? 'Conexão própria indisponível: o armazenamento seguro está indisponível. Tente novamente mais tarde ou procure o suporte da USAGI.' : connected ? 'Indisponível no momento. Atualize as configurações. Se continuar, procure o suporte da USAGI.' : `Indisponível no momento. Conecte sua conta ${name} para habilitar este serviço.`}</p>}
