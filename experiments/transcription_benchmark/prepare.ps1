@@ -38,6 +38,5 @@ $downloadCode = "from huggingface_hub import snapshot_download; [snapshot_downlo
 docker run --rm --entrypoint python --mount "type=bind,source=$artifact\models,target=/models" $WorkerImage -c $downloadCode
 if ($LASTEXITCODE -ne 0) { throw 'Faster-Whisper model download failed' }
 # Preserve immutable evidence of downloaded model/build identities, never credentials.
-Get-ChildItem "$artifact\models" -Recurse -File | Where-Object { $_.Name -eq 'model.bin' -or $_.Name -like 'ggml-*.bin' } |
-    Get-FileHash -Algorithm SHA256 | Select-Object Hash,@{N='Artifact';E={Split-Path $_.Path -Leaf}} |
-    ConvertTo-Json | Set-Content "$artifact\results\model-hashes.local.json" -Encoding UTF8
+docker run --rm --network none --entrypoint python --mount "type=bind,source=$PSScriptRoot,target=/benchmark,readonly" --mount "type=bind,source=$artifact\models,target=/models,readonly" --mount "type=bind,source=$artifact\results,target=/results" $WorkerImage /benchmark/provenance.py --models /models --output /results/model-provenance.local.json
+if ($LASTEXITCODE -ne 0) { throw 'Public artifact identity verification failed' }
