@@ -8,6 +8,26 @@ from pathlib import Path
 from metrics import dispersion
 
 
+METRIC_FIELDS = set("""schema_version engine model requested_device requested_compute
+fixture_id session audio_sha256 audio_seconds conversion_seconds threads beam_size
+vad runtime cold_definition model_load_scope resource_scope harness_sha256
+psutil_version faster_whisper_version ctranslate2_version actual_device actual_compute
+model_load_seconds startup_seconds phase repetition status inference_seconds
+total_seconds rtf speed_x language segment_count wer cer reference_words literal_match
+ram_peak_mib cpu_percent_mean gpu_total_vram_start_mib gpu_total_vram_peak_mib
+gpu_total_vram_delta_mib gpu_percent_mean resource_samples vram_scope
+text_reconstruction speaker_count known_num_speakers der der_collar_seconds
+der_skip_overlap torch_peak_allocated_mib model_revisions""".split())
+
+
+def exportable_rows(rows, public_only=False):
+    if public_only:
+        rows = [row for row in rows if row.get("fixture_id", "").startswith(("fleurs-", "ami-"))]
+    # Closed field list prevents future debug fields/secrets/transcripts leaking
+    # into a CSV when someone extends the local metrics artifact.
+    return [{key: value for key, value in row.items() if key in METRIC_FIELDS} for row in rows]
+
+
 def summarize(rows):
     groups = {}
     for row in rows:
@@ -37,12 +57,14 @@ def main():
     parser.add_argument("results", type=Path)
     parser.add_argument("--csv", type=Path, required=True)
     parser.add_argument("--summary", type=Path, required=True)
+    parser.add_argument("--public-only", action="store_true", help="Exclude private video metrics from published evidence")
     args = parser.parse_args()
     rows = []
     for file in sorted(args.results.glob("*.metrics.json")):
         rows.extend(json.loads(file.read_text(encoding="utf-8")))
     if not rows:
         parser.error("No completed measurements")
+    rows = exportable_rows(rows, args.public_only)
     fields = sorted({key for row in rows for key in row})
     args.csv.parent.mkdir(parents=True, exist_ok=True)
     with args.csv.open("w", encoding="utf-8", newline="") as output:

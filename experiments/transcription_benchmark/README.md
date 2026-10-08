@@ -69,6 +69,9 @@ nome. Áudio, transcript, logs, paths locais e JSONs detalhados permanecem somen
 em `.local-artifacts/` (ignorada). Não publicar hipóteses, mesmo de fixtures públicas.
 O CSV/relatório publicado nesta pasta deve conter somente métricas/proveniência
 aprovadas; não incluir arquivos privados, dados pessoais ou credenciais.
+Use `summarize.py --public-only` para publicar apenas FLEURS/AMI; o exportador
+também aceita somente campos de métricas conhecidos, descartando texto, paths,
+segredos ou campos de debug adicionados a um JSON local por engano.
 
 ## Pyannote (separado)
 

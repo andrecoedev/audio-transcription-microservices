@@ -1,9 +1,17 @@
 import unittest
 
-from summarize import summarize
+from summarize import exportable_rows, summarize
 
 
 class SummaryTests(unittest.TestCase):
+    def test_export_cannot_include_debug_transcripts_or_credentials(self):
+        rows = [{"fixture_id": "fleurs-quality", "rtf": 0.1,
+                 "transcript": "private content", "api_key": "not-a-real-secret", "file_path": "private"}]
+        self.assertEqual(exportable_rows(rows), [{"fixture_id": "fleurs-quality", "rtf": 0.1}])
+
+    def test_public_export_excludes_private_audio_fingerprint(self):
+        self.assertEqual(exportable_rows([{"fixture_id": "local-video-001", "audio_sha256": "private-fingerprint"}], True), [])
+
     def test_never_calls_cpu_a_gpu(self):
         with self.assertRaises(ValueError):
             summarize([{"status": "completed", "actual_device": "cpu", "requested_device": "cuda"}])
