@@ -8,10 +8,22 @@ const providerNames = {
   whisper: 'Transcrição local',
   assemblyai: 'AssemblyAI',
   gemini: 'Gemini',
+  groq: 'Groq',
 }
 
 function isEligible(provider) {
   return Boolean(provider?.available && provider?.allowed && provider?.configured)
+}
+
+function isGroqEligible(provider) {
+  return isEligible(provider)
+    && provider.credential_source === 'platform'
+    && provider.platform_access === true
+    && provider.byok_allowed === false
+}
+
+function isProviderEligible(provider, details) {
+  return provider === 'groq' ? isGroqEligible(details) : isEligible(details)
 }
 
 function resolveProvider(preference, settings, kind) {
@@ -21,27 +33,30 @@ function resolveProvider(preference, settings, kind) {
 }
 
 function serviceDescription(provider, settings) {
-  if (!isEligible(settings.providers?.[provider])) {
+  const details = settings.providers?.[provider]
+  if (!isProviderEligible(provider, details)) {
+    if (provider === 'groq') return 'Groq está indisponível para esta conta no momento.'
     if (provider === 'assemblyai' && settings.credentials?.assemblyai?.configured) {
       return 'Sua chave AssemblyAI não está disponível para uso. Confira Serviços conectados.'
     }
     return `Conecte ou atualize sua conta ${providerNames[provider]} em Serviços conectados.`
   }
   if (provider === 'whisper') return null
-  const source = settings.providers[provider].credential_source
+  const source = details.credential_source
+  if (provider === 'groq') return 'Acesso à Groq disponibilizado pela USAGI.'
   if (source === 'platform') return 'Usa a franquia da USAGI.'
   if (source === 'user') return `Cobrança na sua conta ${providerNames[provider]}.`
   return null
 }
 
 function choiceLabel(provider, providers) {
-  if (provider === 'automatic' || isEligible(providers[provider])) return providerNames[provider]
+  if (provider === 'automatic' || isProviderEligible(provider, providers[provider])) return providerNames[provider]
   return `${providerNames[provider]} (indisponível)`
 }
 
 function ProviderSelect({ kind, label, ariaLabel, savedValue, value, providers, busy, onChange }) {
-  const choices = kind === 'transcription' ? ['automatic', 'whisper', 'assemblyai'] : ['automatic', 'gemini']
-  const unavailableSavedChoice = value !== 'automatic' && !isEligible(providers[value]) && value === savedValue
+  const choices = kind === 'transcription' ? ['automatic', 'whisper', 'assemblyai'] : ['automatic', 'gemini', 'groq']
+  const unavailableSavedChoice = value !== 'automatic' && !isProviderEligible(value, providers[value]) && value === savedValue
 
   return <div className="text-sm font-medium text-gray-700">
     <div className="flex items-center gap-2"><label htmlFor={`preference-${kind}`}>{label}</label>
@@ -52,8 +67,9 @@ function ProviderSelect({ kind, label, ariaLabel, savedValue, value, providers, 
       </HelpPopover></div>
     <select id={`preference-${kind}`} aria-label={ariaLabel} className="input mt-2" value={value} disabled={busy}
       onChange={(event) => onChange(event.target.value)}>
-      {choices.filter((provider) => provider === 'automatic' || isEligible(providers[provider]) || provider === savedValue)
-        .map((provider) => <option key={provider} value={provider} disabled={provider !== 'automatic' && !isEligible(providers[provider])}>
+      {choices.filter((provider) => provider === 'automatic' || isProviderEligible(provider, providers[provider])
+        || provider === savedValue || (provider === 'groq' && providers.groq))
+        .map((provider) => <option key={provider} value={provider} disabled={provider !== 'automatic' && !isProviderEligible(provider, providers[provider])}>
           {choiceLabel(provider, providers)}
         </option>)}
     </select>
@@ -65,7 +81,7 @@ function ProviderSelect({ kind, label, ariaLabel, savedValue, value, providers, 
 
 function ActiveService({ preference, kind, settings, title }) {
   const provider = resolveProvider(preference || 'automatic', settings, kind)
-  const eligible = isEligible(settings.providers?.[provider])
+  const eligible = isProviderEligible(provider, settings.providers?.[provider])
   return <div>
     <p className="text-gray-700">{title}: <span className="font-medium">{providerNames[provider] || provider}</span>
       {!eligible && <span className="font-medium text-amber-800"> (indisponível)</span>}
@@ -104,7 +120,7 @@ export function PreferenceSaveButton({ settings, preferences, saving }) {
   const providers = settings.providers || {}
   const unavailableExplicit = ['transcription_provider', 'intelligence_provider'].some((key) => {
     const value = preferences?.[key]
-    return value && value !== 'automatic' && !isEligible(providers[value])
+    return value && value !== 'automatic' && !isProviderEligible(value, providers[value])
   })
   const dirty = preferences?.transcription_provider !== saved.transcription_provider
     || preferences?.intelligence_provider !== saved.intelligence_provider
