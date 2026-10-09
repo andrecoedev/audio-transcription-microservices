@@ -98,6 +98,9 @@ def begin_groq_call(db, intelligence_id, user_id, context, model):
     require_groq_configuration(worker=True)
     access(db, user_id, lock=True)
     require_execution(db, user_id, "groq", "platform")
+    budget = db.get(PlatformProviderBudget, "groq")
+    if not budget or budget.reserved_cents > min(budget.limit_cents, settings.GROQ_PLATFORM_BUDGET_CENTS):
+        raise RuntimeError("Groq budget policy changed before inference")
     call = db.query(IntelligencePlatformCall).filter_by(intelligence_id=intelligence_id).one_or_none()
     if not call or call.user_id != user_id or call.model != model or call.provider != "groq":
         raise RuntimeError("Groq call has no matching authorization")

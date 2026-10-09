@@ -307,6 +307,7 @@ def test_groq_ambiguous_recovery_fails_without_republishing_or_reexecuting(groq_
     finally:
         db.close()
 
+
     def missing_job(*_args, **_kwargs):
         raise NoSuchJobError
     monkeypatch.setattr(worker.Job, "fetch", missing_job)
@@ -323,3 +324,63 @@ def test_groq_ambiguous_recovery_fails_without_republishing_or_reexecuting(groq_
         assert db.query(IntelligencePlatformCall).filter_by(intelligence_id=intelligence_id).one().state == "attempted"
     finally:
         db.close()
+
+
+def test_reduced_global_budget_blocks_previously_queued_inference(groq_context, monkeypatch):
+    context = groq_context
+    intelligence_id = _request(context).json()["id"]
+    with _db(context) as db:
+        hold = db.query(IntelligencePlatformCall).filter_by(intelligence_id=intelligence_id).one().reserved_cents
+    assert hold > 1
+    monkeypatch.setattr(settings, "GROQ_PLATFORM_BUDGET_CENTS", hold - 1)
+    called = []
+    class Fake:
+        def generate(self, _context):
+            called.append(True)
+            return json.dumps(valid_result())
+    monkeypatch.setattr(worker, "get_provider", lambda **_kwargs: Fake())
+    with pytest.raises(RuntimeError, match="Meeting analysis failed"):
+        worker.process_intelligence_job(intelligence_id)
+    assert called == []
+    with _db(context) as db:
+        assert db.query(IntelligencePlatformCall).filter_by(intelligence_id=intelligence_id).one().state == "reserved"
+
+
+def test_groq_regeneration_keeps_previous_result_and_ownership(groq_context, auth_headers, monkeypatch):
+    context = groq_context
+    class Fake:
+        def generate(self, _context):
+            return json.dumps(valid_result())
+    monkeypatch.setattr(worker, "get_provider", lambda **_kwargs: Fake())
+    first = _request(context).json()
+    worker.process_intelligence_job(first["id"])
+    second = _request(context, "/regenerate").json()
+    assert second["revision"] == 2
+    assert _request(context, "/regenerate").json()["id"] == second["id"]
+    url = f'/meetings/{context["meeting_id"]}/intelligence/result'
+    assert context["client"].get(url, headers=context["headers"]).json()["revision"] == 1
+    assert context["client"].get(url, headers=auth_headers("bob")).status_code == 404
+    worker.process_intelligence_job(second["id"])
+    assert context["client"].get(url, headers=context["headers"]).json()["revision"] == 2
+    assert context["client"].get(url + "?revision=1", headers=context["headers"]).json()["content"] == valid_result()
+
+
+def test_groq_invalid_grounding_fails_but_observed_tokens_remain(groq_context, monkeypatch):
+    context = groq_context
+    payload = valid_result()
+    payload["action_items"][0]["due_date"] = "data não citada"
+    class Fake:
+        def set_usage_observer(self, observer):
+            self.observer = observer
+        def generate(self, _context):
+            self.observer({"status": "response", "prompt_tokens": 40, "completion_tokens": 20})
+            return json.dumps(payload)
+    monkeypatch.setattr(worker, "get_provider", lambda **_kwargs: Fake())
+    intelligence_id = _request(context).json()["id"]
+    with pytest.raises(RuntimeError, match="Meeting analysis failed"):
+        worker.process_intelligence_job(intelligence_id)
+    with _db(context) as db:
+        row = db.get(MeetingIntelligence, intelligence_id)
+        assert row.result is None and row.status == "failed"
+        tokens = db.query(UsageEvent).filter_by(operation_id=row.usage_attempt_id, metric="output_tokens").one()
+        assert tokens.quantity == 20 and tokens.status == "completed"
