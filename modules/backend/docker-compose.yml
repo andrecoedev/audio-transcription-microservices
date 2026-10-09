@@ -16,6 +16,20 @@ x-account-policy: &account-policy
   LOCAL_TRANSCRIPTION_ENABLED: ${LOCAL_TRANSCRIPTION_ENABLED:-false}
   LOCAL_TRANSCRIPTION_HOMOLOGATED: ${LOCAL_TRANSCRIPTION_HOMOLOGATED:-false}
 
+x-groq-policy: &groq-policy
+  GROQ_API_KEY_CONFIGURED: ${GROQ_API_KEY_CONFIGURED:-false}
+  GROQ_PLATFORM_ENABLED: ${GROQ_PLATFORM_ENABLED:-false}
+  GROQ_PLATFORM_BUDGET_CENTS: ${GROQ_PLATFORM_BUDGET_CENTS:-0}
+  GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+  GROQ_TIMEOUT_SECONDS: ${GROQ_TIMEOUT_SECONDS:-60}
+  GROQ_MAX_INPUT_CHARACTERS: ${GROQ_MAX_INPUT_CHARACTERS:-20000}
+  GROQ_MAX_INPUT_TOKENS: ${GROQ_MAX_INPUT_TOKENS:-32000}
+  GROQ_MAX_OUTPUT_TOKENS: ${GROQ_MAX_OUTPUT_TOKENS:-4096}
+  GROQ_MAX_ACTIVE_PER_USER: ${GROQ_MAX_ACTIVE_PER_USER:-0}
+  GROQ_MAX_PROCESSING_PER_USER: ${GROQ_MAX_PROCESSING_PER_USER:-0}
+  GROQ_INPUT_USD_PER_MILLION: ${GROQ_INPUT_USD_PER_MILLION:-0}
+  GROQ_OUTPUT_USD_PER_MILLION: ${GROQ_OUTPUT_USD_PER_MILLION:-0}
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -63,7 +77,7 @@ services:
     ports:
       - "2020:2020"
     environment:
-      <<: [*database-environment, *assemblyai-policy, *account-policy]
+      <<: [*database-environment, *assemblyai-policy, *account-policy, *groq-policy]
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-dev}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
@@ -142,7 +156,7 @@ services:
     command: ["python", "run_worker.py"]
     working_dir: /app/modules/backend
     environment:
-      <<: [*database-environment, *assemblyai-policy, *account-policy]
+      <<: [*database-environment, *assemblyai-policy, *account-policy, *groq-policy]
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-dev}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
@@ -153,6 +167,7 @@ services:
       PROVIDER_CREDENTIAL_ENCRYPTION_KEY: ${PROVIDER_CREDENTIAL_ENCRYPTION_KEY:-}
       AAI_API_KEY: ${AAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       MEETING_MINUTES_TIMEOUT_SECONDS: ${MEETING_MINUTES_TIMEOUT_SECONDS:-600}
       AUDIO_UPLOAD_DIRECTORY: ${AUDIO_UPLOAD_DIRECTORY:-database/uploads}

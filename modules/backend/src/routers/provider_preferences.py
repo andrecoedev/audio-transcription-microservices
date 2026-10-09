@@ -24,7 +24,7 @@ router = APIRouter(prefix="/settings/providers", tags=["provider settings"], rou
 class PreferencesInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     transcription_provider: Literal["automatic", "whisper", "assemblyai"]
-    intelligence_provider: Literal["automatic", "gemini"]
+    intelligence_provider: Literal["automatic", "gemini", "groq"]
     use_diarization: bool
 
 
@@ -54,8 +54,8 @@ def save_preferences(body: PreferencesInput, request: Request, db: Session = Dep
     db.query(User).filter_by(id=user.user_id).with_for_update().one()
     if body.transcription_provider == "assemblyai":
         select_provider(db, user, "assemblyai")
-    if body.intelligence_provider == "gemini":
-        select_provider(db, user, "gemini")
+    if body.intelligence_provider != "automatic":
+        select_provider(db, user, body.intelligence_provider)
     row = db.get(UserProviderPreferences, user.user_id)
     if row is None:
         row = UserProviderPreferences(user_id=user.user_id)

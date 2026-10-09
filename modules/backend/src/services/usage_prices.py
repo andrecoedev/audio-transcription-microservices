@@ -21,14 +21,16 @@ def import_prices(db, rows, *, apply=False):
             raise ValueError("Price catalog fields do not match the contract")
         data = dict(row)
         for key, maximum in (("catalog_version", 64), ("provider", 32), ("model", 100), ("metric", 64), ("unit", 32)):
-            if not isinstance(data[key], str) or len(data[key]) > maximum or not re.fullmatch(r"[A-Za-z0-9_.:+-]+", data[key]):
+            pattern = r"[A-Za-z0-9_.:+/-]+" if key == "model" else r"[A-Za-z0-9_.:+-]+"
+            if not isinstance(data[key], str) or len(data[key]) > maximum or not re.fullmatch(pattern, data[key]):
                 raise ValueError("Invalid catalog label")
         if data["metric"] not in _PRICEABLE:
             raise ValueError("Audit-only metric cannot be priced")
-        if data["provider"] not in {"assemblyai", "gemini", "whisper", "object_storage"}:
+        if data["provider"] not in {"assemblyai", "gemini", "groq", "whisper", "object_storage"}:
             raise ValueError("Unsupported pricing provider")
         supported = {"assemblyai": {"provider_audio_seconds"}, "whisper": {"processing_seconds"},
                      "gemini": {"input_uncached_tokens", "output_tokens", "thinking_tokens", "cache_read_tokens", "tool_tokens"},
+                     "groq": {"input_uncached_tokens", "output_tokens", "cache_read_tokens"},
                      "object_storage": set()}
         if data["metric"] not in supported[data["provider"]]:
             raise ValueError("Unsupported provider pricing metric")

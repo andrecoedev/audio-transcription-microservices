@@ -95,6 +95,42 @@ it('shows automatic intelligence as unavailable when Gemini has no eligible cred
   expect(screen.queryByText(/Gemini usa sua própria conta/)).toBeNull()
 })
 
+it('offers Groq only for intelligence when the platform explicitly enables it, without changing automatic Gemini', () => {
+  const { updatePreference } = setup({
+    settings: { providers: {
+      gemini: { available: true, allowed: true, configured: true, credential_source: 'user' },
+      groq: { available: true, allowed: true, configured: true, credential_source: 'platform', platform_access: true, byok_allowed: false },
+    } },
+    preferences: { intelligence_provider: 'groq' },
+  })
+
+  const intelligence = screen.getByLabelText('Resumos inteligentes')
+  expect(Array.from(intelligence.options).map(option => option.value)).toEqual(['automatic', 'gemini', 'groq'])
+  expect(screen.getByLabelText('Como transcrever seu áudio').querySelector('option[value="groq"]')).toBeNull()
+  expect(paragraphContaining('Resumos inteligentes: Gemini')).toBeTruthy()
+  expect(screen.queryByText(/franquia.*Groq|Groq.*franquia/i)).toBeNull()
+
+  fireEvent.change(intelligence, { target: { value: 'groq' } })
+  expect(updatePreference).toHaveBeenCalledWith('intelligence_provider', 'groq')
+  expect(screen.getByRole('status').textContent).toContain('Acesso à Groq disponibilizado pela USAGI.')
+})
+
+it('clearly disables Groq when backend platform access metadata is unavailable', () => {
+  setup({
+    settings: {
+      preferences: { transcription_provider: 'automatic', intelligence_provider: 'groq', use_diarization: false },
+      providers: {
+        groq: { available: true, allowed: false, configured: false, credential_source: 'platform', platform_access: false, byok_allowed: false },
+      },
+    },
+    preferences: { intelligence_provider: 'groq' },
+  })
+
+  expect(screen.getByRole('option', { name: 'Groq (indisponível)' }).disabled).toBe(true)
+  expect(screen.getByText('Groq está indisponível para esta conta no momento.')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Salvar preferências' }).disabled).toBe(true)
+})
+
 it('explains that explicit AssemblyAI uses the USAGI quota when the platform credential is selected', () => {
   setup({
     settings: {

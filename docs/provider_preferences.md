@@ -9,7 +9,8 @@ continuam disponíveis. Veja [planos e reservas](account_plans.md).
 
 Configurações → Serviços de IA / Transcrição salva preferências no PostgreSQL, não no JWT nem em
 localStorage. Transcrição: `automatic`, `whisper`, `assemblyai`. Resumo inteligente:
-`automatic`, `gemini`. Detecção de falantes tem default por conta e override por job.
+`automatic`, `gemini`, `groq`. Groq exige autorização específica e orçamento;
+veja [integração de resumos Groq](groq_intelligence.md). Detecção de falantes tem default por conta e override por job.
 Guest não acessa este contrato: usa apenas um exemplo sintético read-only, sem
 inferência, credencial ou BYOK. Resultados Guest anteriores preservam seus contratos.
 Minha conta consulta os dados persistidos em `/auth/me`;
@@ -44,7 +45,7 @@ Override explícito por job continua válido. Antes de upload/queue:
 - Automático transcrição: AssemblyAI próprio se houver credencial; senão Whisper.
   Não tenta Whisper depois de erro AssemblyAI. Uma credencial existente mas
   indisponível para decriptação não autoriza fallback.
-- Automático Intelligence: Gemini (único suportado atualmente), credencial própria
+- Automático Intelligence: Gemini (escolha preservada, sem fallback), credencial própria
   primeiro; a credencial da plataforma exige capability beta explícita.
 - Origem de cadastro/papel de admin não concedem uso platform. AssemblyAI exige
   capability, reserva/teto global e franquia USAGI configurada.
@@ -55,8 +56,9 @@ Override explícito por job continua válido. Antes de upload/queue:
 Job/revisão guardam provider, credential_source, credential_id e usuário da
 credencial, nunca secret. Redis recebe só ID do job. Worker decripta envelope
 vinculado ao usuário/provider e instancia client próprio dentro do work horse;
-não reutiliza client platform para BYOK. Gemini SDK legado permanece, sem novo
-provider ou migração SDK. Processos filhos supervisionados isolam os clients por job.
+não reutiliza client platform para BYOK. Gemini SDK legado permanece sem migração.
+Groq usa adapter HTTPX separado, somente plataforma explicitamente autorizada.
+Processos filhos supervisionados isolam os clients por job.
 Grounding, schema/revisões e revisão humana P3 não mudam.
 
 Substituição cria novo ID e elimina ciphertext anterior; jobs pendentes não adotam

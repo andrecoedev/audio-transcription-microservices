@@ -72,6 +72,10 @@ Preferências e dados existentes são preservados; veja [planos e reservas](docs
 [providers](docs/provider_preferences.md)
 e [Guest, contas e limites](docs/guest_and_accounts.md).
 
+Groq é uma opção explícita para resumos, desabilitada por padrão e sujeita a
+permissão beta específica, limites e orçamento. Não processa áudio nem substitui
+Gemini automaticamente. Veja [configuração e limites Groq](docs/groq_intelligence.md).
+
 ## Fluxos oficiais
 
 - POST /transcriptions/jobs → status → GET /transcriptions/{id}.

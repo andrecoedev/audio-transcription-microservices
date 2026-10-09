@@ -228,7 +228,7 @@ class UserProviderPreferences(Base):
     __tablename__ = "user_provider_preferences"
     __table_args__ = (
         CheckConstraint("transcription_provider IN ('automatic', 'whisper', 'assemblyai')", name="ck_preferences_transcription"),
-        CheckConstraint("intelligence_provider IN ('automatic', 'gemini')", name="ck_preferences_intelligence"),
+        CheckConstraint("intelligence_provider IN ('automatic', 'gemini', 'groq')", name="ck_preferences_intelligence"),
     )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     transcription_provider = Column(String(32), nullable=False, default="automatic", server_default="automatic")
@@ -555,6 +555,26 @@ class MeetingIntelligence(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     meeting = relationship("Meeting", back_populates="intelligence_revisions")
+
+
+class IntelligencePlatformCall(Base):
+    """Durable platform hold/no-repeat marker, retained after result deletion."""
+
+    __tablename__ = "intelligence_platform_calls"
+    __table_args__ = (
+        CheckConstraint("reserved_cents > 0 AND input_token_bound > 0 AND output_token_limit > 0", name="ck_intelligence_call_amounts"),
+        CheckConstraint("state IN ('reserved', 'attempted')", name="ck_intelligence_call_state"),
+    )
+    id = Column(String(36), primary_key=True)
+    intelligence_id = Column(Integer, ForeignKey("meeting_intelligence.id", ondelete="SET NULL"), unique=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    provider = Column(String(32), ForeignKey("platform_provider_budgets.provider", ondelete="RESTRICT"), nullable=False)
+    model = Column(String(100), nullable=False)
+    reserved_cents = Column(Integer, nullable=False)
+    input_token_bound = Column(Integer, nullable=False)
+    output_token_limit = Column(Integer, nullable=False)
+    state = Column(String(16), nullable=False, default="reserved", server_default="reserved")
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class UsagePrice(Base):

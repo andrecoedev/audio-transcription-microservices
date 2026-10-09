@@ -197,6 +197,7 @@ function capabilityName(capability) {
     'transcription.platform': 'Transcrição fornecida pela USAGI',
     'intelligence.byok': 'Resumos com sua conta',
     'intelligence.platform': 'Resumos fornecidos pela USAGI',
+    'intelligence.groq.platform': 'Resumos com Groq fornecidos pela USAGI',
   })[capability] || 'Permissão adicional'
 }
 

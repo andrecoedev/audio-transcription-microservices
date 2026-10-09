@@ -4,6 +4,7 @@ import os
 import re
 from pathlib import Path
 from typing import Literal, Optional
+from decimal import Decimal
 
 from .utils.upload_formats import DEFAULT_ALLOWED_EXTENSIONS, SUPPORTED_UPLOAD_EXTENSIONS
 
@@ -31,6 +32,20 @@ class Settings(BaseSettings):
     HF_TOKEN: Optional[str] = Field(default=None, description="Hugging Face API Token")
     AAI_API_KEY: Optional[str] = Field(default=None, description="AssemblyAI API Key")
     GEMINI_API_KEY: Optional[str] = Field(default=None, description="Google Gemini API Key")
+    GROQ_API_KEY: Optional[str] = Field(default=None, repr=False)
+    GROQ_API_KEY_CONFIGURED: bool = False
+    GROQ_PLATFORM_ENABLED: bool = False
+    GROQ_PLATFORM_BUDGET_CENTS: int = Field(default=0, ge=0, le=100000)
+    GROQ_MODEL: Literal["openai/gpt-oss-20b"] = "openai/gpt-oss-20b"
+    GROQ_TIMEOUT_SECONDS: int = Field(default=60, ge=1, le=180)
+    GROQ_MAX_INPUT_CHARACTERS: int = Field(default=20000, ge=1, le=200000)
+    GROQ_MAX_INPUT_TOKENS: int = Field(default=32000, ge=1, le=100000)
+    GROQ_MAX_OUTPUT_TOKENS: int = Field(default=4096, ge=1, le=16384)
+    GROQ_MAX_ACTIVE_PER_USER: int = Field(default=0, ge=0, le=100)
+    GROQ_MAX_PROCESSING_PER_USER: int = Field(default=0, ge=0, le=10)
+    # Operator-reviewed USD rate ceilings; zero disables platform admission.
+    GROQ_INPUT_USD_PER_MILLION: Decimal = Field(default=Decimal(0), ge=0, le=100)
+    GROQ_OUTPUT_USD_PER_MILLION: Decimal = Field(default=Decimal(0), ge=0, le=100)
     HF_TOKEN_CONFIGURED: bool = Field(default=False)
     AAI_API_KEY_CONFIGURED: bool = Field(default=False)
     PROVIDER_CREDENTIAL_ENCRYPTION_KEY: Optional[str] = Field(default=None, repr=False)

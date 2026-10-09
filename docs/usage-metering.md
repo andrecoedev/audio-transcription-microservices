@@ -57,6 +57,13 @@ Official semantic references (reviewed 2026-10-07):
 
 ## Ledger, attribution and idempotency
 
+Groq summaries additionally report real Chat Completions usage when returned:
+prompt/completion/total and optional cache/reasoning details. Reasoning is a
+subset of completion, never a second price. Missing fields stay null; versioned
+operator rates and a separate cumulative authorization budget are documented
+in [Groq intelligence](groq_intelligence.md). Private provider filters accept Groq;
+this does not grant processing permissions or add monthly summary allowances.
+
 Migration `20261007_0012` is additive: `usage_events`, `usage_prices` and nullable
 attempt IDs on existing jobs/revisions. Downgrade refuses to discard populated
 usage/pricing history. Never run it against the project database merely to test it.

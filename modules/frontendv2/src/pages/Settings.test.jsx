@@ -91,6 +91,19 @@ describe('Settings', () => {
     expect(screen.getByRole('tooltip').textContent).toContain('criptografadas e nunca voltam à interface')
   })
 
+  it('offers platform Groq for intelligence without adding a Groq credential form', async () => {
+    audioService.getProviderSettings.mockResolvedValue(settings({ providers: {
+      ...settings().providers,
+      groq: { available: true, allowed: true, configured: true, credential_source: 'platform', platform_access: true, byok_allowed: false },
+    } }))
+    renderSettings()
+
+    const intelligence = await screen.findByLabelText('Resumos inteligentes')
+    expect(intelligence.querySelector('option[value="groq"]')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Groq' })).toBeNull()
+    expect(screen.queryByLabelText('Credencial Groq')).toBeNull()
+  })
+
   it('keeps operational health diagnostics available but collapsed by default', async () => {
     renderSettings()
     await screen.findByText('Resumos via Gemini')

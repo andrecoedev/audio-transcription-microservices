@@ -51,7 +51,10 @@ Rotas exigem usuário interno ativo com `is_superuser` verificado no banco:
 - `DELETE /admin/accounts/{user_id}/beta/{grant_id}`: revogação idempotente.
 
 Capabilities: `transcription.byok`, `transcription.local`, `transcription.platform`,
-`intelligence.byok`, `intelligence.platform`. Uma concessão ativa por conta;
+`intelligence.byok`, `intelligence.platform`, `intelligence.groq.platform`.
+Groq exige esta última capability específica e seus limites/orçamento próprios,
+sem habilitação automática para Starter ou grants Gemini. Veja [Groq](groq_intelligence.md).
+Uma concessão ativa por conta;
 revogar antes de substituir. Enquanto ativa, usa limites configurados em `beta`.
 Expiração/revogação bloqueia novas chamadas, inclusive trabalho já enfileirado
 mas ainda sem inferência. Não cancela uma chamada já autorizada/em andamento.
