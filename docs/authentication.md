@@ -166,6 +166,9 @@ entrar novamente. Downgrade exige ausência de vínculos e usuários sem senha:
 não remova identidades para forçar rollback. Faça backup e planeje a reversão
 antes de uma implantação real.
 
+Para preparar Google Sign-In e distinguir configuração manual de validação
+automatizada, consulte [ativação e homologação Firebase Google](firebase_google_setup.md).
+
 O SDK Firebase Web traz dependências de produtos não usados pelo app. A override
 de `@grpc/grpc-js` para `1.13.6` corrige advisories transitivos da cadeia Node
 Firestore; o frontend importa somente `firebase/app` e `firebase/auth`. Não há
