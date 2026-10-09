@@ -7,13 +7,18 @@ import { useAuthStore } from '../stores/authStore'
 import { firebaseAuth } from '../services/firebaseAuth'
 
 vi.mock('../services/authService', () => ({ authService: { signup: vi.fn(), login: vi.fn(), getConfig: vi.fn(), firebaseLogin: vi.fn() } }))
-vi.mock('../services/firebaseAuth', () => ({ firebaseAuth: { isConfigured: vi.fn(), projectId: vi.fn(), signInWithGoogle: vi.fn(), signOut: vi.fn() } }))
+vi.mock('../services/firebaseAuth', () => ({ firebaseAuth: {
+  isConfigured: vi.fn(), projectId: vi.fn(), signInWithGoogle: vi.fn(), signOut: vi.fn(),
+  signInWithEmail: vi.fn(), createWithEmail: vi.fn(), resendVerification: vi.fn(),
+  refreshVerification: vi.fn(), resetPassword: vi.fn(), getEmailVerificationState: vi.fn(),
+} }))
 
 beforeEach(() => {
   vi.resetAllMocks()
-  authService.getConfig.mockResolvedValue({ firebase_enabled: false, firebase_project_id: null, local_signup_enabled: true })
+  authService.getConfig.mockResolvedValue({ firebase_enabled: false, firebase_project_id: null, firebase_password_enabled: false, local_signup_enabled: true })
   firebaseAuth.isConfigured.mockReturnValue(false)
   firebaseAuth.projectId.mockReturnValue(null)
+  firebaseAuth.getEmailVerificationState.mockResolvedValue(null)
   useAuthStore.setState({ setSession: vi.fn(), setFirebaseSession: vi.fn() })
 })
 afterEach(cleanup)
@@ -118,5 +123,205 @@ describe('Login', () => {
     render(<MemoryRouter><Login /></MemoryRouter>)
     await waitFor(() => expect(screen.queryByRole('link', { name: /criar uma conta/i })).toBeNull())
     expect(screen.queryByRole('link', { name: /criar uma conta/i })).toBeNull()
+  })
+
+  it('uses Firebase email login as the primary flow only when both configs match and returns to the requested page', async () => {
+    const setFirebaseSession = vi.fn()
+    useAuthStore.setState({ setFirebaseSession })
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true, local_signup_enabled: true })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    firebaseAuth.signInWithEmail.mockResolvedValue({ verified: true, token: 'email-id-token' })
+    authService.firebaseLogin.mockResolvedValue({ user: { id: 42, auth_provider: 'firebase' } })
+    render(<MemoryRouter initialEntries={['/login?returnTo=%2Fhistory%3Fpage%3D2&saveGuest=1']}><Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/history" element={<p>History</p>} />
+    </Routes></MemoryRouter>)
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'user@example.test' } })
+    const passwordInput = screen.getByLabelText('Senha')
+    fireEvent.change(passwordInput, { target: { value: 'private-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar com e-mail' }))
+    expect(await screen.findByText('History')).toBeTruthy()
+    expect(firebaseAuth.signInWithEmail).toHaveBeenCalledWith('user@example.test', 'private-password')
+    expect(authService.firebaseLogin).toHaveBeenCalledWith('email-id-token')
+    expect(setFirebaseSession).toHaveBeenCalledWith({ id: 42, auth_provider: 'firebase' })
+    expect(passwordInput.value).toBe('')
+    expect(screen.queryByLabelText('Usuário')).toBeNull()
+  })
+
+  it('keeps unverified email registration pending without exchanging a token or setting a session', async () => {
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true, local_signup_enabled: false })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    firebaseAuth.createWithEmail.mockResolvedValue({ verified: false, token: null })
+    render(<MemoryRouter initialEntries={['/signup?returnTo=%2Fhistory&saveGuest=1']}><Routes>
+      <Route path="/signup" element={<Login signup />} />
+      <Route path="/history" element={<p>History</p>} />
+    </Routes></MemoryRouter>)
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'new@example.test' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'a long password 123' } })
+    fireEvent.change(screen.getByLabelText('Confirme a senha'), { target: { value: 'a long password 123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta com e-mail' }))
+    expect(await screen.findByRole('heading', { name: 'Confirme seu e-mail' })).toBeTruthy()
+    expect(screen.getByText('Confirme new@example.test pelo link enviado para acessar sua conta.')).toBeTruthy()
+    expect(firebaseAuth.createWithEmail).toHaveBeenCalledWith('new@example.test', 'a long password 123')
+    expect(authService.firebaseLogin).not.toHaveBeenCalled()
+    expect(useAuthStore.getState().setFirebaseSession).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /Enviar outro link em 60s/ }).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar e voltar' }))
+    expect(await screen.findByLabelText('Senha')).toBeTruthy()
+    expect(screen.getByLabelText('Senha').value).toBe('')
+    expect(firebaseAuth.signOut).toHaveBeenCalledOnce()
+  })
+
+  it('exchanges a fresh token only after email verification is confirmed', async () => {
+    const setFirebaseSession = vi.fn()
+    useAuthStore.setState({ setFirebaseSession })
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    firebaseAuth.createWithEmail.mockResolvedValue({ verified: false, token: null })
+    firebaseAuth.refreshVerification.mockResolvedValue({ verified: true, token: 'fresh-id-token' })
+    authService.firebaseLogin.mockResolvedValue({ user: { id: 7 } })
+    render(<MemoryRouter initialEntries={['/signup?returnTo=%2Fhistory']}><Routes>
+      <Route path="/signup" element={<Login signup />} />
+      <Route path="/history" element={<p>History</p>} />
+    </Routes></MemoryRouter>)
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'new@example.test' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'a long password 123' } })
+    fireEvent.change(screen.getByLabelText('Confirme a senha'), { target: { value: 'a long password 123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta com e-mail' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Já confirmei meu e-mail' }))
+    expect(await screen.findByText('History')).toBeTruthy()
+    expect(firebaseAuth.refreshVerification).toHaveBeenCalledOnce()
+    expect(authService.firebaseLogin).toHaveBeenCalledWith('fresh-id-token')
+    expect(setFirebaseSession).toHaveBeenCalledWith({ id: 7 })
+  })
+
+  it('restores an unverified Firebase session after reload without admitting it', async () => {
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    firebaseAuth.getEmailVerificationState.mockResolvedValue({ verified: false, token: null })
+    render(<MemoryRouter><Login /></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'Confirme seu e-mail' })).toBeTruthy()
+    expect(firebaseAuth.getEmailVerificationState).toHaveBeenCalledOnce()
+    expect(authService.firebaseLogin).not.toHaveBeenCalled()
+    expect(useAuthStore.getState().setFirebaseSession).not.toHaveBeenCalled()
+  })
+
+  it('does not claim to send a verification email during an unverified email login', async () => {
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    firebaseAuth.signInWithEmail.mockResolvedValue({ verified: false, token: null })
+    render(<MemoryRouter><Login /></MemoryRouter>)
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar com e-mail' }))
+    const notice = await screen.findByRole('status')
+    expect(notice.textContent).toContain('Confirme o endereço pelo link de verificação')
+    expect(notice.textContent).not.toContain('Enviamos')
+    expect(firebaseAuth.resendVerification).not.toHaveBeenCalled()
+    expect(authService.firebaseLogin).not.toHaveBeenCalled()
+  })
+
+  it('reports failed Firebase sign-out cleanup after a terminal email login error', async () => {
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    firebaseAuth.signInWithEmail.mockRejectedValue({ code: 'auth/invalid-credential' })
+    firebaseAuth.signOut.mockRejectedValue(new Error('private cleanup detail'))
+    render(<MemoryRouter><Login /></MemoryRouter>)
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar com e-mail' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('nem encerrar a sessão pendente')
+    expect(alert.textContent).not.toContain('private cleanup detail')
+  })
+
+  it('reports failed Firebase sign-out cleanup after verification refresh fails', async () => {
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    firebaseAuth.createWithEmail.mockResolvedValue({ verified: false, token: null })
+    firebaseAuth.refreshVerification.mockRejectedValue({ code: 'auth/network-request-failed' })
+    firebaseAuth.signOut.mockRejectedValue(new Error('private cleanup detail'))
+    render(<MemoryRouter><Login signup /></MemoryRouter>)
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'a long password 123' } })
+    fireEvent.change(screen.getByLabelText('Confirme a senha'), { target: { value: 'a long password 123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta com e-mail' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Já confirmei meu e-mail' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('nem encerrar a sessão pendente')
+    expect(alert.textContent).not.toContain('private cleanup detail')
+    expect(screen.getByRole('button', { name: 'Cancelar e voltar' })).toBeTruthy()
+  })
+
+  it('explains that Firebase password policy can exceed the 12 character baseline', async () => {
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    firebaseAuth.createWithEmail.mockRejectedValue({ code: 'auth/weak-password' })
+    render(<MemoryRouter><Login signup /></MemoryRouter>)
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'a long password 123' } })
+    fireEvent.change(screen.getByLabelText('Confirme a senha'), { target: { value: 'a long password 123' } })
+    expect(screen.getByText(/ao menos 12 caracteres; a política de segurança pode exigir outros critérios/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta com e-mail' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('a política de segurança pode exigir outros critérios')
+  })
+
+  it('validates signup password confirmation and exposes a generic recovery success', async () => {
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    render(<MemoryRouter initialEntries={['/signup?returnTo=%2Fhistory&saveGuest=1']}><Routes>
+      <Route path="/signup" element={<Login signup />} />
+      <Route path="/login" element={<Login />} />
+    </Routes></MemoryRouter>)
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'person@example.test' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'a long password 123' } })
+    fireEvent.change(screen.getByLabelText('Confirme a senha'), { target: { value: 'different password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta com e-mail' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('As senhas não coincidem.')
+    expect(firebaseAuth.createWithEmail).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar com usuário e senha (conta local)' }))
+    expect(await screen.findByLabelText('Usuário')).toBeTruthy()
+  })
+
+  it('uses a generic recovery success message and keeps auth return query intact', async () => {
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    firebaseAuth.resetPassword.mockResolvedValue(undefined)
+    render(<MemoryRouter initialEntries={['/login?returnTo=%2Fhistory&saveGuest=1']}><Routes>
+      <Route path="/login" element={<Login />} />
+    </Routes></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Esqueci minha senha' }))
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'unknown@example.test' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar instruções' }))
+    expect((await screen.findByRole('status')).textContent).toContain('Se houver uma conta para este e-mail')
+    expect(firebaseAuth.resetPassword).toHaveBeenCalledWith('unknown@example.test')
+  })
+
+  it('shows the local account migration path after a Firebase backend conflict', async () => {
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'public-project', firebase_password_enabled: true, local_signup_enabled: true })
+    firebaseAuth.isConfigured.mockReturnValue(true)
+    firebaseAuth.projectId.mockReturnValue('public-project')
+    firebaseAuth.signInWithEmail.mockResolvedValue({ verified: true, token: 'email-id-token' })
+    authService.firebaseLogin.mockRejectedValue({ status: 409, message: 'private backend detail' })
+    render(<MemoryRouter><Login /></MemoryRouter>)
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'local@example.test' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'private-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar com e-mail' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('Entre com seu usuário e senha')
+    expect(screen.getByRole('alert').textContent).toContain('migre a conta para o acesso por e-mail')
+    expect(screen.queryByText('private backend detail')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Entrar com usuário e senha (conta local)' })).toBeTruthy()
+    expect(firebaseAuth.signOut).toHaveBeenCalled()
   })
 })
