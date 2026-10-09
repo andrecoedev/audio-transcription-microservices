@@ -17,7 +17,7 @@ function firebaseErrorMessage(error, action) {
     'auth/invalid-credential': 'E-mail ou senha inválidos.',
     'auth/invalid-email': 'Informe um e-mail válido.',
     'auth/email-already-in-use': 'Este e-mail já está em uso.',
-    'auth/weak-password': 'Escolha uma senha com pelo menos 12 caracteres.',
+    'auth/weak-password': 'Use ao menos 12 caracteres; a política de segurança pode exigir outros critérios.',
     'auth/too-many-requests': 'Muitas tentativas. Aguarde e tente novamente.',
     'auth/network-request-failed': 'Não foi possível conectar. Verifique sua conexão e tente novamente.',
     'auth/account-changed': 'A conta mudou. Entre novamente para continuar.',
@@ -151,7 +151,7 @@ export default function Login({ signup = false }) {
       return
     }
     if (isFirebaseSignup && password.length < PASSWORD_MIN_LENGTH) {
-      setError('Use uma senha com pelo menos 12 caracteres.')
+      setError('Use ao menos 12 caracteres; a política de segurança pode exigir outros critérios.')
       setPassword('')
       return
     }
@@ -173,13 +173,19 @@ export default function Login({ signup = false }) {
       if (!result.verified) {
         setVerificationPending(true)
         setResendAvailableAt(Date.now() + VERIFICATION_RESEND_SECONDS * 1000)
-        setNotice('Enviamos um link de confirmação para seu e-mail. Confirme o endereço para continuar.')
+        setNotice(isFirebaseSignup
+          ? 'Enviamos um link de confirmação para seu e-mail. Confirme o endereço para continuar.'
+          : 'Confirme o endereço pelo link de verificação. Se necessário, solicite outro envio.')
         return
       }
       await completeFirebaseLogin(result.token)
     } catch (failure) {
-      try { await firebaseAuth.signOut() } catch { /* Keep the public error message stable. */ }
-      setError(firebaseErrorMessage(failure))
+      try {
+        await firebaseAuth.signOut()
+        setError(firebaseErrorMessage(failure))
+      } catch {
+        setError('Não foi possível concluir a autenticação nem encerrar a sessão pendente. Tente novamente ou cancele a sessão antes de entrar.')
+      }
     } finally {
       setPassword('')
       setConfirmPassword('')
@@ -199,9 +205,13 @@ export default function Login({ signup = false }) {
       await completeFirebaseLogin(result.token)
       setVerificationPending(false)
     } catch (failure) {
-      try { await firebaseAuth.signOut() } catch { /* Keep the public error message stable. */ }
-      setVerificationPending(false)
-      setError(firebaseErrorMessage(failure))
+      try {
+        await firebaseAuth.signOut()
+        setVerificationPending(false)
+        setError(firebaseErrorMessage(failure))
+      } catch {
+        setError('Não foi possível atualizar a confirmação nem encerrar a sessão pendente. Tente novamente ou cancele a sessão antes de entrar.')
+      }
     } finally {
       setLoading(false)
     }
@@ -353,7 +363,7 @@ export default function Login({ signup = false }) {
                     <input id="firebase-password-confirm" autoComplete="new-password" type="password" className="input mt-2" required minLength={PASSWORD_MIN_LENGTH}
                       value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
                   </label>
-                  <p className="text-xs text-gray-500">Use uma senha com pelo menos 12 caracteres.</p>
+                  <p className="text-xs text-gray-500">Use ao menos 12 caracteres; a política de segurança pode exigir outros critérios.</p>
                 </>}
                 <Button type="submit" className="w-full" loading={loading}>{isFirebaseSignup ? 'Criar conta com e-mail' : 'Entrar com e-mail'}</Button>
               </form>
