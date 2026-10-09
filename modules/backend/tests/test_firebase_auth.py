@@ -272,11 +272,28 @@ def test_new_firebase_user_cannot_access_existing_account_preferences(db_context
     internal_id = response.json()['user']['id']
     monkeypatch.setattr(firebase_identity, 'verify_firebase_token', lambda _token: _identity())
     headers = {'Authorization': 'Bearer synthetic-id-proof'}
+    db = db_context['session_factory']()
+    try:
+        firebase_user = db.get(User, internal_id)
+        firebase_user.plan = 'starter'
+        db.commit()
+    finally:
+        db.close()
+    repeated_login = db_context['client'].post('/auth/firebase', headers=headers)
+    assert repeated_login.status_code == 200
+    assert repeated_login.json()['user']['id'] == internal_id
+    plan_response = db_context['client'].get('/account/plan', headers=headers)
+    assert plan_response.status_code == 200
+    assert plan_response.json()['plan'] == 'starter'
     settings_response = db_context['client'].get('/settings/providers', headers=headers)
     assert settings_response.status_code == 200
     assert settings_response.json()['credentials']['gemini']['configured'] is False
     assert internal_id not in (1, 2)
     assert db_context['client'].get(f'/transcriptions/{resource_id}', headers=headers).status_code == 404
+    with db_context['session_factory']() as check:
+        assert check.query(TranscriptionOwnership).filter_by(
+            transcription_id=resource_id, user_id=internal_id
+        ).count() == 0
     assert db_context['client'].get('/settings/providers', headers=auth_headers()).json()['credentials']['gemini']['configured'] is True
 
 
@@ -288,6 +305,78 @@ def test_signup_disabled_only_when_google_enabled(db_context, monkeypatch):
     assert result.status_code == 409
     monkeypatch.setattr(settings, 'FIREBASE_AUTH_ENABLED', False)
     assert db_context['client'].get('/auth/config').json()['local_signup_enabled'] is True
+
+
+def test_disabled_firebase_configuration_hides_project_and_fails_closed(db_context, monkeypatch):
+    monkeypatch.setattr(settings, 'FIREBASE_AUTH_ENABLED', False)
+    monkeypatch.setattr(firebase_identity, '_verify_with_sdk', lambda _token: pytest.fail('must fail closed'))
+
+    config = db_context['client'].get('/auth/config').json()
+    assert config['firebase_enabled'] is False
+    assert config['firebase_project_id'] is None
+    assert config['local_signup_enabled'] is True
+    response = db_context['client'].post('/auth/firebase', headers={
+        'Authorization': 'Bearer synthetic-valid-token',
+    })
+    assert response.status_code == 503
+
+
+def test_link_failures_preserve_existing_identity_and_account_data(db_context, monkeypatch):
+    db = db_context['session_factory']()
+    user = db.get(User, 1)
+    user.hashed_password = get_password_hash('synthetic-local-password')
+    original_email = user.email
+    original_username = user.username
+    original_hash = user.hashed_password
+    db.commit()
+    db.close()
+    local_token = create_access_token({'sub': '1', 'username': 'alice', 'scopes': [], 'roles': []})
+    headers = {'Authorization': f'Bearer {local_token}'}
+
+    wrong_password = db_context['client'].post('/auth/firebase/link', headers=headers, json={
+        'id_token': 'synthetic-id-token', 'password': 'incorrect-password',
+    })
+    assert wrong_password.status_code == 401
+
+    monkeypatch.setattr(auth, 'verify_firebase_token', lambda _token: _identity(auth_time=int(time.time()) - 301))
+    expired_google_proof = db_context['client'].post('/auth/firebase/link', headers=headers, json={
+        'id_token': 'synthetic-id-token', 'password': 'synthetic-local-password',
+    })
+    assert expired_google_proof.status_code == 401
+
+    check = db_context['session_factory']()
+    try:
+        unchanged_user = check.get(User, 1)
+        assert unchanged_user.email == original_email
+        assert unchanged_user.username == original_username
+        assert unchanged_user.hashed_password == original_hash
+        assert check.query(FirebaseIdentity).count() == 0
+        assert check.query(AuditEvent).filter_by(event='user.identity_linked', actor_user_id=1).count() == 0
+    finally:
+        check.close()
+
+
+def test_google_uid_linked_to_another_user_cannot_be_reassigned(db_context, monkeypatch):
+    db = db_context['session_factory']()
+    db.get(User, 1).hashed_password = get_password_hash('synthetic-local-password')
+    db.add(FirebaseIdentity(project_id=PROJECT, uid='already-bound-google-uid', user_id=2))
+    db.commit()
+    db.close()
+    monkeypatch.setattr(auth, 'verify_firebase_token', lambda _token: _identity('already-bound-google-uid'))
+    local_token = create_access_token({'sub': '1', 'username': 'alice', 'scopes': [], 'roles': []})
+
+    response = db_context['client'].post('/auth/firebase/link',
+        headers={'Authorization': f'Bearer {local_token}'},
+        json={'id_token': 'synthetic-id-token', 'password': 'synthetic-local-password'})
+
+    assert response.status_code == 409
+    check = db_context['session_factory']()
+    try:
+        assert check.get(FirebaseIdentity, (PROJECT, 'already-bound-google-uid')).user_id == 2
+        assert check.query(FirebaseIdentity).count() == 1
+        assert check.query(AuditEvent).filter_by(event='user.identity_linked').count() == 0
+    finally:
+        check.close()
 
 
 def test_emulator_configuration_is_rejected_before_verification(monkeypatch):
