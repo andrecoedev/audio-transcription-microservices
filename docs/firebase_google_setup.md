@@ -71,6 +71,25 @@ uma montagem de diretório para contornar sua ausência. Após a preparação:
 docker compose -p usagidev --env-file modules/backend/.env --env-file .env.firebase.local -f compose.yaml -f modules/backend/docker-compose.firebase.yml up -d --no-deps api
 ```
 
+**Recriações posteriores:** executar apenas o Compose base pode remover o
+mount ADC e deixar a flag ativa sem credenciais. Use sempre o comando completo
+acima. Para o comando usual `docker compose up` no Windows, é possível configurar
+no `.env` local ignorado da raiz `COMPOSE_FILE=compose.yaml;modules/backend/docker-compose.firebase.yml`
+e `COMPOSE_PROJECT_NAME=usagidev`, junto do caminho privado, flag e projeto
+Firebase públicos. Essa configuração local foi validada nesta execução, sem
+alterar o ambiente global. Não sobrescreva um `.env` existente. Ao fornecer
+`--env-file` ou `-f` explicitamente, preserve todos os arquivos necessários:
+essas opções podem substituir a seleção local padrão.
+
+Durante a tentativa interativa reportada pelo operador, a API foi encontrada
+recriada sem overlay e ADC. A montagem foi restaurada e o comando Compose
+padrão foi validado com a configuração local acima. Consultas Auth config e
+Google provider responderam 200: Google habilitado, cliente OAuth configurado
+e `localhost` autorizado. A primeira tentativa Google apresentou erro genérico;
+não foi confirmado sucesso após a restauração. Um redirecionamento HTTP 302
+observado pelo operador não identifica a falha de autenticação. Não atribuir
+definitivamente o erro do popup à ADC sem evidência da requisição correspondente.
+
 Em ambientes com ADC gerenciado, use o mecanismo aprovado daquele ambiente,
 sem copiar uma chave para o frontend ou Worker. O overlay local não é uma
 prescrição para produção.
