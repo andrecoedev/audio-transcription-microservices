@@ -4,12 +4,14 @@ import AccountSettings from './AccountSettings'
 import { authService } from '../services/authService'
 import { useAuthStore } from '../stores/authStore'
 
-vi.mock('../services/authService', () => ({ authService: { me: vi.fn() } }))
+vi.mock('../services/authService', () => ({ authService: { me: vi.fn(), getConfig: vi.fn() } }))
 vi.mock('./GoogleAccountLink', () => ({ default: () => <div>Vínculo Google</div> }))
+vi.mock('./LegacyFirebaseMigration', () => ({ default: () => <div>Migração do acesso</div> }))
 
 const account = { id: 7, username: 'conta-teste', display_name: 'Nome da conta', email: 'conta@example.test', auth_provider: 'local' }
 beforeEach(() => {
   vi.resetAllMocks()
+  authService.getConfig.mockResolvedValue({ firebase_enabled: false })
   useAuthStore.setState({ user: { id: 7, name: 'Nome somente no navegador' }, authProvider: 'local' })
   authService.me.mockResolvedValue({ authenticated: true, user: account })
 })
@@ -33,6 +35,14 @@ it('offers Google security management only for the verified Google sign-in metho
   expect(await screen.findByText('Gerenciada pelo Google')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'Gerenciar no Google' }).getAttribute('href')).toBe('https://myaccount.google.com/security')
   expect(screen.queryByRole('textbox')).toBeNull()
+})
+
+it('does not infer Google management when the backend identifies password sign-in', async () => {
+  authService.me.mockResolvedValue({ authenticated: true, user: { ...account, auth_provider: 'firebase', firebase_sign_in_provider: 'password' } })
+  render(<AccountSettings />)
+  expect(await screen.findByText('Gerenciada pelo Firebase')).toBeTruthy()
+  expect(screen.queryByText('Gerenciada pelo Google')).toBeNull()
+  expect(screen.queryByRole('link', { name: 'Gerenciar no Google' })).toBeNull()
 })
 
 it('does not fetch private account data for Guest', () => {

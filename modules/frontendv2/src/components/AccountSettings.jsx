@@ -4,6 +4,8 @@ import { useAuthStore } from '../stores/authStore'
 import Button from './Button'
 import HelpPopover from './HelpPopover'
 import GoogleAccountLink from './GoogleAccountLink'
+import FirebaseAccountMethods from './FirebaseAccountMethods'
+import LegacyFirebaseMigration from './LegacyFirebaseMigration'
 
 export default function AccountSettings() {
   const userId = useAuthStore(state => state.user?.id)
@@ -29,7 +31,10 @@ export default function AccountSettings() {
     <Button variant="outline" size="sm" onClick={() => setAttempt(value => value + 1)}>Tentar novamente</Button>
   </div>
   if (!account || account.id !== userId) return <p role="status" className="text-sm text-gray-600">Carregando conta…</p>
-  const google = account.auth_provider === 'firebase'
+  const signInProvider = account.firebase_sign_in_provider
+    ?? (account.auth_provider === 'firebase' ? 'google.com' : null)
+  const firebaseAccount = account.auth_provider === 'firebase'
+  const google = firebaseAccount && signInProvider === 'google.com'
   return <div className="space-y-3">
     <dl className="grid gap-3 sm:grid-cols-2 text-sm">
       <div><dt className="text-gray-500">Nome</dt><dd className="mt-1 break-words font-medium text-gray-900">{account.display_name || account.username}</dd></div>
@@ -38,10 +43,14 @@ export default function AccountSettings() {
     <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
       <span>Senha</span><HelpPopover label="Senha">{google
         ? 'Você entra pelo Google. Gerencie a senha e a segurança na sua conta Google.'
+        : firebaseAccount
+          ? 'Esta conta usa acesso Firebase. Os métodos disponíveis aparecem abaixo e permanecem vinculados à mesma conta.'
         : 'Esta conta usa a senha USAGI existente. Alteração e redefinição de senha ainda não estão disponíveis nesta versão.'}</HelpPopover>
-      <span className="text-gray-600">{google ? 'Gerenciada pelo Google' : 'Alteração não disponível'}</span>
+      <span className="text-gray-600">{google ? 'Gerenciada pelo Google' : firebaseAccount ? 'Gerenciada pelo Firebase' : 'Alteração não disponível'}</span>
       {google && <a className="font-medium text-primary-800 underline" href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer">Gerenciar no Google</a>}
     </div>
-    <GoogleAccountLink />
+    {firebaseAccount
+      ? <FirebaseAccountMethods account={account} onUpdated={() => setAttempt(value => value + 1)} />
+      : <><GoogleAccountLink /><LegacyFirebaseMigration /></>}
   </div>
 }
