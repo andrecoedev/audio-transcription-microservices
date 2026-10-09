@@ -13,7 +13,7 @@ vi.mock('../services/firebaseAuth', () => ({
   },
 }))
 
-const account = { id: 7, email: 'account@example.test' }
+const account = { id: 7, email: 'profile@example.test', firebase_email: 'access@example.test' }
 const enabledConfig = { firebase_enabled: true, firebase_project_id: 'project-test', firebase_password_enabled: true }
 
 beforeEach(() => {
@@ -31,7 +31,7 @@ it('sends password reset for the account email and gives the same generic confir
   render(<FirebaseAccountMethods account={account} />)
   fireEvent.click(await screen.findByRole('button', { name: 'Redefinir senha' }))
   expect((await screen.findByRole('status')).textContent).toContain('Se este e-mail puder redefinir uma senha')
-  expect(firebaseAuth.resetPassword).toHaveBeenCalledWith(account.email)
+  expect(firebaseAuth.resetPassword).toHaveBeenCalledWith(account.firebase_email)
 })
 
 it('validates and links a password to the current Firebase user, then clears both fields', async () => {
@@ -41,7 +41,7 @@ it('validates and links a password to the current Firebase user, then clears bot
   fireEvent.change(password, { target: { value: 'a-long-private-password' } })
   fireEvent.change(confirmation, { target: { value: 'a-long-private-password' } })
   fireEvent.click(screen.getByRole('button', { name: 'Adicionar senha' }))
-  await waitFor(() => expect(firebaseAuth.linkPassword).toHaveBeenCalledWith(account.email, 'a-long-private-password'))
+  await waitFor(() => expect(firebaseAuth.linkPassword).toHaveBeenCalledWith(account.firebase_email, 'a-long-private-password'))
   expect(firebaseAuth.validatePassword).toHaveBeenCalledWith('a-long-private-password')
   expect((await screen.findByRole('status')).textContent).toContain('Senha conectada a esta conta')
   expect(password.value).toBe('')

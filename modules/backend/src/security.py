@@ -38,6 +38,7 @@ class TokenData(BaseModel):
     auth_provider: str = "local"
     display_name: Optional[str] = None
     firebase_sign_in_provider: Optional[str] = None
+    firebase_email: Optional[str] = None
     google_connected: bool = False
 
 
@@ -140,6 +141,7 @@ async def get_optional_user(
         user = find_firebase_user(db, identity)
         token_data = TokenData(auth_provider='firebase', display_name=identity.display_name,
                                firebase_sign_in_provider=identity.sign_in_provider,
+                               firebase_email=identity.email,
                                google_connected=identity.google_connected)
     elif token_data.user_id is not None:
         user = db.get(User, token_data.user_id)

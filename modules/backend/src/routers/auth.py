@@ -118,6 +118,7 @@ async def me(current_user: TokenData = Depends(get_authenticated_user), db: Sess
             "display_name": current_user.display_name,
             "firebase_connected": db.query(FirebaseIdentity).filter_by(user_id=current_user.user_id).first() is not None,
             "firebase_sign_in_provider": current_user.firebase_sign_in_provider,
+            "firebase_email": current_user.firebase_email,
             "google_connected": current_user.google_connected,
         },
     }
@@ -141,6 +142,7 @@ def _firebase_response(user: User, identity: VerifiedFirebaseIdentity) -> dict:
         'registration_source': user.registration_source,
         'auth_provider': 'firebase', 'display_name': identity.display_name,
         'firebase_connected': True, 'firebase_sign_in_provider': identity.sign_in_provider,
+        'firebase_email': identity.email,
         'google_connected': identity.google_connected,
     }}
 

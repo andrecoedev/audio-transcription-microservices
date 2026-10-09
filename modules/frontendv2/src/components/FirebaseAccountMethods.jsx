@@ -40,6 +40,7 @@ export default function FirebaseAccountMethods({ account, onUpdated }) {
   const passwordEnabled = firebaseEnabled && config?.firebase_password_enabled === true
   const hasPassword = methods.includes('password')
   const hasGoogle = methods.includes('google.com')
+  const accessEmail = account.firebase_email
 
   const run = async (operation, successMessage) => {
     setBusy(true)
@@ -58,7 +59,7 @@ export default function FirebaseAccountMethods({ account, onUpdated }) {
   }
 
   const handleReset = () => run(
-    () => firebaseAuth.resetPassword(account.email),
+    () => firebaseAuth.resetPassword(accessEmail),
     GENERIC_RESET_MESSAGE,
   )
 
@@ -85,7 +86,7 @@ export default function FirebaseAccountMethods({ account, onUpdated }) {
         setError('Escolha uma senha que atenda aos requisitos de segurança.')
         return
       }
-      await firebaseAuth.linkPassword(account.email, newPassword)
+      await firebaseAuth.linkPassword(accessEmail, newPassword)
       setMessage('Senha conectada a esta conta.')
       if (onUpdated) await onUpdated()
       setMethods(await firebaseAuth.getAuthMethods())
@@ -119,7 +120,7 @@ export default function FirebaseAccountMethods({ account, onUpdated }) {
       {!hasGoogle && !hasPassword && <p>Nenhum método confirmado pelo Firebase.</p>}
     </div>
 
-    {passwordEnabled && account.email && <div className="space-y-3">
+    {passwordEnabled && accessEmail && <div className="space-y-3">
       {hasPassword
         ? <Button type="button" variant="outline" loading={busy} onClick={handleReset}>Redefinir senha</Button>
         : <form onSubmit={handleLinkPassword} className="space-y-3">

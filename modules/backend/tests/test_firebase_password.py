@@ -68,6 +68,7 @@ def test_password_login_is_idempotent_and_does_not_claim_google(db_context, monk
     me = db_context['client'].get('/auth/me', headers=headers)
     assert me.status_code == 200
     assert me.json()['user']['google_connected'] is False
+    assert me.json()['user']['firebase_email'] == identity.email
     with db_context['session_factory']() as db:
         user = db.get(User, first.json()['user']['id'])
         assert user.hashed_password is None
@@ -108,3 +109,14 @@ def test_google_and_password_same_uid_resolve_same_internal_user(db_context, mon
     assert first.status_code == google.status_code == 200
     assert first.json()['user']['id'] == google.json()['user']['id']
     assert google.json()['user']['google_connected'] is True
+
+
+def test_verified_access_email_does_not_overwrite_internal_profile(db_context, monkeypatch):
+    with db_context['session_factory']() as db:
+        db.add(FirebaseIdentity(project_id=PROJECT, uid='synthetic-google-uid', user_id=1))
+        db.commit()
+    password_identity(monkeypatch, email='access@example.test')
+    response = db_context['client'].get('/auth/me', headers={'Authorization': 'Bearer synthetic-id-proof'})
+    assert response.status_code == 200
+    assert response.json()['user']['email'] == 'alice@example.test'
+    assert response.json()['user']['firebase_email'] == 'access@example.test'
