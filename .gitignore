@@ -28,6 +28,11 @@ modules/backend/benchmarks/*.md
 
 # Local investigations, frozen outputs and private operational files.
 .local-artifacts/
+# Never capture local Google/Firebase credential files in Git.
+application_default_credentials.json
+**/application_default_credentials.json
+**/*firebase-adminsdk*.json
+**/service-account*.json
 .env.*
 !.env.example
 !.env.dev.example

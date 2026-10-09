@@ -36,6 +36,10 @@ dist/
 **/*.mp3
 **/*.m4a
 .local-artifacts/
+**/application_default_credentials.json
+application_default_credentials.json
+**/*firebase-adminsdk*.json
+**/service-account*.json
 docs/
 **/backups/
 **/*.db-*
