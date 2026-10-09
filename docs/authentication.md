@@ -1,5 +1,10 @@
 # Identidade e autenticação
 
+Auditoria do código integrado e do ambiente de desenvolvimento em 2026-10-09:
+[diagnóstico, configuração efetiva e plano incremental](authentication_audit.md).
+Firebase Google está implementado, mas desligado no ambiente auditado;
+Firebase e-mail/senha continua pendente de implementação.
+
 ## Auditoria antes de Firebase (P5-03)
 
 `services/identity.py` cria usuários persistentes PostgreSQL (`users.id`), valida
