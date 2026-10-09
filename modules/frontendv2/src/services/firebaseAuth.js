@@ -9,9 +9,14 @@ function readFirebaseConfig() {
     appId: env.VITE_FIREBASE_APP_ID,
   }
 
-  return Object.values(config).every((value) => typeof value === 'string' && value.trim())
-    ? Object.fromEntries(Object.entries(config).map(([key, value]) => [key, value.trim()]))
-    : null
+  if (!Object.values(config).every((value) => typeof value === 'string' && value.trim())) return null
+  const normalized = Object.fromEntries(Object.entries(config).map(([key, value]) => [key, value.trim()]))
+  if (Object.values(normalized).some((value) => /^your-|^replace[-_]|\$\{/i.test(value))) return null
+  if (/\s/.test(normalized.apiKey)
+      || !/^[a-z0-9][a-z0-9-]{4,127}$/.test(normalized.projectId)
+      || !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$/i.test(normalized.authDomain)
+      || !/^1:[0-9]+:web:[a-f0-9]+$/i.test(normalized.appId)) return null
+  return normalized
 }
 
 function notConfiguredError() {

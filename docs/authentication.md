@@ -1,5 +1,10 @@
 # Identidade e autenticação
 
+Auditoria do código integrado e do ambiente de desenvolvimento em 2026-10-09:
+[diagnóstico, configuração efetiva e plano incremental](authentication_audit.md).
+Firebase Google está implementado, mas desligado no ambiente auditado;
+Firebase e-mail/senha continua pendente de implementação.
+
 ## Auditoria antes de Firebase (P5-03)
 
 `services/identity.py` cria usuários persistentes PostgreSQL (`users.id`), valida
@@ -160,6 +165,9 @@ Firebase preserva dados, mas usuários sem senha precisarão da integração par
 entrar novamente. Downgrade exige ausência de vínculos e usuários sem senha:
 não remova identidades para forçar rollback. Faça backup e planeje a reversão
 antes de uma implantação real.
+
+Para preparar Google Sign-In e distinguir configuração manual de validação
+automatizada, consulte [ativação e homologação Firebase Google](firebase_google_setup.md).
 
 O SDK Firebase Web traz dependências de produtos não usados pelo app. A override
 de `@grpc/grpc-js` para `1.13.6` corrige advisories transitivos da cadeia Node
