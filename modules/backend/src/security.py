@@ -37,6 +37,8 @@ class TokenData(BaseModel):
     registration_source: str = "local"
     auth_provider: str = "local"
     display_name: Optional[str] = None
+    firebase_sign_in_provider: Optional[str] = None
+    google_connected: bool = False
 
 
 def verify_password(plain_password: str, hashed_password: str | None) -> bool:
@@ -136,7 +138,9 @@ async def get_optional_user(
         from .services.firebase_identity import verify_firebase_token, find_firebase_user
         identity = await run_in_threadpool(verify_firebase_token, token)
         user = find_firebase_user(db, identity)
-        token_data = TokenData(auth_provider='firebase', display_name=identity.display_name)
+        token_data = TokenData(auth_provider='firebase', display_name=identity.display_name,
+                               firebase_sign_in_provider=identity.sign_in_provider,
+                               google_connected=identity.google_connected)
     elif token_data.user_id is not None:
         user = db.get(User, token_data.user_id)
     else:

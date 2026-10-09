@@ -83,6 +83,7 @@ class Settings(BaseSettings):
     
     # Security
     FIREBASE_AUTH_ENABLED: bool = Field(default=False)
+    FIREBASE_PASSWORD_ENABLED: bool = Field(default=False)
     FIREBASE_PROJECT_ID: Optional[str] = Field(default=None)
     FIREBASE_HTTP_TIMEOUT_SECONDS: int = Field(default=10, ge=1, le=30)
     SECRET_KEY: Optional[str] = Field(
