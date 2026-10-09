@@ -58,18 +58,70 @@ O frontend recebe esses valores no **build**; reiniciar um container não altera
 um bundle antigo. Refaça o build/recrie API e frontend após configurar.
 O Worker não verifica identidade Firebase e não precisa da credencial Admin.
 
-O overlay opcional existente monta somente na API um JSON administrativo já
-fornecido pelo operador, somente leitura, em
-`.local-artifacts/firebase-adminsdk.json`. Não crie um arquivo vazio ou aceite
+O overlay opcional monta somente na API um arquivo ADC já fornecido pelo
+operador, somente leitura. Prefira um diretório privado fora do repositório,
+por exemplo `%LOCALAPPDATA%\USAGI\credentials\`, com ACL restrita ao usuário.
+Defina `FIREBASE_ADC_HOST_PATH` no arquivo local ignorado `.env.firebase.local`.
+Nunca registre um caminho pessoal absoluto no Git. A ausência dessa variável
+preserva o caminho legado `.local-artifacts/firebase-adminsdk.json`.
+Não crie um arquivo vazio ou aceite
 uma montagem de diretório para contornar sua ausência. Após a preparação:
 
 ```powershell
-docker compose -p usagidev --env-file modules/backend/.env -f compose.yaml -f modules/backend/docker-compose.firebase.yml up --build -d
+docker compose -p usagidev --env-file modules/backend/.env --env-file .env.firebase.local -f compose.yaml -f modules/backend/docker-compose.firebase.yml up -d --no-deps api
 ```
 
 Em ambientes com ADC gerenciado, use o mecanismo aprovado daquele ambiente,
 sem copiar uma chave para o frontend ou Worker. O overlay local não é uma
 prescrição para produção.
+
+Antes de ativar, valide leitura do arquivo pelo Docker, integridade da
+transferência, projeto configurado e uma consulta Auth somente leitura com UID
+sintético. `UserNotFoundError` nesse teste comprova acesso ao serviço sem criar
+usuários. Inicializar o SDK ou renovar OAuth, isoladamente, não comprova acesso
+ao Firebase Auth. Após validar, elimine a cópia original no working tree.
+Não faça build com credenciais dentro do contexto Docker.
+
+ADC `authorized_user` não contém necessariamente `project_id`: seu projeto de
+quota não determina os projetos aos quais o usuário tem acesso. Configure o
+projeto explicitamente na API e teste a autorização real. A documentação oficial
+alerta sobre restrições de ADC gerado com o cliente OAuth padrão do gcloud;
+não generalize uma inicialização bem-sucedida como compatibilidade universal.
+Se necessário, o operador deve fornecer um mecanismo já autorizado adequado,
+sem o projeto criar credenciais ou alterar IAM.
+
+### Validação operacional posterior à preparação
+
+Nesta execução local, uma ADC `authorized_user` foi transferida para diretório
+privado externo, com integridade verificada e ACL restrita. Docker conseguiu
+ler o arquivo; OAuth renovou e Firebase Auth respondeu `UserNotFoundError` ao
+UID sintético, inclusive dentro da API recriada. `/auth/config` passou a indicar
+Firebase ativo e projeto coincidente com o frontend. Login local e `/auth/me`
+continuaram respondendo 200 para a mesma identidade interna. PostgreSQL, Redis
+e Worker não foram recriados. A cópia original no working tree foi removida.
+
+A credencial não estava staged nem em branches/refs remotos inspecionados.
+Foi detectada em um snapshot **local** automático do Codex em refs auxiliares
+do Git: mover/ignorar o arquivo não elimina esse objeto. Não houve limpeza
+destrutiva das refs ou garantia de apagamento seguro. Esse cache local merece
+tratamento pelo operador; rotação/revogação é a opção de invalidar cópias antigas
+caso o ambiente/cache tenha sido compartilhado. Não publicar refs auxiliares.
+
+As imagens relacionadas inspecionadas eram anteriores à chegada do arquivo;
+não havia cópia no filesystem das imagens ativas API/Worker. Isso não constitui
+auditoria de registros externos ou backups históricos desconhecidos.
+Login interativo Google, token Google real em `/auth/me` e vinculação legada
+continuam pendentes de interação do operador; a consulta Admin não os substitui.
+O navegador integrado não conectou nesta sessão, e não havia Playwright/Edge
+local disponível: não houve inspeção visual do botão ou popup Google. A
+configuração servida está coerente e os testes de exibição do botão passaram.
+
+Regressões desta ativação: 40 testes backend de autenticação/SDK/identidade e
+30 testes frontend de configuração/login/vinculação passaram. Build API
+descartável com canário sintético confirmou que ADC, `.env.firebase.local` e
+objetos `.git` são excluídos da imagem. Comparação em memória não detectou
+segredos administrativos nos logs de API/Worker/frontend nem no bundle servido.
+O canário foi removido; nenhuma credencial real foi usada no build ou nos testes.
 
 **Impacto existente da ativação:** login local continua funcionando, mas novo
 cadastro local deixa de ser permitido quando Firebase está habilitado. Só ative
