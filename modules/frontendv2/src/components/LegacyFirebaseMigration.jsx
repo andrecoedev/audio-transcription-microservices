@@ -8,8 +8,9 @@ import { useAuthStore } from '../stores/authStore'
 
 const COOLDOWN_SECONDS = 60
 
-export default function LegacyFirebaseMigration() {
-  const user = useAuthStore((state) => state.user)
+export default function LegacyFirebaseMigration({ account }) {
+  const storedUser = useAuthStore((state) => state.user)
+  const user = account?.id === storedUser?.id ? account : storedUser
   const authProvider = useAuthStore((state) => state.authProvider)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const setFirebaseSession = useAuthStore((state) => state.setFirebaseSession)

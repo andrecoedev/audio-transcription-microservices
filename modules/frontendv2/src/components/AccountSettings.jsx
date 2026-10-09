@@ -51,6 +51,6 @@ export default function AccountSettings() {
     </div>
     {firebaseAccount
       ? <FirebaseAccountMethods account={account} onUpdated={() => setAttempt(value => value + 1)} />
-      : <><GoogleAccountLink /><LegacyFirebaseMigration /></>}
+      : <>{!account.firebase_connected && <GoogleAccountLink />}<LegacyFirebaseMigration account={account} /></>}
   </div>
 }
