@@ -9,9 +9,11 @@ from src.services import firebase_identity
 pytestmark = pytest.mark.postgres
 
 
-def test_concurrent_first_google_logins_create_one_internal_user(postgres_session_factory, monkeypatch):
+@pytest.mark.parametrize('provider', ['google.com', 'password'])
+def test_concurrent_first_firebase_logins_create_one_internal_user(postgres_session_factory, monkeypatch, provider):
     identity = firebase_identity.VerifiedFirebaseIdentity('synthetic-project-123',
-        'synthetic-concurrent-uid', 'concurrent@example.test', int(time.time()))
+        'synthetic-concurrent-uid', 'concurrent@example.test', int(time.time()),
+        sign_in_provider=provider, google_connected=provider == 'google.com')
     real_find = firebase_identity.find_firebase_user
     barrier, lock = Barrier(2), Lock()
     initial_calls = 0
