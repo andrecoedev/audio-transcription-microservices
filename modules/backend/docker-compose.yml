@@ -211,10 +211,11 @@ services:
       context: ../frontendv2
       dockerfile: Dockerfile.web
       args:
-        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
-        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
-        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
-        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
+        # Public Web fields only. Administrative/provider secrets never belong here.
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-${FIREBASE_API_KEY:-}}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-${FIREBASE_AUTH_DOMAIN:-}}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-${FIREBASE_PROJECT_ID:-}}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-${FIREBASE_APP_ID:-}}
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
     depends_on:

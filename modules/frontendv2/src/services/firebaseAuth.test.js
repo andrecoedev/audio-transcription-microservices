@@ -44,7 +44,7 @@ const configuredEnv = {
   VITE_FIREBASE_API_KEY: 'public-api-key',
   VITE_FIREBASE_AUTH_DOMAIN: 'example.firebaseapp.com',
   VITE_FIREBASE_PROJECT_ID: 'example-project',
-  VITE_FIREBASE_APP_ID: 'public-app-id',
+  VITE_FIREBASE_APP_ID: '1:123456789:web:0000000000000000000000',
 }
 
 async function loadService() {
@@ -73,6 +73,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs())
 
 describe('firebaseAuth', () => {
+  it.each([
+    ['VITE_FIREBASE_PROJECT_ID', 'your-firebase-project-id'],
+    ['VITE_FIREBASE_PROJECT_ID', 'INVALID_PROJECT'],
+    ['VITE_FIREBASE_AUTH_DOMAIN', 'https://example.firebaseapp.com'],
+    ['VITE_FIREBASE_AUTH_DOMAIN', 'example.firebaseapp.com/path'],
+    ['VITE_FIREBASE_APP_ID', 'public-app-id'],
+    ['VITE_FIREBASE_API_KEY', 'invalid key with spaces'],
+  ])('does not initialize Google for invalid public config %s', async (key, value) => {
+    vi.stubEnv(key, value)
+    const service = await loadService()
+    expect(service.isConfigured()).toBe(false)
+    expect(service.projectId()).toBeNull()
+    await expect(service.signInWithGoogle()).rejects.toMatchObject({ code: 'auth/not-configured' })
+    expect(sdk.initializeApp).not.toHaveBeenCalled()
+  })
   it('passes force refresh to the SDK and guards against switching users during refresh', async () => {
     const getIdToken = vi.fn().mockResolvedValue('synthetic-proof')
     sdk.auth.currentUser = { uid: 'first', getIdToken }
@@ -112,7 +127,7 @@ describe('firebaseAuth', () => {
       apiKey: 'public-api-key',
       authDomain: 'example.firebaseapp.com',
       projectId: 'example-project',
-      appId: 'public-app-id',
+      appId: '1:123456789:web:0000000000000000000000',
     }, 'usagi-auth')
     expect(sdk.setPersistence).toHaveBeenCalledWith(sdk.auth, sdk.browserLocalPersistence)
     expect(sdk.auth.authStateReady).toHaveBeenCalledOnce()
