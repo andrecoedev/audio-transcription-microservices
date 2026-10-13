@@ -172,7 +172,7 @@ def delete_meeting(
 ):
     meeting = _get_owned_meeting(db, meeting_id, user)
     try:
-        delete_transcription_data(db, meeting.transcription, user.user_id)
+        deletion = delete_transcription_data(db, meeting.transcription, user.user_id)
     except ActiveTranscriptionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return {"message": "Meeting deleted successfully"}
+    return {"message": "Meeting deleted successfully", **deletion}

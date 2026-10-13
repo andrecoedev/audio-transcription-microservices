@@ -120,13 +120,13 @@ async def delete_transcription(
     enforce_transcription_access(db, transcription_id, current_user, write=True)
 
     try:
-        delete_transcription_data(
+        deletion = delete_transcription_data(
             db, transcription, current_user.user_id if current_user else None
         )
     except ActiveTranscriptionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     logger.info("Transcription %s deleted", transcription_id)
-    return {"message": "Transcription deleted successfully"}
+    return {"message": "Transcription deleted successfully", **deletion}
 
 
 @router.get("/stats")

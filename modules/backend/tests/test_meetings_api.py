@@ -86,6 +86,24 @@ def test_meeting_list_detail_and_transcript_are_owner_scoped(db_context, auth_he
     assert client.delete(f"/meetings/{bob_id}", headers=auth_headers()).status_code == 404
 
 
+def test_meeting_delete_reports_storage_cleanup_pending(db_context, auth_headers, monkeypatch):
+    class UnavailableStorage:
+        def delete(self, _key):
+            raise OSError("synthetic storage outage")
+    monkeypatch.setattr("src.services.audio_storage.get_audio_storage", lambda: UnavailableStorage())
+    meeting_id = _seed_meeting(db_context["session_factory"])
+    db = db_context["session_factory"]()
+    db.query(TranscriptionJob).filter_by(transcription_id=meeting_id).update(
+        {"input_path": "", "input_object_key": "synthetic-meeting-key"}
+    )
+    db.commit()
+    db.close()
+    response = db_context["client"].delete(f"/meetings/{meeting_id}", headers=auth_headers())
+    assert response.status_code == 200
+    assert response.json() == {"message": "Meeting deleted successfully", "cleanup_pending": True}
+    assert db_context["client"].get(f"/meetings/{meeting_id}", headers=auth_headers()).status_code == 404
+
+
 def test_meeting_title_speaker_rename_and_cascade_delete(db_context, auth_headers):
     meeting_id = _seed_meeting(db_context["session_factory"])
     client = db_context["client"]

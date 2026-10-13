@@ -17,7 +17,7 @@ class ActiveTranscriptionError(ValueError):
 
 def delete_transcription_data(
     db: Session, transcription: Transcription, actor_user_id: int | None
-) -> None:
+) -> dict[str, bool]:
     """Cascade meeting/job/ownership in one DB commit, then clean the input."""
     job = (
         db.query(TranscriptionJob)
@@ -53,5 +53,8 @@ def delete_transcription_data(
         db.rollback()
         raise
 
-    if cleanup_after_commit(db, [reference])["failed"]:
+    cleanup = cleanup_after_commit(db, [reference])
+    cleanup_pending = bool(cleanup["pending"] or cleanup["failed"])
+    if cleanup_pending:
         logger.warning("Input cleanup incomplete for transcription %s", transcription.id)
+    return {"cleanup_pending": cleanup_pending}

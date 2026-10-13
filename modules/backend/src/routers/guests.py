@@ -88,10 +88,10 @@ def result(transcription_id: int, db: Session = Depends(get_db), guest: GuestSes
 def delete(transcription_id: int, db: Session = Depends(get_db), guest: GuestSession = Depends(get_guest_session)):
     row = owned_transcription(db, transcription_id, guest)
     try:
-        delete_transcription_data(db, row, None)
+        deletion = delete_transcription_data(db, row, None)
     except ActiveTranscriptionError:
         raise HTTPException(409, "Active transcription jobs cannot be deleted") from None
-    return {"deleted": True}
+    return {"deleted": True, **deletion}
 
 
 class ClaimRequest(BaseModel):

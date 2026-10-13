@@ -122,7 +122,7 @@ def retry_audio_cleanup(db, *, reference=None, apply=False, storage=None, limit=
 
 
 def cleanup_after_commit(db, references, *, storage=None):
-    result = {"deleted": 0, "failed": 0}
+    result = {"deleted": 0, "failed": 0, "pending": 0}
     for reference in set(filter(None, references)):
         try:
             attempt = retry_audio_cleanup(db, reference=reference, apply=True, storage=storage)
@@ -130,7 +130,11 @@ def cleanup_after_commit(db, references, *, storage=None):
             db.rollback()
             logger.warning("Audio cleanup retry deferred (%s)", type(exc).__name__)
             result["failed"] += 1
+            result["pending"] += 1
             continue
-        for key in result:
+        for key in ("deleted", "failed"):
             result[key] += attempt[key]
+        # Active/shared inputs and failed accounting publication also leave a
+        # durable intent. Never report physical completion for those cases.
+        result["pending"] += max(0, attempt["pending"] - attempt["deleted"])
     return result

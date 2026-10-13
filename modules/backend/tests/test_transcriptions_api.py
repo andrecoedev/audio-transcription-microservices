@@ -294,6 +294,73 @@ def test_owner_cannot_delete_active_job(db_context, auth_headers):
     db.close()
 
 
+def test_delete_reports_pending_physical_cleanup_without_exposing_storage_details(
+    db_context, auth_headers, monkeypatch
+):
+    class UnavailableStorage:
+        def delete(self, _key):
+            raise OSError("synthetic private storage path unavailable")
+
+    monkeypatch.setattr("src.services.audio_storage.get_audio_storage", lambda: UnavailableStorage())
+    transcription_id = _seed_job(db_context["session_factory"], status="completed")
+    db = db_context["session_factory"]()
+    db.query(TranscriptionJob).filter_by(transcription_id=transcription_id).update(
+        {"input_path": "", "input_object_key": "synthetic-delete-key"}
+    )
+    db.commit()
+    db.close()
+
+    response = db_context["client"].delete(
+        f"/transcriptions/{transcription_id}", headers=auth_headers()
+    )
+    assert response.status_code == 200
+    assert response.json()["cleanup_pending"] is True
+    assert "synthetic" not in str(response.json())
+    assert db_context["client"].get(
+        f"/transcriptions/{transcription_id}", headers=auth_headers()
+    ).status_code == 404
+
+
+def test_delete_with_successful_cleanup_keeps_compatible_message(db_context, auth_headers):
+    transcription_id = _seed_job(db_context["session_factory"], status="completed")
+    audio = db_context["tmp_path"] / "synthetic-delete.wav"
+    audio.write_bytes(b"synthetic audio")
+    db = db_context["session_factory"]()
+    db.query(TranscriptionJob).filter_by(transcription_id=transcription_id).update(
+        {"input_path": str(audio)}
+    )
+    db.commit()
+    db.close()
+    response = db_context["client"].delete(
+        f"/transcriptions/{transcription_id}", headers=auth_headers()
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "message": "Transcription deleted successfully", "cleanup_pending": False,
+    }
+    assert not audio.exists()
+
+
+def test_delete_preserves_shared_active_input_and_other_owners_resource(db_context, auth_headers):
+    first = _seed_job(db_context["session_factory"], status="completed")
+    second = _seed_job(db_context["session_factory"], owner="bob", status="processing")
+    db = db_context["session_factory"]()
+    db.query(TranscriptionJob).filter(TranscriptionJob.transcription_id.in_([first, second])).update(
+        {"input_path": "", "input_object_key": "shared-active-key"}
+    )
+    db.commit()
+    db.close()
+    response = db_context["client"].delete(f"/transcriptions/{first}", headers=auth_headers())
+    assert response.status_code == 200
+    assert response.json()["cleanup_pending"] is True
+    assert db_context["client"].get(
+        f"/transcriptions/{second}", headers=auth_headers(username="bob")
+    ).status_code == 200
+    assert db_context["client"].get(
+        f"/transcriptions/{second}", headers=auth_headers()
+    ).status_code == 404
+
+
 def test_cross_user_cannot_generate_meeting_minutes(
     db_context, auth_headers, monkeypatch
 ):
