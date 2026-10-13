@@ -128,11 +128,11 @@ export default function FirebaseAccountMethods({ account, onUpdated }) {
           <h3 className="text-sm font-semibold text-gray-900">Conectar acesso por e-mail</h3>
           <p className="text-sm text-gray-600">Você poderá entrar com Google ou senha, sem mudar de conta.</p>
           <label className="block text-sm font-medium text-gray-700" htmlFor="firebase-new-password">Nova senha
-            <input id="firebase-new-password" type="password" autoComplete="new-password" required
+            <input id="firebase-new-password" type="password" autoComplete="new-password" required aria-describedby="account-password-policy"
               value={password} onChange={event => setPassword(event.target.value)} className="input mt-2" />
           </label>
           <label className="block text-sm font-medium text-gray-700" htmlFor="firebase-confirm-password">Confirmar nova senha
-            <input id="firebase-confirm-password" type="password" autoComplete="new-password" required
+            <input id="firebase-confirm-password" type="password" autoComplete="new-password" required aria-describedby="account-password-policy"
               value={confirmation} onChange={event => setConfirmation(event.target.value)} className="input mt-2" />
           </label>
           <PasswordChecklist status={passwordPolicy.status} password={password} confirmation={confirmation} id="account-password-policy" />

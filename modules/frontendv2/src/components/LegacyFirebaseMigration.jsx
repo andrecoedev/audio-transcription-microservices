@@ -263,11 +263,11 @@ export default function LegacyFirebaseMigration({ account }) {
           </label>
           <label htmlFor="migration-password" className="block text-sm font-medium text-gray-700">Senha do acesso por e-mail
             <input id="migration-password" type="password" autoComplete={target === 'create' ? 'new-password' : 'current-password'}
-              required value={targetPassword}
+              required aria-describedby={target === 'create' ? 'migration-password-policy' : undefined} value={targetPassword}
               onChange={(event) => setTargetPassword(event.target.value)} className="input mt-2" />
           </label>
           {target === 'create' && <label htmlFor="migration-confirm-password" className="block text-sm font-medium text-gray-700">Confirmar senha
-            <input id="migration-confirm-password" type="password" autoComplete="new-password" required
+            <input id="migration-confirm-password" type="password" autoComplete="new-password" required aria-describedby="migration-password-policy"
               value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="input mt-2" />
           </label>}
           {target === 'create' && <PasswordChecklist status={passwordPolicy.status} password={targetPassword}

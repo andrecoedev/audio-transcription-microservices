@@ -8,22 +8,25 @@ import { authService } from '../services/authService'
 import { firebaseAuth } from '../services/firebaseAuth'
 import { authDestination, authSwitchQuery } from '../services/authReturn'
 import { useAuthStore } from '../stores/authStore'
+import { usePasswordPolicy } from '../hooks/usePasswordPolicy'
+import PasswordChecklist from '../components/PasswordChecklist'
 
 const VERIFICATION_RESEND_SECONDS = 60
-const PASSWORD_MIN_LENGTH = 12
 
 function firebaseErrorMessage(error, action) {
   const messages = {
     'auth/invalid-credential': 'E-mail ou senha inválidos.',
+    'auth/wrong-password': 'E-mail ou senha inválidos.',
+    'auth/user-not-found': 'E-mail ou senha inválidos.',
     'auth/invalid-email': 'Informe um e-mail válido.',
     'auth/email-already-in-use': 'Este e-mail já está em uso.',
-    'auth/weak-password': 'Use ao menos 12 caracteres; a política de segurança pode exigir outros critérios.',
+    'auth/weak-password': 'Confira os requisitos da senha indicados abaixo.',
     'auth/too-many-requests': 'Muitas tentativas. Aguarde e tente novamente.',
     'auth/network-request-failed': 'Não foi possível conectar. Verifique sua conexão e tente novamente.',
     'auth/account-changed': 'A conta mudou. Entre novamente para continuar.',
   }
   if (error?.status === 409) {
-    return 'Já existe uma conta local com este e-mail. Entre com seu usuário e senha e, em Configurações, migre a conta para o acesso por e-mail.'
+    return 'Seu acesso precisa ser atualizado. Confirme seu acesso antigo para manter seus dados na mesma conta.'
   }
   return messages[error?.code] || (action === 'recover'
     ? 'Não foi possível iniciar a recuperação agora. Tente novamente.'
@@ -41,6 +44,7 @@ export default function Login({ signup = false }) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [needsAccessUpdate, setNeedsAccessUpdate] = useState(false)
   const [notice, setNotice] = useState('')
   const [config, setConfig] = useState(null)
   const [configLoaded, setConfigLoaded] = useState(false)
@@ -74,15 +78,16 @@ export default function Login({ signup = false }) {
     && firebaseAuth.isConfigured()
     && firebaseAuth.projectId() === config.firebase_project_id
   const emailAuthEnabled = googleEnabled && config?.firebase_password_enabled === true
-  const localSignupEnabled = configLoaded && config !== null && config.local_signup_enabled !== false
-  const legacyMode = searchParams.get('legacy') === '1'
-  const firebaseMode = emailAuthEnabled && !legacyMode
-    ? (mode === 'recover' ? 'recover' : signup ? 'firebase-signup' : mode)
+  const legacyMode = !signup && searchParams.get('legacy') === '1'
+  const firebaseMode = !legacyMode
+    ? (mode === 'recover' ? 'recover' : signup ? 'firebase-signup' : 'firebase')
     : null
   const isFirebaseSignup = firebaseMode === 'firebase-signup'
   const isRecovery = firebaseMode === 'recover'
-  const localMode = !firebaseMode || firebaseMode === 'local'
+  const localMode = legacyMode
   const guestQuery = authSwitchQuery(searchParams)
+  const policy = usePasswordPolicy(password, isFirebaseSignup && emailAuthEnabled)
+  const passwordsMatch = Boolean(password && confirmPassword && password === confirmPassword)
 
   useEffect(() => {
     if (!configLoaded || !emailAuthEnabled || isAuthenticated || verificationPending
@@ -101,6 +106,7 @@ export default function Login({ signup = false }) {
 
   const clearFeedback = () => {
     setError('')
+    setNeedsAccessUpdate(false)
     setNotice('')
   }
 
@@ -126,15 +132,11 @@ export default function Login({ signup = false }) {
     setConfirmPassword('')
     clearFeedback()
     try {
-      const result = signup
-        ? await authService.signup(username, email, submittedPassword)
-        : await authService.login(username, submittedPassword)
+      const result = await authService.login(username, submittedPassword)
       setSession(result.user, result.access_token)
       goToDestination()
     } catch {
-      setError(signup
-        ? 'Não foi possível criar sua conta. Confira os dados e tente novamente.'
-        : 'Não foi possível entrar. Confira seu usuário e senha e tente novamente.')
+      setError('Não foi possível entrar. Confira seu usuário e senha e tente novamente.')
     } finally {
       setPassword('')
       setConfirmPassword('')
@@ -150,15 +152,12 @@ export default function Login({ signup = false }) {
       setPassword('')
       return
     }
-    if (isFirebaseSignup && password.length < PASSWORD_MIN_LENGTH) {
-      setError('Use ao menos 12 caracteres; a política de segurança pode exigir outros critérios.')
-      setPassword('')
+    if (!emailAuthEnabled) {
+      setError('O acesso por e-mail está indisponível. Tente novamente mais tarde.')
       return
     }
-    if (isFirebaseSignup && password !== confirmPassword) {
-      setError('As senhas não coincidem.')
-      setPassword('')
-      setConfirmPassword('')
+    if (isFirebaseSignup && (!policy.valid || !passwordsMatch)) {
+      setError('Confira os requisitos da senha e a confirmação antes de continuar.')
       return
     }
 
@@ -180,6 +179,7 @@ export default function Login({ signup = false }) {
       }
       await completeFirebaseLogin(result.token)
     } catch (failure) {
+      setNeedsAccessUpdate(failure?.status === 409)
       try {
         await firebaseAuth.signOut()
         setError(firebaseErrorMessage(failure))
@@ -205,6 +205,7 @@ export default function Login({ signup = false }) {
       await completeFirebaseLogin(result.token)
       setVerificationPending(false)
     } catch (failure) {
+      setNeedsAccessUpdate(failure?.status === 409)
       try {
         await firebaseAuth.signOut()
         setVerificationPending(false)
@@ -246,6 +247,7 @@ export default function Login({ signup = false }) {
 
   const handleRecovery = async (event) => {
     event.preventDefault()
+    if (!emailAuthEnabled) return
     setLoading(true)
     clearFeedback()
     try {
@@ -267,8 +269,9 @@ export default function Login({ signup = false }) {
       setFirebaseSession(result.user)
       goToDestination()
     } catch (failure) {
+      setNeedsAccessUpdate(failure?.status === 409)
       setError(failure.status === 409
-        ? 'Esta conta já existe. Entre com seu usuário e senha e conecte o Google em Configurações → Conta.'
+        ? 'Seu acesso precisa ser atualizado. Confirme seu acesso antigo para manter seus dados na mesma conta.'
         : 'Não foi possível entrar com Google. Tente novamente.')
       try { await firebaseAuth.signOut() } catch {
         setError('Não foi possível concluir nem encerrar a sessão Google. Tente novamente.')
@@ -278,15 +281,10 @@ export default function Login({ signup = false }) {
     }
   }
 
-  const selectLocalLogin = () => {
-    clearFeedback()
-    setMode('local')
-  }
-
   const selectFirebaseLogin = () => {
     clearFeedback()
     setMode('firebase')
-    if (signup) navigate(`/login${guestQuery}`, { replace: true })
+    navigate(`/login${guestQuery}`, { replace: true })
   }
 
   const title = verificationPending
@@ -295,7 +293,7 @@ export default function Login({ signup = false }) {
       ? 'Recuperar senha'
       : isFirebaseSignup || (signup && localMode)
         ? 'Crie sua conta'
-        : 'Salve seu trabalho'
+        : legacyMode ? 'Atualizar método de acesso' : 'Salve seu trabalho'
 
   return (
     <section aria-labelledby="auth-heading" className="mx-auto flex w-full max-w-md flex-col justify-center py-8">
@@ -355,41 +353,34 @@ export default function Login({ signup = false }) {
                     <Lock aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                     <input id="firebase-password" autoComplete={isFirebaseSignup ? 'new-password' : 'current-password'} type="password"
                       value={password} onChange={(event) => setPassword(event.target.value)} className="input pl-10" required
-                      minLength={isFirebaseSignup ? PASSWORD_MIN_LENGTH : undefined} />
+                      aria-describedby={isFirebaseSignup ? 'signup-password-policy' : undefined} />
                   </span>
                 </label>
                 {isFirebaseSignup && <>
-                  <label htmlFor="firebase-password-confirm" className="block text-sm font-medium text-gray-700">Confirme a senha
-                    <input id="firebase-password-confirm" autoComplete="new-password" type="password" className="input mt-2" required minLength={PASSWORD_MIN_LENGTH}
+                  <label htmlFor="firebase-password-confirm" className="block text-sm font-medium text-gray-700">Confirmar senha
+                    <input id="firebase-password-confirm" autoComplete="new-password" type="password" className="input mt-2" required aria-describedby="signup-password-policy"
                       value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
                   </label>
-                  <p className="text-xs text-gray-500">Use ao menos 12 caracteres; a política de segurança pode exigir outros critérios.</p>
+                  <PasswordChecklist status={policy.status} password={password} confirmation={confirmPassword} id="signup-password-policy" />
+                  {policy.loading && <p role="status" className="text-xs text-gray-500">Verificando requisitos…</p>}
+                  {policy.error && <div role="alert" className="text-sm text-red-800">
+                    Não foi possível consultar os requisitos da senha. Verifique sua conexão e tente novamente.
+                    <button type="button" className="ml-2 underline" onClick={policy.retry}>Tentar novamente</button>
+                  </div>}
                 </>}
-                <Button type="submit" className="w-full" loading={loading}>{isFirebaseSignup ? 'Criar conta com e-mail' : 'Entrar com e-mail'}</Button>
+                <Button type="submit" className="w-full" loading={loading}
+                  disabled={!emailAuthEnabled || (isFirebaseSignup && (!policy.valid || !passwordsMatch))}>{isFirebaseSignup ? 'Criar conta' : 'Entrar'}</Button>
               </form>
-              {isFirebaseSignup && <button type="button" className="mt-4 w-full text-sm text-gray-600 hover:text-gray-900" disabled={loading}
-                onClick={() => navigate(`/login?legacy=1${guestQuery ? `&${guestQuery.slice(1)}` : ''}`)}>
-                Entrar com usuário e senha (conta local)
-              </button>}
               {!isFirebaseSignup && <div className="mt-4 flex flex-col items-center gap-3 text-sm">
-                <button type="button" className="text-primary-800 hover:text-primary-900" disabled={loading} onClick={() => { setMode('recover'); clearFeedback() }}>
+                <button type="button" className="text-primary-800 hover:text-primary-900" disabled={loading || !emailAuthEnabled} onClick={() => { setMode('recover'); clearFeedback() }}>
                   Esqueci minha senha
-                </button>
-                <button type="button" className="text-primary-800 hover:text-primary-900" disabled={loading} onClick={() => navigate(`/signup${guestQuery}`)}>
-                  Novo na USAGI? Criar uma conta
-                </button>
-                <button type="button" className="text-gray-600 hover:text-gray-900" disabled={loading} onClick={selectLocalLogin}>
-                  Entrar com usuário e senha (conta local)
                 </button>
               </div>}
             </>
           ) : (
             <>
-              {googleEnabled && <div className="mb-4">
-                <Button type="button" className="w-full" loading={loading} disabled={loading} onClick={handleGoogleLogin}>Continuar com Google</Button>
-                {!signup && <p className="my-3 text-center text-sm text-gray-500">ou use seu usuário e senha</p>}
-              </div>}
-              {(!signup || localSignupEnabled) && <form onSubmit={handleLocalSubmit} className="space-y-4">
+              <p className="mb-4 text-sm text-gray-600">Confirme seu acesso antigo. Em Minha conta, conecte Google ou e-mail para continuar usando a mesma conta e seus dados.</p>
+              <form onSubmit={handleLocalSubmit} className="space-y-4">
                 <label htmlFor="login-username" className="block text-sm font-medium text-gray-700">Usuário
                   <span className="relative mt-2 block">
                     <User aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
@@ -397,21 +388,16 @@ export default function Login({ signup = false }) {
                       onChange={(event) => setUsername(event.target.value)} className="input pl-10" required />
                   </span>
                 </label>
-                {signup && <label htmlFor="signup-email" className="block text-sm font-medium text-gray-700">E-mail
-                  <input id="signup-email" type="email" autoComplete="email" className="input mt-2" required maxLength={255}
-                    value={email} onChange={(event) => setEmail(event.target.value)} />
-                </label>}
                 <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">Senha
                   <span className="relative mt-2 block">
                     <Lock aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                    <input id="login-password" autoComplete={signup ? 'new-password' : 'current-password'} type="password"
+                    <input id="login-password" autoComplete="current-password" type="password"
                       value={password} onChange={(event) => setPassword(event.target.value)} className="input pl-10" placeholder="********"
-                      required minLength={signup ? PASSWORD_MIN_LENGTH : undefined} />
+                      required />
                   </span>
                 </label>
-                {signup && <p className="text-xs text-gray-500">Use uma senha com pelo menos 12 caracteres.</p>}
-                <Button type="submit" className="w-full" loading={loading}>{signup ? 'Criar conta' : 'Entrar'}</Button>
-              </form>}
+                <Button type="submit" className="w-full" loading={loading}>Entrar</Button>
+              </form>
               {emailAuthEnabled && <button type="button" className="mt-4 w-full text-sm text-primary-800" disabled={loading} onClick={selectFirebaseLogin}>
                 Voltar ao acesso por e-mail
               </button>}
@@ -419,16 +405,17 @@ export default function Login({ signup = false }) {
           )}
 
           {error && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+          {needsAccessUpdate && <Link className="mt-3 block text-sm text-primary-800 underline" to={`/login?legacy=1${guestQuery ? `&${guestQuery.slice(1)}` : '&returnTo=%2Fsettings'}`}>Atualizar método de acesso</Link>}
           {notice && !verificationPending && <p role="status" className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{notice}</p>}
           <div className="mt-5 flex flex-col items-center gap-3 text-sm text-primary-800">
-            {!verificationPending && localMode && (signup || localSignupEnabled || googleEnabled || emailAuthEnabled) && <Link to={signup ? `/login${guestQuery}` : emailAuthEnabled ? `/signup?legacy=1${guestQuery ? `&${guestQuery.slice(1)}` : ''}` : `/signup${guestQuery}`}>
-              {signup ? 'Já tenho conta' : emailAuthEnabled ? 'Criar uma conta local' : 'Novo na USAGI? Criar uma conta'}
+            {!verificationPending && !isRecovery && !localMode && <Link to={`${signup ? '/login' : '/signup'}${guestQuery}`}>
+              {signup ? 'Já tenho conta' : 'Criar uma conta'}
             </Link>}
             <Link className="text-gray-600 hover:text-gray-900" to="/">Continuar sem conta</Link>
           </div>
           {!configLoaded && <p role="status" className="mt-4 text-sm text-gray-500">Verificando formas de acesso…</p>}
           {configLoaded && !config && <p role="alert" className="mt-4 text-sm text-red-800">Não foi possível consultar as formas de acesso. Recarregue a página para tentar novamente.</p>}
-          {signup && configLoaded && config && !localSignupEnabled && !googleEnabled && !emailAuthEnabled && <p role="status" className="mt-4 text-sm text-gray-600">O cadastro não está disponível neste ambiente. Você pode continuar como visitante ou entrar em uma conta existente.</p>}
+          {configLoaded && config && !emailAuthEnabled && !legacyMode && <p role="status" className="mt-4 text-sm text-gray-600">O acesso por e-mail está indisponível neste ambiente. {googleEnabled ? 'Use Google ou continue sem conta.' : 'Você pode continuar sem conta.'}</p>}
           {!verificationPending && <p className="mt-5 text-center text-sm text-gray-500">Depois de entrar, você volta à transcrição em que estava trabalhando.</p>}
         </CardContent>
       </Card>
