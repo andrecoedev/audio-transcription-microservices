@@ -13,6 +13,7 @@ from ..models import GuestSession, Transcription, TranscriptionJob, Transcriptio
 from ..schemas import JobResponse, JobStatusResponse
 from ..security import TokenData, require_scope_when
 from ..services.audit import append_audit_event
+from ..services.upload_policy import upload_limit_mb
 from ..services.transcription_deletion import ActiveTranscriptionError, delete_transcription_data
 from ..services.rate_limit import enforce_rate_limit
 from ..services.provider_policy import require_guest_processing
@@ -215,7 +216,10 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
             file,
             storage=storage,
             allowed_extensions=settings.allowed_extensions_list,
-            max_size_bytes=min(settings.max_upload_size_bytes, settings.PUBLIC_MAX_UPLOAD_MB * 1024 * 1024) if public else settings.max_upload_size_bytes,
+            max_size_bytes=upload_limit_mb(
+                current_user.user_id if current_user else None,
+                "public" if guest_session else current_user.registration_source,
+            ) * 1024 * 1024,
         )
 
         transcription = Transcription(
