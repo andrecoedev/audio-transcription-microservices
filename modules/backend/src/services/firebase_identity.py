@@ -23,6 +23,8 @@ class VerifiedFirebaseIdentity:
     email: str
     auth_time: int
     display_name: str | None = None
+    sign_in_provider: str = 'google.com'
+    google_connected: bool = True
 
 
 def _verify_with_sdk(token: str) -> dict:
@@ -72,12 +74,17 @@ def verify_firebase_token(token: str) -> VerifiedFirebaseIdentity:
             or not isinstance(email, str) or not 3 <= len(email) <= 255
             or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email)
             or claims.get('email_verified') is not True
-            or not isinstance(firebase, dict) or firebase.get('sign_in_provider') != 'google.com'
+            or not isinstance(firebase, dict) or firebase.get('sign_in_provider') not in ('google.com', 'password')
             or firebase.get('tenant') is not None or type(claims.get('auth_time')) is not int):
         raise HTTPException(401, 'Could not validate credentials')
+    provider = firebase['sign_in_provider']
+    if provider == 'password' and not settings.FIREBASE_PASSWORD_ENABLED:
+        raise HTTPException(401, 'Could not validate credentials')
     name = claims.get('name')
+    identities = firebase.get('identities', {})
     return VerifiedFirebaseIdentity(project, uid, email.strip().lower(), claims['auth_time'],
-        name[:100] if isinstance(name, str) else None)
+        name[:100] if isinstance(name, str) else None, provider,
+        provider == 'google.com' or (isinstance(identities, dict) and bool(identities.get('google.com'))))
 
 
 def find_firebase_user(db: Session, identity: VerifiedFirebaseIdentity) -> User | None:

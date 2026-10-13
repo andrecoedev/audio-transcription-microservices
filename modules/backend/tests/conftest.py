@@ -20,6 +20,10 @@ os.environ.update(
         "SECRET_KEY": secrets.token_urlsafe(32),
         "DATABASE_URL": "sqlite:///:memory:",
         "DEBUG": "false",
+        # Local Firebase activation must never select a real provider in tests.
+        # Firebase-specific fixtures explicitly enable and mock its boundary.
+        "FIREBASE_AUTH_ENABLED": "false",
+        "FIREBASE_PASSWORD_ENABLED": "false",
     }
 )
 

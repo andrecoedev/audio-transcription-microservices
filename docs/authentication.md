@@ -2,8 +2,11 @@
 
 Auditoria do código integrado e do ambiente de desenvolvimento em 2026-10-09:
 [diagnóstico, configuração efetiva e plano incremental](authentication_audit.md).
-Firebase Google está implementado, mas desligado no ambiente auditado;
-Firebase e-mail/senha continua pendente de implementação.
+Google foi homologado localmente pelo operador após o PR #22. A integração
+e-mail/senha, verificação, recuperação e migração explícita é descrita em
+[Firebase password](firebase_password_setup.md); sua homologação real ainda
+depende de habilitação no Console e testes interativos. As seções P5-03 abaixo
+preservam o contexto histórico Google-only, não a capacidade atual de password.
 
 ## Auditoria antes de Firebase (P5-03)
 

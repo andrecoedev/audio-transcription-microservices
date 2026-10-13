@@ -1,5 +1,11 @@
 # Auditoria de autenticação — 2026-10-09
 
+> Este documento preserva a auditoria anterior ao PR #22. O PR foi integrado e
+> o usuário informou Google homologado localmente. A próxima etapa de senha,
+> coexistência e migração está descrita em
+> [firebase_password_setup.md](firebase_password_setup.md), distinguindo
+> implementação/testes simulados de homologação real pendente.
+
 ## Diagnóstico
 
 A P5-03 implementou **Google via Firebase opcional**, com validação no servidor e

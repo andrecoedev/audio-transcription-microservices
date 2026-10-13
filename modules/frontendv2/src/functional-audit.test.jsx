@@ -14,6 +14,8 @@ import MeetingDetail from './pages/MeetingDetail'
 import { audioService } from './services/audioService'
 import { guestService } from './services/guestService'
 import { useAuthStore } from './stores/authStore'
+import { authService } from './services/authService'
+import { firebaseAuth } from './services/firebaseAuth'
 import toast from 'react-hot-toast'
 
 vi.mock('./services/audioService', () => ({ audioService: {
@@ -25,6 +27,10 @@ vi.mock('./services/audioService', () => ({ audioService: {
   getMeeting: vi.fn(), getMeetingTranscript: vi.fn(), getMeetingMinutes: vi.fn(),
 } }))
 vi.mock('./services/guestService', () => ({ guestService: { policy: vi.fn() } }))
+vi.mock('./services/authService', () => ({ authService: { getConfig: vi.fn() } }))
+vi.mock('./services/firebaseAuth', () => ({ firebaseAuth: {
+  isConfigured: vi.fn(), projectId: vi.fn(), getEmailVerificationState: vi.fn(),
+} }))
 vi.mock('./components/MeetingIntelligencePanel', () => ({ default: ({ onResultChange }) =>
   <button onClick={() => onResultChange(2)}>Simular nova revisão concluída</button> }))
 vi.mock('./components/MeetingActionsPanel', () => ({ default: () => null }))
@@ -32,6 +38,10 @@ vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() 
 
 beforeEach(() => {
   vi.resetAllMocks()
+  authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_password_enabled: true, firebase_project_id: 'project-test' })
+  firebaseAuth.isConfigured.mockReturnValue(true)
+  firebaseAuth.projectId.mockReturnValue('project-test')
+  firebaseAuth.getEmailVerificationState.mockResolvedValue(null)
   guestService.policy.mockResolvedValue({ allowed_extensions: ['wav', 'mp3', 'm4a'], max_upload_mb: 100, max_audio_seconds: 600 })
   useAuthStore.setState({ user: { name: 'Teste', roles: [] } })
   audioService.checkHealth.mockResolvedValue({ database: 'connected',
@@ -231,9 +241,9 @@ describe('functional frontend contracts', () => {
     expect(audioService.createTranscriptionJob).not.toHaveBeenCalled()
   })
 
-  it('associates login labels with their inputs', () => {
+  it('offers accessible labels for public e-mail sign-in', async () => {
     render(<MemoryRouter><Login /></MemoryRouter>)
-    expect(screen.getByLabelText('Usuário').getAttribute('autocomplete')).toBe('username')
+    expect((await screen.findByLabelText('E-mail')).getAttribute('autocomplete')).toBe('email')
     expect(screen.getByLabelText('Senha').getAttribute('autocomplete')).toBe('current-password')
   })
 

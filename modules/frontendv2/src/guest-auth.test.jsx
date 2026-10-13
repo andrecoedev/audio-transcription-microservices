@@ -10,12 +10,18 @@ import { guestService } from './services/guestService'
 import { authService } from './services/authService'
 import { useAuthStore } from './stores/authStore'
 import { audioService } from './services/audioService'
+import { firebaseAuth } from './services/firebaseAuth'
 
 vi.mock('./services/guestService', () => ({ guestService: {
   policy: vi.fn(), demo: vi.fn(), session: vi.fn(), result: vi.fn(), createSession: vi.fn(),
   createJob: vi.fn(), claim: vi.fn(), delete: vi.fn(),
 } }))
-vi.mock('./services/authService', () => ({ authService: { signup: vi.fn(), login: vi.fn(), me: vi.fn(), getConfig: vi.fn() } }))
+vi.mock('./services/authService', () => ({ authService: { me: vi.fn(), getConfig: vi.fn(), firebaseLogin: vi.fn() } }))
+vi.mock('./services/firebaseAuth', () => ({ firebaseAuth: {
+  isConfigured: vi.fn(), projectId: vi.fn(), getEmailVerificationState: vi.fn(), validatePassword: vi.fn(),
+  signInWithEmail: vi.fn(), createWithEmail: vi.fn(), observe: vi.fn(() => () => {}), getToken: vi.fn(),
+  getTokenContext: vi.fn(), signOut: vi.fn(),
+} }))
 vi.mock('./services/audioService', () => ({ audioService: {
   getProviderSettings: vi.fn(), createTranscriptionJob: vi.fn(),
 } }))
@@ -30,7 +36,16 @@ beforeEach(() => {
   sessionStorage.clear()
   window.history.replaceState({}, '', '/')
   useAuthStore.setState({ user: null, token: null, authProvider: 'local', isAuthenticated: false })
-  authService.getConfig.mockResolvedValue({ firebase_enabled: false, local_signup_enabled: true })
+  authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_password_enabled: true, firebase_project_id: 'project-test' })
+  firebaseAuth.isConfigured.mockReturnValue(true)
+  firebaseAuth.projectId.mockReturnValue('project-test')
+  firebaseAuth.getEmailVerificationState.mockResolvedValue(null)
+  firebaseAuth.getToken.mockResolvedValue('firebase-id-token')
+  firebaseAuth.validatePassword.mockResolvedValue({
+    isValid: true,
+    passwordPolicy: { customStrengthOptions: { minPasswordLength: 8 } },
+    meetsMinPasswordLength: true,
+  })
   guestService.policy.mockResolvedValue(policy)
   guestService.demo.mockResolvedValue({
     id: 'usagi-demo-v1', is_demo: true, title: 'Reunião de exemplo', description: 'Demonstração sintética.', duration_seconds: 90,
@@ -55,19 +70,27 @@ describe('Guest and account boundaries', () => {
   it.each([false, true])('immediately enters the authenticated app after signup=%s and preserves pending ownership proof on refresh', async (signup) => {
     sessionStorage.setItem('usagi-guest-session', JSON.stringify({ guest_token: 'synthetic-proof', resultId: 7 }))
     guestService.result.mockResolvedValue({ status: 'completed', segments: [] })
-    const response = { access_token: 'synthetic-user-proof', user: { username: 'visitor', registration_source: 'public' } }
-    authService.login.mockResolvedValue(response)
-    authService.signup.mockResolvedValue(response)
-    authService.me.mockResolvedValue({ authenticated: true, user: response.user })
+    const user = { id: 8, username: 'visitor', auth_provider: 'firebase', firebase_sign_in_provider: 'password', registration_source: 'public' }
+    authService.firebaseLogin.mockResolvedValue({ user })
+    authService.me.mockResolvedValue({ authenticated: true, user })
+    firebaseAuth.signInWithEmail.mockResolvedValue({ verified: true, token: 'firebase-id-token' })
+    firebaseAuth.createWithEmail.mockResolvedValue({ verified: true, token: 'firebase-id-token' })
     window.history.replaceState({}, '', signup ? '/signup?saveGuest=1' : '/login?saveGuest=1')
     render(<App />)
-    fireEvent.change(await screen.findByLabelText('Usuário'), { target: { value: 'visitor' } })
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'visitor@example.test' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'test password long' } })
-    if (signup) fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'visitor@example.test' } })
+    if (signup) fireEvent.change(screen.getByLabelText('Confirmar senha'), { target: { value: 'test password long' } })
+    if (signup) await waitFor(() => expect(screen.getByRole('button', { name: 'Criar conta' }).disabled).toBe(false))
     fireEvent.click(screen.getByRole('button', { name: signup ? 'Criar conta' : 'Entrar' }))
+    await waitFor(() => expect(signup ? firebaseAuth.createWithEmail : firebaseAuth.signInWithEmail).toHaveBeenCalledOnce())
     expect(await screen.findByRole('heading', { name: 'Nova Transcrição' })).toBeTruthy()
     expect(window.location.pathname).toBe('/new-transcription')
     expect(useAuthStore.getState().isAuthenticated).toBe(true)
+    expect(useAuthStore.getState().authProvider).toBe('firebase')
+    expect(firebaseAuth.createWithEmail).toHaveBeenCalledTimes(signup ? 1 : 0)
+    expect(firebaseAuth.signInWithEmail).toHaveBeenCalledTimes(signup ? 0 : 1)
+    expect(authService.firebaseLogin).toHaveBeenCalledWith('firebase-id-token')
+    expect(localStorage.getItem('token')).toBeNull()
     expect(await screen.findByRole('button', { name: 'Salvar na minha conta' })).toBeTruthy()
     expect(guestService.claim).not.toHaveBeenCalled()
     cleanup()
@@ -166,18 +189,23 @@ describe('Guest and account boundaries', () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(true)
   })
 
-  it('creates a public account and returns to the explicit guest save flow', async () => {
-    authService.signup.mockResolvedValue({ access_token: 'user-proof', user: { username: 'visitor', registration_source: 'public' } })
+  it('creates a public Firebase account and returns to the explicit guest save flow', async () => {
+    firebaseAuth.createWithEmail.mockResolvedValue({ verified: true, token: 'firebase-signup-token' })
+    authService.firebaseLogin.mockResolvedValue({ user: { id: 9, username: 'visitor', auth_provider: 'firebase', registration_source: 'public' } })
     render(<MemoryRouter initialEntries={['/signup?saveGuest=1']}><Routes>
       <Route path="/signup" element={<Login signup />} />
       <Route path="/new-transcription" element={<p>Experiência autenticada</p>} />
     </Routes></MemoryRouter>)
-    fireEvent.change(await screen.findByLabelText('Usuário'), { target: { value: 'visitor' } })
-    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'visitor@example.test' } })
+    fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'visitor@example.test' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'test password long' } })
+    fireEvent.change(screen.getByLabelText('Confirmar senha'), { target: { value: 'test password long' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Criar conta' }).disabled).toBe(false))
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
+    await waitFor(() => expect(firebaseAuth.createWithEmail).toHaveBeenCalledOnce())
     expect(await screen.findByText('Experiência autenticada')).toBeTruthy()
-    expect(authService.signup).toHaveBeenCalledWith('visitor', 'visitor@example.test', 'test password long')
+    expect(firebaseAuth.createWithEmail).toHaveBeenCalledWith('visitor@example.test', 'test password long')
+    expect(authService.firebaseLogin).toHaveBeenCalledWith('firebase-signup-token')
+    expect(useAuthStore.getState().authProvider).toBe('firebase')
     expect(useAuthStore.getState().user.registration_source).toBe('public')
   })
 

@@ -12,7 +12,7 @@ from ..config import settings
 from ..database import get_db
 from ..security import TokenData, create_access_token, get_authenticated_user, oauth2_scheme, verify_password
 from ..models import FirebaseIdentity, User
-from ..services.firebase_identity import verify_firebase_token, resolve_firebase_user
+from ..services.firebase_identity import VerifiedFirebaseIdentity, verify_firebase_token, resolve_firebase_user
 from ..services.audit import append_audit_event
 from ..services.identity import authenticate_local_user, principal_for_user, register_public_user
 from ..services.rate_limit import enforce_rate_limit
@@ -116,7 +116,10 @@ async def me(current_user: TokenData = Depends(get_authenticated_user), db: Sess
             "registration_source": current_user.registration_source,
             "auth_provider": current_user.auth_provider,
             "display_name": current_user.display_name,
-            "google_connected": db.query(FirebaseIdentity).filter_by(user_id=current_user.user_id).first() is not None,
+            "firebase_connected": db.query(FirebaseIdentity).filter_by(user_id=current_user.user_id).first() is not None,
+            "firebase_sign_in_provider": current_user.firebase_sign_in_provider,
+            "firebase_email": current_user.firebase_email,
+            "google_connected": current_user.google_connected,
         },
     }
 
@@ -127,16 +130,20 @@ async def auth_config():
     return {"mode": "strict", "strict": True, "demo_login": False,
             "firebase_enabled": settings.FIREBASE_AUTH_ENABLED,
             "firebase_project_id": settings.FIREBASE_PROJECT_ID if settings.FIREBASE_AUTH_ENABLED else None,
+            "firebase_password_enabled": settings.FIREBASE_AUTH_ENABLED and settings.FIREBASE_PASSWORD_ENABLED,
             "local_signup_enabled": not settings.FIREBASE_AUTH_ENABLED}
 
 
-def _firebase_response(user: User, display_name: str | None) -> dict:
+def _firebase_response(user: User, identity: VerifiedFirebaseIdentity) -> dict:
     principal = principal_for_user(user)
     return {'authenticated': True, 'user': {
         'id': user.id, 'username': user.username, 'email': user.email,
         'roles': principal['roles'], 'scopes': principal['scopes'],
         'registration_source': user.registration_source,
-        'auth_provider': 'firebase', 'display_name': display_name, 'google_connected': True,
+        'auth_provider': 'firebase', 'display_name': identity.display_name,
+        'firebase_connected': True, 'firebase_sign_in_provider': identity.sign_in_provider,
+        'firebase_email': identity.email,
+        'google_connected': identity.google_connected,
     }}
 
 
@@ -149,7 +156,7 @@ def firebase_login(request: Request, token: str = Depends(oauth2_scheme), db: Se
     append_audit_event(db, event='user.registered' if created else 'user.login',
                        actor_user_id=user.id, resource_type='user', resource_id=user.id)
     db.commit()
-    return _firebase_response(user, identity.display_name)
+    return _firebase_response(user, identity)
 
 
 class FirebaseLinkRequest(BaseModel):
@@ -162,14 +169,14 @@ class FirebaseLinkRequest(BaseModel):
 def link_firebase(payload: FirebaseLinkRequest, request: Request,
                   current: TokenData = Depends(get_authenticated_user), db: Session = Depends(get_db)):
     if current.auth_provider != 'local':
-        raise HTTPException(403, 'Sign in with your existing USAGI password to link Google')
+        raise HTTPException(403, 'Sign in with your existing USAGI password to link Firebase')
     enforce_rate_limit(request, 'firebase-link', str(current.user_id))
     user = db.query(User).filter_by(id=current.user_id).with_for_update().one()
     if not verify_password(payload.password.get_secret_value(), user.hashed_password):
-        raise HTTPException(401, 'Unable to link Google; confirm your existing password')
+        raise HTTPException(401, 'Unable to link Firebase; confirm your existing password')
     identity = verify_firebase_token(payload.id_token.get_secret_value())
     if not 0 <= time.time() - identity.auth_time <= 300:
-        raise HTTPException(401, 'Authenticate with Google again to link your account')
+        raise HTTPException(401, 'Authenticate with Firebase again to link your account')
     binding = db.get(FirebaseIdentity, (identity.project_id, identity.uid))
     existing = db.query(FirebaseIdentity).filter_by(user_id=user.id).first()
     if ((binding is not None and binding.user_id != user.id)
@@ -185,4 +192,4 @@ def link_firebase(payload: FirebaseLinkRequest, request: Request,
         append_audit_event(db, event='user.identity_linked', actor_user_id=user.id,
                            resource_type='user', resource_id=user.id)
     db.commit()
-    return _firebase_response(user, identity.display_name)
+    return _firebase_response(user, identity)
