@@ -57,6 +57,21 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Login', () => {
+  it('does not call signup even when an invalid form is submitted directly', async () => {
+    enableFirebase()
+    firebaseAuth.validatePassword.mockResolvedValue({ isValid: false,
+      containsNumericCharacter: false,
+      passwordPolicy: { customStrengthOptions: { containsNumericCharacter: true } } })
+    render(<MemoryRouter><Login signup /></MemoryRouter>)
+    const email = await screen.findByLabelText('E-mail')
+    fireEvent.change(email, { target: { value: 'test@example.test' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'password' } })
+    fireEvent.change(screen.getByLabelText('Confirmar senha'), { target: { value: 'password' } })
+    fireEvent.submit(email.closest('form'))
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(firebaseAuth.createWithEmail).not.toHaveBeenCalled()
+    expect(authService.signup).not.toHaveBeenCalled()
+  })
   it('uses public email login without username or local account options', async () => {
     render(<MemoryRouter><Login /></MemoryRouter>)
     expect(screen.getByRole('heading', { name: 'Salve seu trabalho' })).toBeTruthy()

@@ -1,13 +1,14 @@
 import { Check, Circle } from 'lucide-react'
+import { formatNumber } from '../utils/format'
 
 export default function PasswordChecklist({ status, password, confirmation, id }) {
   const options = status?.passwordPolicy?.customStrengthOptions ?? {}
   const requirements = []
   if (typeof options.minPasswordLength === 'number') {
-    requirements.push(['minimum', `Pelo menos ${options.minPasswordLength} caracteres`, status.meetsMinPasswordLength])
+    requirements.push(['minimum', `Pelo menos ${formatNumber(options.minPasswordLength)} caracteres`, status.meetsMinPasswordLength])
   }
   if (typeof options.maxPasswordLength === 'number') {
-    requirements.push(['maximum', `No máximo ${options.maxPasswordLength.toLocaleString('pt-BR')} caracteres`, status.meetsMaxPasswordLength])
+    requirements.push(['maximum', `No máximo ${formatNumber(options.maxPasswordLength)} caracteres`, status.meetsMaxPasswordLength])
   }
   for (const [field, label] of [
     ['containsUppercaseLetter', 'Contém letra maiúscula'],

@@ -10,14 +10,19 @@ import Meetings from './pages/Meetings'
 import MeetingDetail from './pages/MeetingDetail'
 import Login from './pages/Login'
 import { authService } from './services/authService'
+import { firebaseAuth } from './services/firebaseAuth'
 import { audioService } from './services/audioService'
 import { guestService } from './services/guestService'
 import { useAuthStore } from './stores/authStore'
 import toast from 'react-hot-toast'
 
 vi.mock('./services/authService', () => ({
-  authService: { getConfig: vi.fn(), me: vi.fn(), login: vi.fn() },
+  authService: { getConfig: vi.fn(), me: vi.fn(), login: vi.fn(), firebaseLogin: vi.fn() },
 }))
+vi.mock('./services/firebaseAuth', () => ({ firebaseAuth: {
+  isConfigured: vi.fn(), projectId: vi.fn(), signInWithEmail: vi.fn(), getEmailVerificationState: vi.fn(),
+  observe: vi.fn(() => () => {}), getToken: vi.fn(),
+} }))
 vi.mock('./services/audioService', () => ({
   audioService: {
     checkHealth: vi.fn(),
@@ -50,8 +55,12 @@ vi.mock('react-hot-toast', () => ({
 
 beforeEach(() => {
   localStorage.clear()
-  useAuthStore.setState({ user: null, token: null, isAuthenticated: false })
+  useAuthStore.setState({ user: null, token: null, authProvider: 'local', isAuthenticated: false })
   authService.getConfig.mockResolvedValue({ strict: true })
+  firebaseAuth.isConfigured.mockReturnValue(true)
+  firebaseAuth.projectId.mockReturnValue('project-test')
+  firebaseAuth.getEmailVerificationState.mockResolvedValue(null)
+  firebaseAuth.getToken.mockResolvedValue('firebase-id-token')
   guestService.policy.mockResolvedValue({ allowed_extensions: ['wav', 'mp3', 'm4a'], max_upload_mb: 100, max_audio_seconds: 600 })
   audioService.getProviderSettings.mockResolvedValue({
     preferences: { transcription_provider: 'automatic', intelligence_provider: 'automatic', use_diarization: false },
@@ -117,10 +126,11 @@ describe('public React flow', () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(true)
   })
 
-  it('logs in and persists the returned session', async () => {
-    authService.login.mockResolvedValue({
-      access_token: 'issued-token',
-      user: { id: 1, username: 'alice', scopes: [] },
+  it('logs in with public e-mail auth and stores the backend account without a local token', async () => {
+    authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_password_enabled: true, firebase_project_id: 'project-test' })
+    firebaseAuth.signInWithEmail.mockResolvedValue({ verified: true, token: 'firebase-id-token' })
+    authService.firebaseLogin.mockResolvedValue({
+      user: { id: 1, username: 'alice', auth_provider: 'firebase', firebase_sign_in_provider: 'password', registration_source: 'public' },
     })
     render(
       <MemoryRouter initialEntries={['/login']}>
@@ -130,16 +140,19 @@ describe('public React flow', () => {
         </Routes>
       </MemoryRouter>
     )
-    fireEvent.change(screen.getByLabelText('Usuário'), {
-      target: { value: 'alice' },
+    fireEvent.change(await screen.findByLabelText('E-mail'), {
+      target: { value: 'alice@example.test' },
     })
     fireEvent.change(screen.getByLabelText('Senha'), {
       target: { value: 'correct-password' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
     expect(await screen.findByText('Sessão autenticada')).toBeTruthy()
-    expect(authService.login).toHaveBeenCalledWith('alice', 'correct-password')
-    expect(localStorage.getItem('token')).toBe('issued-token')
+    expect(firebaseAuth.signInWithEmail).toHaveBeenCalledWith('alice@example.test', 'correct-password')
+    expect(authService.firebaseLogin).toHaveBeenCalledWith('firebase-id-token')
+    expect(useAuthStore.getState().authProvider).toBe('firebase')
+    expect(useAuthStore.getState().user.id).toBe(1)
+    expect(localStorage.getItem('token')).toBeNull()
   })
 
   it('uploads through the jobs endpoint flow and opens the result route', async () => {
