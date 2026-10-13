@@ -44,9 +44,9 @@ export default function AccountSettings() {
       <span>Senha</span><HelpPopover label="Senha">{google
         ? 'Você entra pelo Google. Gerencie a senha e a segurança na sua conta Google.'
         : firebaseAccount
-          ? 'Esta conta usa acesso Firebase. Os métodos disponíveis aparecem abaixo e permanecem vinculados à mesma conta.'
+          ? 'Os métodos de acesso disponíveis aparecem abaixo e permanecem vinculados à mesma conta.'
         : 'Esta conta usa a senha USAGI existente. Alteração e redefinição de senha ainda não estão disponíveis nesta versão.'}</HelpPopover>
-      <span className="text-gray-600">{google ? 'Gerenciada pelo Google' : firebaseAccount ? 'Gerenciada pelo Firebase' : 'Alteração não disponível'}</span>
+      <span className="text-gray-600">{google ? 'Gerenciada pelo Google' : firebaseAccount ? 'Gerenciada pelo método conectado' : 'Alteração não disponível'}</span>
       {google && <a className="font-medium text-primary-800 underline" href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer">Gerenciar no Google</a>}
     </div>
     {firebaseAccount

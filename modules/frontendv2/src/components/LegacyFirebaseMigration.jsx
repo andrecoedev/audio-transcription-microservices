@@ -5,6 +5,8 @@ import Button from './Button'
 import { authService } from '../services/authService'
 import { firebaseAuth } from '../services/firebaseAuth'
 import { useAuthStore } from '../stores/authStore'
+import { usePasswordPolicy } from '../hooks/usePasswordPolicy'
+import PasswordChecklist from './PasswordChecklist'
 
 const COOLDOWN_SECONDS = 60
 
@@ -52,6 +54,9 @@ export default function LegacyFirebaseMigration({ account }) {
     && firebaseAuth.projectId() === config.firebase_project_id
   const localAccount = isAuthenticated && authProvider === 'local' && user?.id != null
   const connected = Boolean(user?.firebase_connected || user?.google_connected)
+  const passwordPolicy = usePasswordPolicy(targetPassword, target === 'create' && firebaseEnabled)
+  const createPasswordValid = target !== 'create' || (passwordPolicy.valid && targetPassword.length > 0
+    && targetPassword === confirmPassword)
 
   useEffect(() => {
     const enabled = configLoaded && config?.firebase_enabled === true && config?.firebase_password_enabled === true
@@ -75,7 +80,7 @@ export default function LegacyFirebaseMigration({ account }) {
         }
       }
     }).catch(() => {
-      if (active) setError('Não foi possível recuperar o acesso Firebase iniciado anteriormente.')
+      if (active) setError('Não foi possível recuperar o acesso iniciado anteriormente.')
     }).finally(() => {
       if (active) setRestoreChecked(true)
     })
@@ -117,9 +122,10 @@ export default function LegacyFirebaseMigration({ account }) {
 
   const handleTargetSubmit = async (event) => {
     event.preventDefault()
+    if (target === 'create' && (!passwordPolicy.valid || !targetPassword || targetPassword !== confirmPassword)) return
     if (target === 'create' && targetPassword !== confirmPassword) {
       flushSync(clearTargetPasswords)
-      setError('As senhas da nova conta Firebase não coincidem.')
+      setError('As senhas do novo acesso não coincidem.')
       return
     }
     const emailValue = email
@@ -136,7 +142,7 @@ export default function LegacyFirebaseMigration({ account }) {
     } catch (failure) {
       const signedOut = await cleanupFirebase()
       const message = failure?.code === 'auth/weak-password'
-        ? 'A senha não atende aos requisitos de segurança configurados no Firebase.'
+        ? 'A senha não atende aos requisitos de segurança configurados.'
         : 'Não foi possível validar o acesso por e-mail. Confira os dados e tente novamente.'
       setError(signedOut ? message : `${message} ${cleanupFailure}`)
     } finally {
@@ -230,11 +236,11 @@ export default function LegacyFirebaseMigration({ account }) {
       <div>
         <h2 id="firebase-migration-heading" className="text-base font-semibold text-gray-900">Conectar acesso por e-mail</h2>
         <p className="mt-1 text-sm text-gray-600">
-          Conecte um método Firebase à sua conta USAGI atual. Suas transcrições e demais dados continuam na mesma conta.
+          Conecte um método de acesso à sua conta USAGI atual. Suas transcrições e demais dados continuam na mesma conta.
         </p>
       </div>
 
-      {!restoreChecked && <p role="status" className="text-sm text-gray-600">Verificando um acesso Firebase iniciado anteriormente…</p>}
+      {!restoreChecked && <p role="status" className="text-sm text-gray-600">Verificando um acesso iniciado anteriormente…</p>}
 
       {restoreChecked && stage === 'credentials' && <>
         <fieldset className="space-y-2">
@@ -257,15 +263,22 @@ export default function LegacyFirebaseMigration({ account }) {
           </label>
           <label htmlFor="migration-password" className="block text-sm font-medium text-gray-700">Senha do acesso por e-mail
             <input id="migration-password" type="password" autoComplete={target === 'create' ? 'new-password' : 'current-password'}
-              required minLength={target === 'create' ? 12 : undefined} value={targetPassword}
+              required value={targetPassword}
               onChange={(event) => setTargetPassword(event.target.value)} className="input mt-2" />
           </label>
           {target === 'create' && <label htmlFor="migration-confirm-password" className="block text-sm font-medium text-gray-700">Confirmar senha
             <input id="migration-confirm-password" type="password" autoComplete="new-password" required
-              minLength={12} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="input mt-2" />
+              value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="input mt-2" />
           </label>}
+          {target === 'create' && <PasswordChecklist status={passwordPolicy.status} password={targetPassword}
+            confirmation={confirmPassword} id="migration-password-policy" />}
+          {target === 'create' && passwordPolicy.loading && <p role="status" className="text-xs text-gray-600">Verificando requisitos…</p>}
+          {target === 'create' && passwordPolicy.error && <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-red-800">
+            <span>Não foi possível consultar os requisitos da senha. Verifique sua conexão e tente novamente.</span>
+            <button type="button" className="font-medium underline" onClick={passwordPolicy.retry}>Tentar novamente</button>
+          </div>}
           {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-          <Button type="submit" loading={loading}>
+          <Button type="submit" loading={loading || (target === 'create' && passwordPolicy.loading)} disabled={target === 'create' && !createPasswordValid}>
             {target === 'create' ? 'Criar acesso por e-mail' : 'Continuar'}
           </Button>
         </form>

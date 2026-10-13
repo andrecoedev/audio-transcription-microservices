@@ -39,10 +39,11 @@ it('offers Google security management only for the verified Google sign-in metho
 
 it('does not infer Google management when the backend identifies password sign-in', async () => {
   authService.me.mockResolvedValue({ authenticated: true, user: { ...account, auth_provider: 'firebase', firebase_sign_in_provider: 'password' } })
-  render(<AccountSettings />)
-  expect(await screen.findByText('Gerenciada pelo Firebase')).toBeTruthy()
+  const { container } = render(<AccountSettings />)
+  expect(await screen.findByText('Gerenciada pelo método conectado')).toBeTruthy()
   expect(screen.queryByText('Gerenciada pelo Google')).toBeNull()
   expect(screen.queryByRole('link', { name: 'Gerenciar no Google' })).toBeNull()
+  expect(container.textContent).not.toMatch(/Firebase|PostgreSQL|UID|conta local/i)
 })
 
 it('does not fetch private account data for Guest', () => {

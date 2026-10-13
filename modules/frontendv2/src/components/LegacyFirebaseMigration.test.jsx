@@ -10,7 +10,7 @@ vi.mock('../services/authService', () => ({ authService: { getConfig: vi.fn(), l
 vi.mock('../services/firebaseAuth', () => ({
   firebaseAuth: {
     isConfigured: vi.fn(), projectId: vi.fn(), createWithEmail: vi.fn(), signInWithEmail: vi.fn(),
-    getEmailVerificationState: vi.fn(), refreshVerification: vi.fn(), resendVerification: vi.fn(), signOut: vi.fn(),
+    getEmailVerificationState: vi.fn(), refreshVerification: vi.fn(), resendVerification: vi.fn(), signOut: vi.fn(), validatePassword: vi.fn(),
   },
 }))
 
@@ -23,6 +23,15 @@ beforeEach(() => {
   firebaseAuth.isConfigured.mockReturnValue(true)
   firebaseAuth.projectId.mockReturnValue('project-a')
   firebaseAuth.signOut.mockResolvedValue(undefined)
+  firebaseAuth.validatePassword.mockResolvedValue({
+    isValid: true,
+    passwordPolicy: { customStrengthOptions: { minPasswordLength: 8 } },
+    meetsMinPasswordLength: true,
+    meetsMinPasswordUppercase: true,
+    meetsMinPasswordLowercase: true,
+    meetsMinPasswordNumeric: true,
+    meetsMinPasswordNonAlphanumeric: true,
+  })
   firebaseAuth.getEmailVerificationState.mockResolvedValue(null)
   useAuthStore.setState({
     user: localUser, authProvider: 'local', isAuthenticated: true,
@@ -70,12 +79,13 @@ describe('LegacyFirebaseMigration', () => {
 
     fireEvent.click(await screen.findByLabelText('Criar acesso por e-mail'))
     fireEvent.change(screen.getByLabelText('E-mail do acesso'), { target: { value: 'new@example.test' } })
-    fireEvent.change(screen.getByLabelText('Senha do acesso por e-mail'), { target: { value: 'target-password' } })
-    fireEvent.change(screen.getByLabelText('Confirmar senha'), { target: { value: 'target-password' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Criar acesso por e-mail' }))
+    fireEvent.change(screen.getByLabelText('Senha do acesso por e-mail'), { target: { value: 'valid8ch' } })
+    fireEvent.change(screen.getByLabelText('Confirmar senha'), { target: { value: 'valid8ch' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Criar acesso por e-mail' }))
 
     expect(await screen.findByText(/Confirme o endereço pelo link/)).toBeTruthy()
-    expect(firebaseAuth.createWithEmail).toHaveBeenCalledWith('new@example.test', 'target-password')
+    expect(firebaseAuth.createWithEmail).toHaveBeenCalledWith('new@example.test', 'valid8ch')
+    expect(firebaseAuth.validatePassword).toHaveBeenCalledWith('valid8ch')
     expect(screen.queryByLabelText('Senha do acesso por e-mail')).toBeNull()
     expect(screen.queryByLabelText('Confirmar senha')).toBeNull()
     expect(screen.getByRole('button', { name: 'Reenviar e-mail (60s)' }).disabled).toBe(true)
@@ -89,6 +99,12 @@ describe('LegacyFirebaseMigration', () => {
     expect(authService.linkGoogle).toHaveBeenCalledWith('verified-id-token', 'legacy-password')
     expect(screen.getByRole('status').textContent).toContain('Seus dados permanecem nesta conta')
     expect(firebaseAuth.signInWithEmail).not.toHaveBeenCalled()
+  })
+
+  it('does not expose implementation or storage terminology in its visible copy', async () => {
+    const { container } = renderMigration()
+    await screen.findByRole('heading', { name: 'Conectar acesso por e-mail' })
+    expect(container.textContent).not.toMatch(/Firebase|PostgreSQL|UID|conta local/i)
   })
 
   it('uses an existing verified Firebase account without calling Firebase login exchange', async () => {

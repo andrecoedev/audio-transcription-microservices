@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { authService } from '../services/authService'
 import { firebaseAuth } from '../services/firebaseAuth'
 import Button from './Button'
+import { usePasswordPolicy } from '../hooks/usePasswordPolicy'
+import PasswordChecklist from './PasswordChecklist'
 
 const GENERIC_RESET_MESSAGE = 'Se este e-mail puder redefinir uma senha, enviaremos as instruções.'
 
@@ -41,6 +43,8 @@ export default function FirebaseAccountMethods({ account, onUpdated }) {
   const hasPassword = methods.includes('password')
   const hasGoogle = methods.includes('google.com')
   const accessEmail = account.firebase_email
+  const passwordPolicy = usePasswordPolicy(password, passwordEnabled && !hasPassword)
+  const passwordFormValid = passwordPolicy.valid && password.length > 0 && password === confirmation
 
   const run = async (operation, successMessage) => {
     setBusy(true)
@@ -65,16 +69,13 @@ export default function FirebaseAccountMethods({ account, onUpdated }) {
 
   const handleLinkPassword = async (event) => {
     event.preventDefault()
+    if (!passwordPolicy.valid || !password || password !== confirmation) return
     const newPassword = password
     const confirmPassword = confirmation
     setPassword('')
     setConfirmation('')
     setError('')
     setMessage('')
-    if (newPassword.length < 12) {
-      setError('A senha deve ter pelo menos 12 caracteres.')
-      return
-    }
     if (newPassword !== confirmPassword) {
       setError('As senhas não correspondem.')
       return
@@ -117,24 +118,30 @@ export default function FirebaseAccountMethods({ account, onUpdated }) {
       <p>Métodos de acesso conectados:</p>
       {hasGoogle && <p>Google</p>}
       {hasPassword && <p>E-mail e senha</p>}
-      {!hasGoogle && !hasPassword && <p>Nenhum método confirmado pelo Firebase.</p>}
+      {!hasGoogle && !hasPassword && <p>Nenhum método de acesso confirmado.</p>}
     </div>
 
     {passwordEnabled && accessEmail && <div className="space-y-3">
       {hasPassword
         ? <Button type="button" variant="outline" loading={busy} onClick={handleReset}>Redefinir senha</Button>
         : <form onSubmit={handleLinkPassword} className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-900">Adicionar senha a esta conta</h3>
+          <h3 className="text-sm font-semibold text-gray-900">Conectar acesso por e-mail</h3>
           <p className="text-sm text-gray-600">Você poderá entrar com Google ou senha, sem mudar de conta.</p>
           <label className="block text-sm font-medium text-gray-700" htmlFor="firebase-new-password">Nova senha
-            <input id="firebase-new-password" type="password" autoComplete="new-password" minLength={12} required
+            <input id="firebase-new-password" type="password" autoComplete="new-password" required
               value={password} onChange={event => setPassword(event.target.value)} className="input mt-2" />
           </label>
           <label className="block text-sm font-medium text-gray-700" htmlFor="firebase-confirm-password">Confirmar nova senha
-            <input id="firebase-confirm-password" type="password" autoComplete="new-password" minLength={12} required
+            <input id="firebase-confirm-password" type="password" autoComplete="new-password" required
               value={confirmation} onChange={event => setConfirmation(event.target.value)} className="input mt-2" />
           </label>
-          <Button type="submit" loading={busy}>Adicionar senha</Button>
+          <PasswordChecklist status={passwordPolicy.status} password={password} confirmation={confirmation} id="account-password-policy" />
+          {passwordPolicy.loading && <p role="status" className="text-xs text-gray-600">Verificando requisitos…</p>}
+          {passwordPolicy.error && <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-red-800">
+            <span>Não foi possível consultar os requisitos da senha. Verifique sua conexão e tente novamente.</span>
+            <button type="button" className="font-medium underline" onClick={passwordPolicy.retry}>Tentar novamente</button>
+          </div>}
+          <Button type="submit" loading={busy || passwordPolicy.loading} disabled={!passwordFormValid}>Conectar acesso</Button>
         </form>}
     </div>}
 

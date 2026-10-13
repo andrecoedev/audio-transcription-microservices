@@ -22,7 +22,15 @@ beforeEach(() => {
   firebaseAuth.getAuthMethods.mockResolvedValue(['google.com'])
   firebaseAuth.isConfigured.mockReturnValue(true)
   firebaseAuth.projectId.mockReturnValue('project-test')
-  firebaseAuth.validatePassword.mockResolvedValue({ isValid: true })
+  firebaseAuth.validatePassword.mockResolvedValue({
+    isValid: true,
+    passwordPolicy: { customStrengthOptions: { minPasswordLength: 8 } },
+    meetsMinPasswordLength: true,
+    meetsMinPasswordUppercase: true,
+    meetsMinPasswordLowercase: true,
+    meetsMinPasswordNumeric: true,
+    meetsMinPasswordNonAlphanumeric: true,
+  })
 })
 afterEach(cleanup)
 
@@ -40,12 +48,26 @@ it('validates and links a password to the current Firebase user, then clears bot
   const confirmation = screen.getByLabelText('Confirmar nova senha')
   fireEvent.change(password, { target: { value: 'a-long-private-password' } })
   fireEvent.change(confirmation, { target: { value: 'a-long-private-password' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Adicionar senha' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Conectar acesso' }))
   await waitFor(() => expect(firebaseAuth.linkPassword).toHaveBeenCalledWith(account.firebase_email, 'a-long-private-password'))
   expect(firebaseAuth.validatePassword).toHaveBeenCalledWith('a-long-private-password')
   expect((await screen.findByRole('status')).textContent).toContain('Senha conectada a esta conta')
   expect(password.value).toBe('')
   expect(confirmation.value).toBe('')
+})
+
+it('accepts an eight-character password when the SDK policy says it is valid', async () => {
+  render(<FirebaseAccountMethods account={account} />)
+  fireEvent.change(await screen.findByLabelText('Nova senha'), { target: { value: 'valid8ch' } })
+  fireEvent.change(screen.getByLabelText('Confirmar nova senha'), { target: { value: 'valid8ch' } })
+  fireEvent.click(await screen.findByRole('button', { name: 'Conectar acesso' }))
+  await waitFor(() => expect(firebaseAuth.linkPassword).toHaveBeenCalledWith(account.firebase_email, 'valid8ch'))
+})
+
+it('does not expose implementation or storage terminology in its visible copy', async () => {
+  const { container } = render(<FirebaseAccountMethods account={account} />)
+  await screen.findByRole('button', { name: 'Conectar acesso' })
+  expect(container.textContent).not.toMatch(/Firebase|PostgreSQL|UID|conta local/i)
 })
 
 it('clears rejected credentials and never displays provider errors or password values', async () => {
@@ -55,7 +77,7 @@ it('clears rejected credentials and never displays provider errors or password v
   const confirmation = screen.getByLabelText('Confirmar nova senha')
   fireEvent.change(password, { target: { value: 'a-long-private-password' } })
   fireEvent.change(confirmation, { target: { value: 'a-long-private-password' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Adicionar senha' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Conectar acesso' }))
   expect((await screen.findByRole('alert')).textContent).toContain('Não foi possível conectar a senha')
   expect(password.value).toBe('')
   expect(confirmation.value).toBe('')
@@ -78,5 +100,5 @@ it('does not render password actions when the feature flag is unavailable', asyn
   authService.getConfig.mockResolvedValue({ firebase_enabled: true, firebase_project_id: 'project-test' })
   render(<FirebaseAccountMethods account={account} />)
   await waitFor(() => expect(authService.getConfig).toHaveBeenCalledOnce())
-  expect(screen.queryByRole('button', { name: 'Adicionar senha' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Conectar acesso' })).toBeNull()
 })
