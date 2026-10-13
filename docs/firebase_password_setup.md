@@ -19,8 +19,8 @@ são copiados para Firebase, removidos ou usados como senha nova.
 2. No projeto correto do Firebase Console, habilite Authentication > Sign-in
    method > Email/Password. Login por link não faz parte desta implementação.
 3. Configure política de senha e proteção contra enumeração de e-mails no Console.
-   A UI pede no mínimo 12 caracteres e consulta a política oficial pelo SDK;
-   o serviço pode exigir outros critérios. A configuração do Console deve
+   A UI consulta `validatePassword()` e exibe somente critérios retornados pelo
+   SDK, sem mínimo próprio. A configuração do Console deve
    impor a política desejada também a chamadas diretas.
 4. Revise templates/idioma de verificação e redefinição e domínios autorizados.
    Os links usam os handlers oficiais hospedados pelo Firebase, incluindo
@@ -63,7 +63,11 @@ mantêm o rate limiting Redis existente, inclusive login/link e falha segura.
 
 ## Migração iniciada pelo usuário
 
-1. Entre explicitamente com usuário/senha da conta USAGI existente.
+1. O login público oferece somente Google e e-mail/senha. O caminho temporário
+   `/login?legacy=1&returnTo=%2Fsettings` permite confirmar usuário/senha antigos
+   para atualizar o método de acesso. É uma entrada explícita documentada, não
+   um segredo ou controle de autorização. Não há cadastro legado no frontend,
+   nem fallback automático quando a configuração Firebase está indisponível.
 2. Em Minha conta, escolha conectar um acesso por e-mail existente ou criar um
    acesso Firebase. Não use primeiro login de conta nova para migrar dados.
 3. Autentique a identidade de destino; se necessário, confirme seu e-mail.
@@ -99,8 +103,18 @@ Google homologado localmente para conta nova/vínculo. Na auditoria somente leit
 do banco de desenvolvimento `transcription_db`, havia duas contas, uma com senha
 local e uma binding Firebase, sem órfãos. Não houve migração de contas reais.
 
-A consulta real Admin de configuração respondeu 200 e indicou Email/Password
-desabilitado. Portanto testes SDK simulados e PostgreSQL descartável não comprovam
+A consulta real Admin em 09/10 respondeu 200 e indicou Email/Password desabilitado.
+Na revisão UX de 13/10/2026, Admin e SDK 12.19.0 confirmaram Email/Password ativo
+e política mínimo 8/máximo 4096, maiúscula, minúscula, número e especial. O estado
+de imposição retornou `OFF`: revisar manualmente o modo no Console caso esses
+critérios devam ser impostos também a chamadas diretas. Nenhuma configuração
+foi alterada automaticamente. O checklist deriva dos nomes públicos
+`PasswordValidationStatus`/`PasswordPolicy`, não dos nomes da API Admin.
+Validações obsoletas de digitação são descartadas; cadastro/conexão de senha
+ficam bloqueados enquanto os critérios/confirmação não forem satisfeitos ou
+não for possível consultar a política. Não se avalia senha legada com política nova.
+O usuário informou password funcional localmente; a consulta de política não
+substitui o teste interativo de cadastro/verificação/reset. Testes simulados não comprovam
 homologação real de password. Antes de liberar, verificar com contas sintéticas
 autorizadas: signup, recebimento/verificação, reenvio, login, reset e link expirado,
 refresh/reabertura/logout, Google, migração preservando ID/ownership/plano/BYOK,
