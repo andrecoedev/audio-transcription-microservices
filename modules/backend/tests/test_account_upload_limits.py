@@ -50,6 +50,7 @@ def test_authenticated_policy_is_account_scoped(db_context, monkeypatch):
         response = client.get("/settings/providers", headers=public_headers(user_id))
         assert response.status_code == 200
         assert response.json()["upload_policy"]["max_upload_mb"] == expected
+        assert response.json()["upload_policy"]["max_audio_seconds"] == settings.PUBLIC_MAX_AUDIO_SECONDS
         with db_context["session_factory"]() as db:
             assert db.get(User, user_id).plan == "free"
     assert client.get("/guest/policy").json()["max_upload_mb"] == settings.PUBLIC_MAX_UPLOAD_MB

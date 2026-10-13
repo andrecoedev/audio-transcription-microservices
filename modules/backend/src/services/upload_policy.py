@@ -15,4 +15,7 @@ def upload_policy(user):
     return {
         "max_upload_mb": upload_limit_mb(user.user_id, user.registration_source),
         "allowed_extensions": settings.allowed_extensions_list,
+        "max_audio_seconds": (
+            settings.PUBLIC_MAX_AUDIO_SECONDS if user.registration_source == "public" else None
+        ),
     }
