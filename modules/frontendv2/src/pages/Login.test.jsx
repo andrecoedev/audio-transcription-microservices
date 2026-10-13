@@ -57,6 +57,21 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Login', () => {
+  it('uses the same decorative lock layout and accessible input attributes for both signup password fields', () => {
+    render(<MemoryRouter><Login signup /></MemoryRouter>)
+    const password = screen.getByLabelText('Senha')
+    const confirmation = screen.getByLabelText('Confirmar senha')
+    expect(confirmation.className).toBe(password.className)
+    expect(confirmation.parentElement.className).toBe(password.parentElement.className)
+    const passwordIcon = password.previousElementSibling
+    const confirmationIcon = confirmation.previousElementSibling
+    expect(confirmationIcon.tagName.toLowerCase()).toBe('svg')
+    expect(confirmationIcon.getAttribute('class')).toBe(passwordIcon.getAttribute('class'))
+    expect(confirmationIcon.getAttribute('aria-hidden')).toBe('true')
+    for (const attribute of ['type', 'autocomplete', 'required', 'aria-describedby']) {
+      expect(confirmation.getAttribute(attribute)).toBe(password.getAttribute(attribute))
+    }
+  })
   it('does not call signup even when an invalid form is submitted directly', async () => {
     enableFirebase()
     firebaseAuth.validatePassword.mockResolvedValue({ isValid: false,

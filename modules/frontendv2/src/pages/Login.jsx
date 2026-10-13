@@ -358,8 +358,11 @@ export default function Login({ signup = false }) {
                 </label>
                 {isFirebaseSignup && <>
                   <label htmlFor="firebase-password-confirm" className="block text-sm font-medium text-gray-700">Confirmar senha
-                    <input id="firebase-password-confirm" autoComplete="new-password" type="password" className="input mt-2" required aria-describedby="signup-password-policy"
-                      value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+                    <span className="relative mt-2 block">
+                      <Lock aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                      <input id="firebase-password-confirm" autoComplete="new-password" type="password" className="input pl-10" required aria-describedby="signup-password-policy"
+                        value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+                    </span>
                   </label>
                   <PasswordChecklist status={policy.status} password={password} confirmation={confirmPassword} id="signup-password-policy" />
                   {policy.loading && <p role="status" className="text-xs text-gray-500">Verificando requisitos…</p>}
