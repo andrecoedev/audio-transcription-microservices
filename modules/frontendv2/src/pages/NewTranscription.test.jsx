@@ -24,6 +24,32 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
+it('uses each authenticated account upload policy while guests keep their guest limit', async () => {
+  const authenticatedPolicy = { ...policy, max_upload_mb: 5120 }
+  audioService.getProviderSettings.mockResolvedValue({ ...settings(true, true), upload_policy: authenticatedPolicy })
+  useAuthStore.setState({ user: { registration_source: 'public' }, isAuthenticated: true })
+  const publicAccount = render(<MemoryRouter><NewTranscription /></MemoryRouter>)
+  expect((await screen.findByLabelText('Limites desta conta')).textContent).toContain('5.120')
+  publicAccount.unmount()
+
+  useAuthStore.setState({ user: null, isAuthenticated: false })
+  const guest = render(<MemoryRouter><NewTranscription guestPolicy={policy} /></MemoryRouter>)
+  expect(screen.getByLabelText('Limites desta conta').textContent).toContain('100')
+  guest.unmount()
+
+  audioService.getProviderSettings.mockResolvedValue({ ...settings(true, true), upload_policy: policy })
+  useAuthStore.setState({ user: { registration_source: 'public' }, isAuthenticated: true })
+  render(<MemoryRouter><NewTranscription /></MemoryRouter>)
+  expect((await screen.findByLabelText('Limites desta conta')).textContent).toContain('100')
+})
+
+it('falls back to public limits when an older provider settings response omits upload_policy', async () => {
+  audioService.getProviderSettings.mockResolvedValue(settings(true, true))
+  useAuthStore.setState({ user: { registration_source: 'public' }, isAuthenticated: true })
+  render(<MemoryRouter><NewTranscription /></MemoryRouter>)
+  expect((await screen.findByLabelText('Limites desta conta')).textContent).toContain('100')
+})
+
 it.each([[true, false], [false, true]])('labels and blocks unavailable AssemblyAI (available=%s, allowed=%s)', async (available, allowed) => {
   audioService.getProviderSettings.mockResolvedValue(settings(available, allowed))
   const { container } = render(<MemoryRouter><NewTranscription /></MemoryRouter>)

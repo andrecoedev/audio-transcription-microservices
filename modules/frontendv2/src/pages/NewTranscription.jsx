@@ -53,8 +53,9 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
     }).finally(() => { if (active) setProviderLoading(false) })
     return () => { active = false }
   }, [guestPolicy, user, providerAttempt])
-  const limits = guestPolicy || (publicAccount ? publicLimits : null)
-  const allowedExtensions = (guestPolicy || publicLimits)?.allowed_extensions || EMPTY_EXTENSIONS
+  const authenticatedUploadPolicy = user ? providerSettings?.upload_policy : null
+  const limits = guestPolicy || (authenticatedUploadPolicy || (publicAccount ? publicLimits : null))
+  const allowedExtensions = (guestPolicy || (user ? (authenticatedUploadPolicy || publicLimits) : publicLimits))?.allowed_extensions || EMPTY_EXTENSIONS
   const formatsLabel = allowedExtensions.map(extension => extension.toUpperCase()).join(', ')
   const policyReady = allowedExtensions.length > 0
   const processingAllowed = !guestPolicy || guestPolicy.can_create_job === true
