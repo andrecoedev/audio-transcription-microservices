@@ -62,6 +62,67 @@ def test_all_free_accounts_including_admin_are_denied(account, admin, provider, 
     assert error.value.status_code == 403
 
 
+def enable_dev_local(monkeypatch, account, user_id=1):
+    from types import SimpleNamespace
+    monkeypatch.setattr(settings, "APP_ENV", "dev")
+    monkeypatch.setattr(settings, "DEV_LOCAL_ACCESS_ENABLED", True)
+    monkeypatch.setattr(settings, "LOCAL_TRANSCRIPTION_ENABLED", True)
+    account.get(User, user_id).development_local_access = True
+    account.commit()
+    # SQLite does not implement row locks; emulate the supported dialect name
+    # in this isolated sequential unit test without weakening the runtime guard.
+    real_get_bind = account.get_bind
+    monkeypatch.setattr(account, "get_bind", lambda *args, **kwargs:
+        SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+        if not args and not kwargs else real_get_bind(*args, **kwargs))
+
+
+def test_dev_local_access_bypasses_commercial_quota_only_for_local(account, monkeypatch):
+    limits(monkeypatch, monthly_usagi_seconds=0, max_audio_seconds=0,
+           max_stored_bytes=0, max_queued_jobs=0, max_processing_jobs=0)
+    enable_dev_local(monkeypatch, account)
+    row = job(account)
+    hold = reserve(account, row, size=10_000)
+    account.commit()
+    assert reserve(account, row, size=10_000).id == hold.id
+    assert hold.reserved_seconds == settings.DEV_LOCAL_MAX_AUDIO_SECONDS
+    policy.claim_reservation(account, row.id)
+    account.commit()
+    with pytest.raises(HTTPException):
+        policy.authorize_inference(account, row.id, settings.DEV_LOCAL_MAX_AUDIO_SECONDS + 0.001)
+    policy.authorize_inference(account, row.id, 7.25)
+    account.commit()
+    policy.finish_reservation(account, row.id, success=True)
+    account.commit()
+    view = policy.plan_view(account, 1)
+    assert view["development_access"] is True
+    assert view["quota"]["limit_seconds"] is None
+    assert view["quota"]["available_seconds"] is None
+    assert Decimal(view["quota"]["consumed_seconds"]) == Decimal("7.250")
+    assert Decimal(view["quota"]["reserved_seconds"]) == Decimal(0)
+    assert view["limits"]["max_audio_seconds"] is None
+    with pytest.raises(HTTPException):
+        policy.require_execution(account, 1, "assemblyai", "platform")
+
+
+def test_dev_local_access_is_revoked_before_worker_claim(account, monkeypatch):
+    enable_dev_local(monkeypatch, account)
+    row = job(account)
+    reserve(account, row)
+    account.commit()
+    account.get(User, 1).development_local_access = False
+    account.commit()
+    with pytest.raises(HTTPException):
+        policy.claim_reservation(account, row.id)
+
+
+def test_dev_local_permission_requires_both_environment_flags(account, monkeypatch):
+    enable_dev_local(monkeypatch, account)
+    monkeypatch.setattr(settings, "DEV_LOCAL_ACCESS_ENABLED", False)
+    with pytest.raises(HTTPException):
+        policy.require_execution(account, 1, "whisper", "none")
+
+
 def test_starter_byok_is_separate_and_does_not_inherit_platform(account, monkeypatch):
     account.get(User, 1).plan = "starter"
     account.commit()

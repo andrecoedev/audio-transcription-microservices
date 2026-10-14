@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 import json
 from pathlib import Path
 from threading import Barrier
@@ -31,6 +32,42 @@ pytestmark = pytest.mark.postgres
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 LOCAL_SELECTION = {"provider": "whisper", "credential_source": "none"}
 BYOK_SELECTION = {"provider": "assemblyai", "credential_source": "user"}
+
+
+def test_development_local_permission_large_upload_and_revocation(postgres_session_factory, monkeypatch):
+    from src.services.transcription_entitlements import authorize_inference, finish_reservation
+
+    monkeypatch.setattr(settings, "APP_ENV", "dev")
+    monkeypatch.setattr(settings, "DEV_LOCAL_ACCESS_ENABLED", True)
+    monkeypatch.setattr(settings, "LOCAL_TRANSCRIPTION_ENABLED", True)
+    monkeypatch.setattr(settings, "LOCAL_TRANSCRIPTION_HOMOLOGATED", False)
+    monkeypatch.setattr(settings, "PLAN_POLICIES_JSON", "{}")
+    user_id = _seed_user(postgres_session_factory)
+    with postgres_session_factory() as db:
+        db.get(User, user_id).development_local_access = True
+        db.commit()
+        tid = _add_job(db, user_id, "development-local")
+        hold = _reserve(db, user_id, tid, LOCAL_SELECTION, size_bytes=5 * 1024**3)
+        db.commit()
+        assert hold.stored_bytes == 5 * 1024**3
+        assert _reserve(db, user_id, tid, LOCAL_SELECTION).id == hold.id
+        claim_reservation(db, tid)
+        db.commit()
+        authorize_inference(db, tid, 3600)
+        db.commit()
+        finish_reservation(db, tid, success=True)
+        db.commit()
+        view = plan_view(db, user_id)
+        assert view["quota"]["limit_seconds"] is None
+        assert view["quota"]["available_seconds"] is None
+        assert Decimal(view["quota"]["consumed_seconds"]) == 3600
+        assert view["byok"]["measured_seconds"] == "0"
+        db.get(User, user_id).development_local_access = False
+        db.commit()
+        assert plan_view(db, user_id)["development_access"] is False
+        with pytest.raises(HTTPException) as denied:
+            _reserve(db, user_id, _add_job(db, user_id, "revoked-local"), LOCAL_SELECTION)
+        assert denied.value.status_code == 403
 
 
 def _set_policy(monkeypatch, **overrides):

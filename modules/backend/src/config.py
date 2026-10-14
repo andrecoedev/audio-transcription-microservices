@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     PLAN_POLICIES_JSON: str = "{}"
     LOCAL_TRANSCRIPTION_ENABLED: bool = False
     LOCAL_TRANSCRIPTION_HOMOLOGATED: bool = False
+    DEV_LOCAL_ACCESS_ENABLED: bool = False
+    DEV_LOCAL_MAX_AUDIO_SECONDS: int = Field(default=86400, ge=1)
+    DEV_LOCAL_MAX_QUEUED_JOBS: int = Field(default=2, ge=1)
+    DEV_LOCAL_MAX_PROCESSING_JOBS: int = Field(default=1, ge=1)
     """Configurações da aplicação."""
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -7,6 +7,7 @@ unit tests usable with SQLite without making it a second production runtime.
 from sqlalchemy import (
     JSON,
     Boolean,
+    BigInteger,
     CheckConstraint,
     Column,
     Date,
@@ -151,6 +152,9 @@ class User(Base):
     is_superuser = Column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
+    development_local_access = Column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     created_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -201,7 +205,7 @@ class TranscriptionReservation(Base):
     state = Column(String(16), nullable=False)
     reserved_seconds = Column(Numeric(20, 3), nullable=False)
     measured_seconds = Column(Numeric(20, 3), nullable=True)
-    stored_bytes = Column(Integer, nullable=False)
+    stored_bytes = Column(BigInteger, nullable=False)
     input_reference = Column(String(500), nullable=False)
     storage_released_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

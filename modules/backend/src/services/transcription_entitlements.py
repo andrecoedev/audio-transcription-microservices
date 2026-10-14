@@ -46,6 +46,17 @@ def _aware(value):
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
+def has_development_local_access(user):
+    return bool(settings.APP_ENV == "dev" and settings.DEV_LOCAL_ACCESS_ENABLED
+                and settings.LOCAL_TRANSCRIPTION_ENABLED and user
+                and getattr(user, "is_active", True)
+                and getattr(user, "development_local_access", False))
+
+
+def development_local_access(db, user_id):
+    return has_development_local_access(db.get(User, user_id))
+
+
 def access(db, user_id, *, now=None, lock=False):
     now = now or now_utc()
     if lock and db.get_bind().dialect.name != "postgresql" and settings.APP_ENV != "test":
@@ -67,6 +78,8 @@ def access(db, user_id, *, now=None, lock=False):
         caps.add("transcription.local")
     else:
         caps.discard("transcription.local")  # Beta never bypasses infrastructure readiness.
+    if has_development_local_access(user):
+        caps.add("transcription.local")
     try:
         policies = json.loads(settings.PLAN_POLICIES_JSON)
         if not isinstance(policies, dict) or set(policies) - {"free", "starter", "business", "beta"}:
@@ -78,14 +91,15 @@ def access(db, user_id, *, now=None, lock=False):
 
 
 def require_execution(db, user_id, provider, credential_source):
-    _, caps, _, _ = access(db, user_id)
+    user, caps, _, _ = access(db, user_id)
     if provider == "groq" and credential_source != "platform":
         raise HTTPException(403, "Chave própria para este serviço ainda não está disponível.")
     capability = ("intelligence.groq.platform" if provider == "groq" else
         "transcription.local" if provider == "whisper" else
         ("transcription." if provider == "assemblyai" else "intelligence.") +
         ("byok" if credential_source == "user" else "platform"))
-    if capability not in caps:
+    dev_local = provider == "whisper" and credential_source == "none" and has_development_local_access(user)
+    if capability not in caps and not dev_local:
         message = "A transcrição fornecida pela USAGI ainda não está disponível neste ambiente." if provider == "whisper" else "Este serviço exige um plano autorizado ou acesso beta válido."
         raise HTTPException(403, message)
 
@@ -105,7 +119,8 @@ def plan_view(db, user_id, *, now=None):
     start, end = month_window(now)
     rows = _rows(db, user_id, start.date())
     used, reserved = _total(rows, "usagi", {"consumed"}), _total(rows, "usagi", HELD)
-    return {"plan": user.plan, "beta": {"capabilities": sorted(set().union(*(set(g.capabilities) for g in grants))),
+    dev_access = has_development_local_access(user)
+    result = {"plan": user.plan, "beta": {"capabilities": sorted(set().union(*(set(g.capabilities) for g in grants))),
         "expires_at": max(_aware(g.expires_at) for g in grants).isoformat()} if grants else None,
         "period_start": start.isoformat(), "renews_at": end.isoformat(),
         "quota": {"limit_seconds": limits.monthly_usagi_seconds, "consumed_seconds": str(used),
@@ -113,12 +128,24 @@ def plan_view(db, user_id, *, now=None):
         "byok": {"measured_seconds": str(sum((r.measured_seconds or Decimal(0) for r in rows if r.source == "byok" and r.state == "consumed"), Decimal(0))),
                  "pending_seconds": str(_total(rows, "byok", HELD))},
         "limits": limits.model_dump(exclude={"monthly_usagi_seconds"}),
-        "local_processing_available": "transcription.local" in caps}
+        "local_processing_available": "transcription.local" in caps,
+        "development_access": dev_access}
+    if dev_access:
+        result["quota"]["limit_seconds"] = None
+        result["quota"]["available_seconds"] = None
+        result["limits"]["max_audio_seconds"] = None
+        result["limits"]["max_stored_bytes"] = None
+        result["limits"]["max_queued_jobs"] = settings.DEV_LOCAL_MAX_QUEUED_JOBS
+        result["limits"]["max_processing_jobs"] = settings.DEV_LOCAL_MAX_PROCESSING_JOBS
+        result["technical_max_audio_seconds"] = settings.DEV_LOCAL_MAX_AUDIO_SECONDS
+    return result
 
 
 def reserve_transcription(db, user_id, transcription_id, selection, size_bytes, reference, *, now=None):
     now = now or now_utc()
-    _, _, limits, _ = access(db, user_id, now=now, lock=True)
+    user, _, limits, _ = access(db, user_id, now=now, lock=True)
+    dev_local = (selection["provider"] == "whisper" and selection["credential_source"] == "none"
+                 and has_development_local_access(user))
     operation = f"transcription:{transcription_id}"
     existing = db.query(TranscriptionReservation).filter_by(operation_key=operation).one_or_none()
     if existing:
@@ -126,7 +153,8 @@ def reserve_transcription(db, user_id, transcription_id, selection, size_bytes, 
             raise HTTPException(403, "A operação pertence a outra conta.")
         return existing
     require_execution(db, user_id, selection["provider"], selection["credential_source"])
-    if min(limits.max_audio_seconds, limits.max_stored_bytes, limits.max_queued_jobs, limits.max_processing_jobs) <= 0:
+    if not dev_local and min(limits.max_audio_seconds, limits.max_stored_bytes,
+            limits.max_queued_jobs, limits.max_processing_jobs) <= 0:
         raise HTTPException(503, "Os limites deste plano ainda não estão configurados para transcrição.")
     rows = _rows(db, user_id)
     # Persisted jobs also include pre-policy jobs; never ignore legacy concurrency.
@@ -134,7 +162,8 @@ def reserve_transcription(db, user_id, transcription_id, selection, size_bytes, 
         TranscriptionOwnership.transcription_id == TranscriptionJob.transcription_id).filter(
         TranscriptionOwnership.user_id == user_id, TranscriptionJob.status == "queued",
         TranscriptionJob.transcription_id != transcription_id).count()
-    if queued >= limits.max_queued_jobs:
+    max_queued = settings.DEV_LOCAL_MAX_QUEUED_JOBS if dev_local else limits.max_queued_jobs
+    if queued >= max_queued:
         raise HTTPException(429, "Sua fila está cheia. Aguarde uma transcrição terminar.")
     storage = sum(r.stored_bytes for r in rows if r.storage_released_at is None)
     # Conservative admission for historical uploads with no exact reservation.
@@ -143,13 +172,16 @@ def reserve_transcription(db, user_id, transcription_id, selection, size_bytes, 
         TranscriptionOwnership.user_id == user_id, TranscriptionReservation.id.is_(None),
         Transcription.id != transcription_id).all()
     storage += sum(math.ceil((r.file_size_mb or 0) * 1024 * 1024) for r in legacy)
-    if size_bytes < 0 or storage + size_bytes > limits.max_stored_bytes:
+    if size_bytes < 0 or (not dev_local and storage + size_bytes > limits.max_stored_bytes):
         raise HTTPException(429, "O limite de armazenamento foi atingido. Exclua arquivos que não precisa manter.")
     start, _ = month_window(now)
     source = "byok" if selection["credential_source"] == "user" else "usagi"
     monthly = [r for r in rows if r.period_start == start.date()]
     remaining = limits.monthly_usagi_seconds - _total(monthly, "usagi", HELD | {"consumed"})
-    seconds = Decimal(limits.max_audio_seconds) if source == "byok" else min(Decimal(limits.max_audio_seconds), remaining)
+    if dev_local:
+        seconds = Decimal(settings.DEV_LOCAL_MAX_AUDIO_SECONDS)
+    else:
+        seconds = Decimal(limits.max_audio_seconds) if source == "byok" else min(Decimal(limits.max_audio_seconds), remaining)
     if seconds < 1:
         raise HTTPException(429, "Sua franquia mensal está esgotada. Aguarde a renovação.")
     row = TranscriptionReservation(id=str(uuid4()), operation_key=operation, transcription_id=transcription_id,
@@ -169,7 +201,7 @@ def claim_reservation(db, transcription_id):
     row = reservation_for(db, transcription_id)
     if not row or not row.user_id:
         raise HTTPException(403, "Esta transcrição não possui autorização de processamento válida.")
-    _, _, limits, _ = access(db, row.user_id, lock=True)
+    user, _, limits, _ = access(db, row.user_id, lock=True)
     db.refresh(row)
     require_execution(db, row.user_id, row.provider, row.credential_source)
     if row.state != "queued":
@@ -178,7 +210,10 @@ def claim_reservation(db, transcription_id):
         TranscriptionOwnership.transcription_id == TranscriptionJob.transcription_id).filter(
         TranscriptionOwnership.user_id == row.user_id, TranscriptionJob.status == "processing",
         TranscriptionJob.transcription_id != transcription_id).count()
-    if running >= limits.max_processing_jobs:
+    dev_local = (row.provider == "whisper" and row.credential_source == "none"
+                 and has_development_local_access(user))
+    max_processing = settings.DEV_LOCAL_MAX_PROCESSING_JOBS if dev_local else limits.max_processing_jobs
+    if running >= max_processing:
         raise HTTPException(429, "O limite de transcrições simultâneas foi atingido.")
     row.state = "processing"
     return row
@@ -188,7 +223,7 @@ def authorize_inference(db, transcription_id, duration):
     row = reservation_for(db, transcription_id)
     if not row or not row.user_id:
         raise HTTPException(403, "Autorização de processamento ausente.")
-    _, _, limits, _ = access(db, row.user_id, lock=True)
+    user, _, limits, _ = access(db, row.user_id, lock=True)
     db.refresh(row)
     require_execution(db, row.user_id, row.provider, row.credential_source)
     # Round only to millisecond precision, always upwards; never trust client metadata.
@@ -196,7 +231,10 @@ def authorize_inference(db, transcription_id, duration):
     if not seconds.is_finite() or seconds <= 0:
         raise HTTPException(422, "Não foi possível verificar a duração do áudio.")
     seconds = seconds.quantize(Decimal("0.001"), rounding=ROUND_CEILING)
-    if row.state != "processing" or seconds > min(row.reserved_seconds, Decimal(limits.max_audio_seconds)):
+    dev_local = (row.provider == "whisper" and row.credential_source == "none"
+                 and has_development_local_access(user))
+    max_duration = settings.DEV_LOCAL_MAX_AUDIO_SECONDS if dev_local else limits.max_audio_seconds
+    if row.state != "processing" or seconds > min(row.reserved_seconds, Decimal(max_duration)):
         raise HTTPException(429, "O áudio excede o tempo disponível para esta transcrição.")
     row.measured_seconds = seconds
     row.reserved_seconds = seconds  # Release unused maximum before irreversible inference.
