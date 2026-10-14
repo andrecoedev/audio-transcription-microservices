@@ -208,6 +208,31 @@ class TranscriptionReservation(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
+class AccountDeletion(Base):
+    """Durable deletion receipt and API-only Firebase retry intent.
+
+    No FK to the erased user. UID exists only until identity cleanup succeeds.
+    Numeric receipts survive to reconcile older backups before reopening them.
+    """
+    __tablename__ = "account_deletions"
+    __table_args__ = (
+        UniqueConstraint("deleted_user_id", name="uq_account_deletion_user"),
+        CheckConstraint("attempts >= 0", name="ck_account_deletion_attempts"),
+        CheckConstraint("(firebase_project_id IS NULL) = (firebase_uid IS NULL)", name="ck_account_deletion_identity_pair"),
+        CheckConstraint("completed_at IS NULL OR firebase_uid IS NULL", name="ck_account_deletion_completed"),
+        Index("ix_account_deletion_identity", "firebase_project_id", "firebase_uid"),
+    )
+    id = Column(String(36), primary_key=True)
+    deleted_user_id = Column(Integer, nullable=False)
+    blocks_bootstrap = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    requested_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    firebase_project_id = Column(String(128), nullable=True)
+    firebase_uid = Column(String(128), nullable=True)
+    attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    last_attempt_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
 class FirebaseIdentity(Base):
     """Firebase identity bound to one internal user."""
 
