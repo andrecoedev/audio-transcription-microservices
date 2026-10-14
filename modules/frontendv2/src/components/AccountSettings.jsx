@@ -99,7 +99,11 @@ export default function AccountSettings() {
       const result = await authService.deleteAccount(body, token)
       setShowDelete(false)
       setConfirmation('')
-      try { await endSession() } catch { /* access is already cleared; deletion remains successful */ }
+      try { await endSession() } catch {
+        // Domain access is already cleared, but external sign-out failure is
+        // not evidence of completed browser-session cleanup.
+        toast.error('Conta excluída, mas não foi possível sair da sessão externa. Feche o navegador e tente sair novamente.')
+      }
       navigate('/', { replace: true })
       const pendingMessage = result.cleanup_pending && result.identity_cleanup_pending
         ? 'Conta excluída. A limpeza de arquivos e a remoção da identidade de acesso estão pendentes.'

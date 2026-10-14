@@ -109,6 +109,20 @@ it('keeps the account signed in and gives a safe message when deletion is blocke
   expect(endSession).not.toHaveBeenCalled()
 })
 
+it('reports external sign-out failure without reversing a completed erasure', async () => {
+  endSession.mockRejectedValueOnce(new Error('private SDK diagnostic'))
+  render(<AccountSettings />)
+  await screen.findByText('Nome da conta')
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir minha conta' }))
+  fireEvent.change(screen.getByLabelText('Digite EXCLUIR para confirmar'), { target: { value: 'EXCLUIR' } })
+  fireEvent.change(screen.getByLabelText('Senha da conta USAGI'), { target: { value: 'synthetic-password' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar exclusão' }))
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/não foi possível sair da sessão externa/)))
+  expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/Conta USAGI excluída/))
+  expect(useNavigate.mock.results.at(-1).value).toHaveBeenCalledWith('/', { replace: true })
+  expect(JSON.stringify(toast.error.mock.calls)).not.toContain('private SDK diagnostic')
+})
+
 it('reauthenticates Firebase Google with same-account popup before deletion', async () => {
   authService.me.mockResolvedValue({ authenticated: true, user: { ...account, auth_provider: 'firebase' } })
   render(<AccountSettings />)
