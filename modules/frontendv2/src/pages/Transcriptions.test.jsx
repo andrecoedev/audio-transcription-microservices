@@ -7,6 +7,8 @@ import { audioService } from '../services/audioService'
 vi.mock('../services/audioService', () => ({ audioService: {
   listTranscriptions: vi.fn(), deleteTranscription: vi.fn(),
 } }))
+vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() } }))
+import toast from 'react-hot-toast'
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -15,7 +17,10 @@ beforeEach(() => {
     { id: 2, filename: 'interview.mp3', status: 'queued', created_at: '2026-10-01T10:00:00Z' },
   ] })
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('Transcriptions history', () => {
   it('renders actual rows and filters visible page results by filename', async () => {
@@ -70,5 +75,36 @@ describe('Transcriptions history', () => {
     expect(await screen.findByRole('alert')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
     expect(await screen.findByRole('link', { name: 'team-sync.wav' })).toBeTruthy()
+  })
+
+  it('reports pending file cleanup after deleting a transcription', async () => {
+    audioService.deleteTranscription.mockResolvedValue({ cleanup_pending: true })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<MemoryRouter><Transcriptions /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir team-sync.wav' }))
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
+      'Transcrição excluída. A remoção dos arquivos está pendente e será tentada novamente.',
+    ))
+  })
+
+  it('keeps the existing success message when file cleanup is complete', async () => {
+    audioService.deleteTranscription.mockResolvedValue({ cleanup_pending: false })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<MemoryRouter><Transcriptions /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir team-sync.wav' }))
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Transcrição excluída'))
+  })
+
+  it('does not request deletion when the confirmation is canceled', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<MemoryRouter><Transcriptions /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir team-sync.wav' }))
+
+    expect(audioService.deleteTranscription).not.toHaveBeenCalled()
   })
 })

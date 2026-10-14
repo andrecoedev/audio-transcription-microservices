@@ -12,7 +12,7 @@ from ..config import settings
 from ..database import get_db
 from ..security import TokenData, create_access_token, get_authenticated_user, oauth2_scheme, verify_password
 from ..models import FirebaseIdentity, User
-from ..services.firebase_identity import VerifiedFirebaseIdentity, verify_firebase_token, resolve_firebase_user
+from ..services.firebase_identity import VerifiedFirebaseIdentity, verify_firebase_token, resolve_firebase_user, ensure_identity_not_erased
 from ..services.audit import append_audit_event
 from ..services.identity import authenticate_local_user, principal_for_user, register_public_user
 from ..services.rate_limit import enforce_rate_limit
@@ -171,13 +171,16 @@ def link_firebase(payload: FirebaseLinkRequest, request: Request,
     if current.auth_provider != 'local':
         raise HTTPException(403, 'Sign in with your existing USAGI password to link Firebase')
     enforce_rate_limit(request, 'firebase-link', str(current.user_id))
-    user = db.query(User).filter_by(id=current.user_id).with_for_update().one()
+    user = db.query(User).filter_by(id=current.user_id).with_for_update().populate_existing().one_or_none()
+    if user is None or not user.is_active:
+        raise HTTPException(401, 'Entre novamente na sua conta.')
     if not verify_password(payload.password.get_secret_value(), user.hashed_password):
         raise HTTPException(401, 'Unable to link Firebase; confirm your existing password')
     identity = verify_firebase_token(payload.id_token.get_secret_value())
     if not 0 <= time.time() - identity.auth_time <= 300:
         raise HTTPException(401, 'Authenticate with Firebase again to link your account')
     binding = db.get(FirebaseIdentity, (identity.project_id, identity.uid))
+    ensure_identity_not_erased(db, identity)
     existing = db.query(FirebaseIdentity).filter_by(user_id=user.id).first()
     if ((binding is not None and binding.user_id != user.id)
             or (existing is not None and existing != binding)):
@@ -187,6 +190,9 @@ def link_firebase(payload: FirebaseLinkRequest, request: Request,
             with db.begin_nested():
                 db.add(FirebaseIdentity(project_id=identity.project_id, uid=identity.uid, user_id=user.id))
                 db.flush()
+                # The unique UID insert may have waited for erasure of its
+                # previous binding. Never relink an identity pending deletion.
+                ensure_identity_not_erased(db, identity)
         except IntegrityError:
             raise HTTPException(409, 'Unable to link Google; account is already linked') from None
         append_audit_event(db, event='user.identity_linked', actor_user_id=user.id,

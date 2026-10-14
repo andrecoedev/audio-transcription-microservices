@@ -8,6 +8,7 @@ import MeetingIntelligencePanel from '../components/MeetingIntelligencePanel'
 import MeetingActionsPanel from '../components/MeetingActionsPanel'
 import MeetingMinutesPanel from '../components/MeetingMinutesPanel'
 import { formatCount, formatDuration, formatSeconds } from '../utils/format'
+import { deletionFeedback } from '../utils/deletionFeedback'
 
 const workspaceTabs = [
   { id: 'summary', label: 'Resumo' },
@@ -75,8 +76,8 @@ export default function MeetingDetail() {
   const remove = async () => {
     if (!window.confirm('Excluir esta reunião e sua transcrição?')) return
     try {
-      await audioService.deleteMeeting(id)
-      toast.success('Reunião excluída')
+      const result = await audioService.deleteMeeting(id)
+      toast.success(deletionFeedback('Reunião excluída', result.cleanup_pending))
       navigate('/meetings')
     } catch { toast.error('Erro ao excluir reunião') }
   }

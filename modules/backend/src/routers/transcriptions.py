@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
-from ..authorization import enforce_transcription_access, is_admin, ownership_filter
+from ..authorization import enforce_transcription_access, ownership_filter
 from ..config import settings
 from ..database import get_db
 from ..models import GuestSession, Transcription, TranscriptionJob, TranscriptionOwnership
@@ -62,16 +62,19 @@ async def list_transcriptions(
     ),
 ):
     """Lista transcrições com paginação e filtro opcional de status."""
-    query = db.query(Transcription)
+    if current_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    if current_user and not is_admin(current_user):
-        query = query.join(
-            TranscriptionOwnership,
-            TranscriptionOwnership.transcription_id == Transcription.id,
-        )
-        query = query.filter(
-            ownership_filter(current_user.user_id, current_user.username, current_user.registration_source)
-        )
+    query = db.query(Transcription).join(
+        TranscriptionOwnership,
+        TranscriptionOwnership.transcription_id == Transcription.id,
+    ).filter(
+        ownership_filter(current_user.user_id, current_user.username, current_user.registration_source)
+    )
 
     if status:
         query = query.filter(Transcription.status == status)
@@ -121,13 +124,13 @@ async def delete_transcription(
     enforce_transcription_access(db, transcription_id, current_user, write=True)
 
     try:
-        delete_transcription_data(
+        deletion = delete_transcription_data(
             db, transcription, current_user.user_id if current_user else None
         )
     except ActiveTranscriptionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     logger.info("Transcription %s deleted", transcription_id)
-    return {"message": "Transcription deleted successfully"}
+    return {"message": "Transcription deleted successfully", **deletion}
 
 
 @router.get("/stats")
@@ -138,11 +141,16 @@ async def get_statistics(
     ),
 ):
     """Obtém estatísticas gerais do sistema."""
-    query = db.query(Transcription)
-    if current_user and not is_admin(current_user):
-        query = query.join(TranscriptionOwnership).filter(
-            ownership_filter(current_user.user_id, current_user.username, current_user.registration_source)
+    if current_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
         )
+
+    query = db.query(Transcription).join(TranscriptionOwnership).filter(
+        ownership_filter(current_user.user_id, current_user.username, current_user.registration_source)
+    )
     total = query.count()
     completed = query.filter(Transcription.status == "completed").count()
     failed = query.filter(Transcription.status == "failed").count()
@@ -221,7 +229,12 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
                 "public" if guest_session else current_user.registration_source,
             ) * 1024 * 1024,
         )
-
+        if guest_session is None:
+            # Lock before inserting ownership FKs; erasure checks the same row.
+            from ..models import User
+            owner = db.query(User).filter_by(id=current_user.user_id).with_for_update(key_share=True).populate_existing().one_or_none()
+            if owner is None or not owner.is_active:
+                raise HTTPException(401, "Entre novamente na sua conta.")
         transcription = Transcription(
             filename=saved_upload.key,
             original_filename=saved_upload.original_filename,

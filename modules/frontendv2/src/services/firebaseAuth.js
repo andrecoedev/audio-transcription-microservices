@@ -141,8 +141,26 @@ export const firebaseAuth = {
       }
       const credential = authContext.sdk.EmailAuthProvider.credential(user.email, password)
       await authContext.sdk.reauthenticateWithCredential(user, credential)
+      if (authContext.auth.currentUser?.uid !== user.uid) throw accountChangedError()
+      return { uid: user.uid }
     } catch (error) {
-      if (error?.code === 'auth/email-required') throw error
+      if (error?.code === 'auth/email-required' || error?.code === 'auth/account-changed') throw error
+      throw safeAuthError(error)
+    }
+  },
+
+  async reauthenticateGoogle() {
+    const authContext = await getAuthContext()
+    await authContext.ready
+    const user = requireCurrentUser(authContext.auth)
+    const provider = new authContext.sdk.GoogleAuthProvider()
+    provider.setCustomParameters({ prompt: 'select_account' })
+    try {
+      const result = await authContext.sdk.reauthenticateWithPopup(user, provider)
+      if (result.user.uid !== user.uid || authContext.auth.currentUser?.uid !== user.uid) throw accountChangedError()
+      return { uid: user.uid }
+    } catch (error) {
+      if (error?.code === 'auth/account-changed') throw error
       throw safeAuthError(error)
     }
   },

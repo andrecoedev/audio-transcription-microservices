@@ -12,6 +12,8 @@ class BodyLimitedRoute(APIRoute):
     async def handle(self, scope, receive, send):
         limit = None
         path = scope.get("path")
+        if scope.get("method") == "DELETE" and path == "/account":
+            limit = 16 * 1024
         if scope.get("method") in {"POST", "PATCH"} and path.startswith("/settings/providers"):
             limit = 16 * 1024
         if scope.get("method") == "POST":

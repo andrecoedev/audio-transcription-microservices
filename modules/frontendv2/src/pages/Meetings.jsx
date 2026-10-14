@@ -4,6 +4,8 @@ import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import Button from '../components/Button'
 import { audioService } from '../services/audioService'
 import { formatCount, formatDuration, formatNumber, formatTimestamp } from '../utils/format'
+import { deletionFeedback } from '../utils/deletionFeedback'
+import toast from 'react-hot-toast'
 
 export default function Meetings() {
   const [meetings, setMeetings] = useState([])
@@ -32,7 +34,8 @@ export default function Meetings() {
   const remove = async (meeting) => {
     if (!window.confirm(`Excluir a reunião “${meeting.title}” e sua transcrição?`)) return
     try {
-      await audioService.deleteMeeting(meeting.id)
+      const result = await audioService.deleteMeeting(meeting.id)
+      toast.success(deletionFeedback('Reunião excluída', result.cleanup_pending))
       await load()
     } catch {
       setError(true)

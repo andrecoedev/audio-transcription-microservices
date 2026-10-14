@@ -5,7 +5,7 @@ import re
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..models import TranscriptionOwnership, User
+from ..models import AccountDeletion, TranscriptionOwnership, User
 from ..security import get_password_hash, verify_password
 
 
@@ -44,6 +44,10 @@ def authenticate_local_user(db: Session, username: str, password: str) -> User |
         return user
 
     if normalized_username == settings.AUTH_ADMIN_USERNAME:
+        # Explicit account erasure must not be undone by an unchanged .env.
+        # Restoring administrator access requires a reviewed operational action.
+        if db.query(AccountDeletion.id).filter_by(blocks_bootstrap=True).first():
+            return None
         if not _valid_bootstrap_admin_password(password):
             return None
         stored_hash = settings.AUTH_ADMIN_PASSWORD_HASH or get_password_hash(password)

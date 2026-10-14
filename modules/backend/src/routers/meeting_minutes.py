@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from ..authorization import enforce_transcription_access
 from ..config import settings
 from ..database import get_db
-from ..models import Transcription
+from ..models import Transcription, User
 from ..schemas import MeetingMinutesRequest
 from ..security import TokenData, require_scope_when
 from ..services.provider_policy import require_provider_credential
@@ -68,6 +68,13 @@ async def generate_meeting_minutes(
     ),
 ):
     """Preserva o contrato síncrono, mas executa Gemini no processo worker."""
+    if current_user is None:
+        raise HTTPException(401, "Entre na sua conta para continuar.")
+    # This legacy synchronous request holds its admission lock until the RQ
+    # response/timeout. Account deletion uses NOWAIT, never races a live call.
+    owner = db.query(User).filter_by(id=current_user.user_id).with_for_update(key_share=True).populate_existing().one_or_none()
+    if owner is None or not owner.is_active:
+        raise HTTPException(401, "Entre novamente na sua conta.")
     require_execution(db, current_user.user_id, "gemini", "platform")
     require_provider_credential(current_user, "gemini")
     if not (settings.GEMINI_API_KEY_CONFIGURED or settings.GEMINI_API_KEY):

@@ -6,6 +6,7 @@ import Button from '../components/Button'
 import StatusBadge from '../components/StatusBadge'
 import { audioService } from '../services/audioService'
 import { formatCount, formatDuration, formatNumber, formatTimestamp, getDisplayFilename } from '../utils/format'
+import { deletionFeedback } from '../utils/deletionFeedback'
 import toast from 'react-hot-toast'
 
 export default function Transcriptions() {
@@ -29,7 +30,11 @@ export default function Transcriptions() {
 
   const handleDelete = async (item) => {
     if (!window.confirm(`Tem certeza que deseja excluir “${getDisplayFilename(item)}”?`)) return
-    try { await audioService.deleteTranscription(item.id); toast.success('Transcrição excluída'); await loadTranscriptions() } catch { toast.error('Não foi possível excluir a transcrição') }
+    try {
+      const result = await audioService.deleteTranscription(item.id)
+      toast.success(deletionFeedback('Transcrição excluída', result.cleanup_pending))
+      await loadTranscriptions()
+    } catch { toast.error('Não foi possível excluir a transcrição') }
   }
   const visible = transcriptions.filter((item) => getDisplayFilename(item).toLowerCase().includes(searchTerm.toLowerCase()))
 

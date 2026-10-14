@@ -1,4 +1,8 @@
 from types import SimpleNamespace
+from contextlib import nullcontext
+import logging
+
+import pytest
 
 import numpy as np
 
@@ -9,6 +13,68 @@ from src.services.diarization_engine import DiarizationEngine
 
 def _engine_without_model():
     return DiarizationEngine.__new__(DiarizationEngine)
+
+
+class SensitiveSyntheticError(Exception):
+    def __str__(self):
+        return "private provider response body"
+
+
+def test_pipeline_load_error_log_does_not_include_exception_text(monkeypatch, caplog):
+    monkeypatch.setattr(diarization_module, "version", lambda _name: "4.0")
+    monkeypatch.setattr(
+        diarization_module, "pipeline_config", lambda *_args: ("repo", {})
+    )
+    monkeypatch.setattr(diarization_module, "hf_hub_download", lambda **_kwargs: None)
+    monkeypatch.setattr(diarization_module.torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(
+        diarization_module.Pipeline,
+        "from_pretrained",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(SensitiveSyntheticError()),
+    )
+
+    with caplog.at_level(logging.ERROR, logger=diarization_module.__name__):
+        with pytest.raises(SensitiveSyntheticError):
+            engine = _engine_without_model()
+            engine.hf_token = None
+            engine._load_pipeline()
+
+    assert "Erro ao carregar pipeline de diarização (SensitiveSyntheticError)" in caplog.text
+    assert "private provider response body" not in caplog.text
+
+
+def test_segment_error_log_does_not_include_exception_text(monkeypatch, caplog):
+    engine = _engine_without_model()
+    monkeypatch.setattr(
+        diarization_module.librosa,
+        "load",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(SensitiveSyntheticError()),
+    )
+
+    with caplog.at_level(logging.ERROR, logger=diarization_module.__name__):
+        assert not engine.is_valid_segment("fixture.wav", 0.0, 1.0, 0.1, -40.0)
+
+    assert "Erro ao verificar segmento 0.00s-1.00s (SensitiveSyntheticError)" in caplog.text
+    assert "private provider response body" not in caplog.text
+
+
+def test_diarization_error_log_does_not_include_exception_text(monkeypatch, caplog):
+    class Pipeline:
+        def __call__(self, _path, hook=None):
+            raise SensitiveSyntheticError()
+
+    engine = _engine_without_model()
+    engine.pipeline = Pipeline()
+    monkeypatch.setattr(diarization_module, "ProgressHook", nullcontext)
+    monkeypatch.setattr(settings, "MIN_SEGMENT_DURATION", 0.0)
+    monkeypatch.setattr(settings, "SILENCE_THRESHOLD", -100.0)
+
+    with caplog.at_level(logging.ERROR, logger=diarization_module.__name__):
+        with pytest.raises(SensitiveSyntheticError):
+            engine.diarize("fixture.wav")
+
+    assert "Erro durante diarização (SensitiveSyntheticError)" in caplog.text
+    assert "private provider response body" not in caplog.text
 
 
 def test_short_segment_is_rejected_before_audio_decode(monkeypatch):

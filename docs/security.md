@@ -52,6 +52,11 @@ ou credentials. Filtro/formatter redige assignments, tokens e senhas de URLs.
 
 ## Privacidade e manutenção
 
+Consulte também [Privacidade no beta](privacy_beta.md) para o resumo operacional,
+os limites de providers externos e as recomendações de backup/restore. Exportação
+e exclusão self-service têm testes locais; exclusão real Firebase e operação de
+backup de implantação ainda exigem homologação autorizada.
+
 Originais/WAVs são eliminados após processamento, com proteção de jobs ativos
 e reconciliação idempotente em falha. Retenção de transcrições/audit é indefinida
 por padrão; preview explícito antes de --apply. Dados exportados incluem Meeting/

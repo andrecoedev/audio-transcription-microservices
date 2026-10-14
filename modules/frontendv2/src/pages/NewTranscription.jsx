@@ -326,6 +326,10 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
       </Card>
 
       {/* Ações */}
+      <p className="text-sm text-gray-600">
+        Ao usar transcrição externa, o áudio necessário ao processamento é enviado ao serviço selecionado, inclusive com sua própria chave.
+        {' '}O áudio é removido da USAGI após o processamento; falhas de limpeza podem deixar a remoção pendente.
+      </p>
       <div className="flex items-center justify-between">
         <Button
           variant="outline"

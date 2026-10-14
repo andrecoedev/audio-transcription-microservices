@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..models import FirebaseIdentity, User
+from ..models import AccountDeletion, FirebaseIdentity, User
 
 _app_lock = Lock()
 
@@ -87,7 +87,13 @@ def verify_firebase_token(token: str) -> VerifiedFirebaseIdentity:
         provider == 'google.com' or (isinstance(identities, dict) and bool(identities.get('google.com'))))
 
 
+def ensure_identity_not_erased(db: Session, identity: VerifiedFirebaseIdentity) -> None:
+    if db.query(AccountDeletion.id).filter_by(firebase_project_id=identity.project_id, firebase_uid=identity.uid).first():
+        raise HTTPException(410, 'Esta conta foi excluída. A remoção da identidade está pendente.')
+
+
 def find_firebase_user(db: Session, identity: VerifiedFirebaseIdentity) -> User | None:
+    ensure_identity_not_erased(db, identity)
     binding = db.get(FirebaseIdentity, (identity.project_id, identity.uid))
     if binding is None:
         return None
@@ -116,6 +122,11 @@ def resolve_firebase_user(db: Session, identity: VerifiedFirebaseIdentity) -> tu
             db.flush()
             db.add(FirebaseIdentity(project_id=identity.project_id, uid=identity.uid, user_id=user.id))
             db.flush()
+            # The unique project+UID insert waits for a concurrent cascade to
+            # commit. Recheck AFTER that wait, inside the savepoint: a deletion
+            # receipt rolls back both provisional user and binding, not just
+            # the HTTP response. Avoid opposite User/binding lock ordering.
+            ensure_identity_not_erased(db, identity)
         return user, True
     except IntegrityError:
         # First-login race: only the same verified project+UID may reuse a user.

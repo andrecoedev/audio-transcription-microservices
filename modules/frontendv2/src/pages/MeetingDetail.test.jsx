@@ -8,6 +8,8 @@ vi.mock('../services/audioService', () => ({ audioService: {
   getMeeting: vi.fn(), getMeetingTranscript: vi.fn(), updateMeetingTitle: vi.fn(), renameMeetingSpeaker: vi.fn(), deleteMeeting: vi.fn(),
   getMeetingMinutes: vi.fn(),
 } }))
+vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() } }))
+import toast from 'react-hot-toast'
 vi.mock('../components/MeetingIntelligencePanel', () => ({ default: ({ initialTab }) => <div data-testid="intelligence-panel">{initialTab}</div> }))
 vi.mock('../components/MeetingActionsPanel', () => ({ default: () => <div data-testid="actions-panel">Meeting tasks</div> }))
 vi.mock('../components/MeetingMinutesPanel', () => ({ default: () => <div>Meeting minutes</div> }))
@@ -24,6 +26,7 @@ beforeEach(() => {
 const scrollToDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTo')
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
   window.history.replaceState({}, '', '/')
   if (scrollToDescriptor) Object.defineProperty(HTMLElement.prototype, 'scrollTo', scrollToDescriptor)
   else delete HTMLElement.prototype.scrollTo
@@ -92,4 +95,36 @@ it('keeps title and speaker rename controls connected to the existing APIs', asy
   fireEvent.change(screen.getByLabelText('Nome de SPEAKER_00'), { target: { value: 'Ana Silva' } })
   fireEvent.click(screen.getByRole('button', { name: 'Renomear' }))
   expect(audioService.renameMeetingSpeaker).toHaveBeenCalledWith('7', 'SPEAKER_00', 'Ana Silva')
+})
+
+it('reports pending file cleanup after deleting a meeting', async () => {
+  audioService.deleteMeeting.mockResolvedValue({ cleanup_pending: true })
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  renderMeeting()
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Excluir reunião' }))
+
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith(
+    'Reunião excluída. A remoção dos arquivos está pendente e será tentada novamente.',
+  ))
+})
+
+it('keeps the existing success message when file cleanup is complete', async () => {
+  audioService.deleteMeeting.mockResolvedValue({ cleanup_pending: false })
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  renderMeeting()
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Excluir reunião' }))
+
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Reunião excluída'))
+})
+
+it('does not request deletion when the confirmation is canceled', async () => {
+  vi.spyOn(window, 'confirm').mockReturnValue(false)
+  renderMeeting()
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Excluir reunião' }))
+
+  expect(audioService.deleteMeeting).not.toHaveBeenCalled()
+  expect(toast.success).not.toHaveBeenCalled()
 })
