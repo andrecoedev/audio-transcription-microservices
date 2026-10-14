@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ..authorization import enforce_transcription_access, is_admin, ownership_filter
+from ..authorization import enforce_transcription_access, ownership_filter
 from ..database import get_db
 from ..models import Meeting, MeetingSpeaker, TranscriptionOwnership
 from ..security import TokenData, require_scope
@@ -66,14 +66,19 @@ def list_meetings(
     db: Session = Depends(get_db),
     user: TokenData = Depends(require_scope("read_transcriptions")),
 ):
-    query = db.query(Meeting)
-    if not is_admin(user):
-        query = query.join(
-            TranscriptionOwnership,
-            TranscriptionOwnership.transcription_id == Meeting.id,
-        ).filter(
-            ownership_filter(user.user_id, user.username, user.registration_source)
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
         )
+
+    query = db.query(Meeting).join(
+        TranscriptionOwnership,
+        TranscriptionOwnership.transcription_id == Meeting.id,
+    ).filter(
+        ownership_filter(user.user_id, user.username, user.registration_source)
+    )
     total = query.count()
     meetings = (
         query.order_by(Meeting.created_at.desc(), Meeting.id.desc())

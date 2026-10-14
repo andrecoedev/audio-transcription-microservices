@@ -34,8 +34,12 @@ def enforce_transcription_access(
     Cross-user and unresolved ownership both return 404 to avoid disclosing
     whether another user's resource exists.
     """
-    if not current_user or is_admin(current_user):
-        return
+    if current_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     owner = (
         db.query(TranscriptionOwnership)

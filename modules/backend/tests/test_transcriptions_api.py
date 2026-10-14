@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from src.config import settings
-from src.models import AuditEvent, Transcription, TranscriptionJob, TranscriptionOwnership
+from src.models import AuditEvent, Transcription, TranscriptionJob, TranscriptionOwnership, User
 from src.routers import transcriptions
 
 
@@ -392,6 +392,52 @@ def test_list_and_stats_are_scoped_to_current_user(db_context, auth_headers):
         "failed": 0,
         "processing": 0,
     }
+
+
+def test_database_admin_can_read_only_owned_transcriptions_and_stats(db_context, auth_headers):
+    own_id = _seed_job(db_context["session_factory"], owner="alice", status="completed")
+    other_id = _seed_job(db_context["session_factory"], owner="bob", status="failed")
+    db = db_context["session_factory"]()
+    try:
+        db.query(TranscriptionOwnership).filter_by(transcription_id=own_id).one().user_id = 1
+        db.query(TranscriptionOwnership).filter_by(transcription_id=other_id).one().user_id = 2
+        db.get(User, 1).is_superuser = True
+        db.commit()
+    finally:
+        db.close()
+
+    headers = auth_headers(username="alice")
+    own = db_context["client"].get(f"/transcriptions/{own_id}", headers=headers)
+    other = db_context["client"].get(f"/transcriptions/{other_id}", headers=headers)
+    other_status = db_context["client"].get(f"/transcriptions/{other_id}/status", headers=headers)
+    listing = db_context["client"].get("/transcriptions", headers=headers)
+    stats = db_context["client"].get("/stats", headers=headers)
+
+    assert own.status_code == 200
+    assert other.status_code == 404
+    assert other_status.status_code == 404
+    assert listing.status_code == 200
+    assert [row["id"] for row in listing.json()["transcriptions"]] == [own_id]
+    assert stats.json() == {
+        "total_transcriptions": 1,
+        "completed": 1,
+        "failed": 0,
+        "processing": 0,
+    }
+
+
+def test_transcription_access_fails_closed_without_identity(db_context):
+    from fastapi import HTTPException
+
+    from src.authorization import enforce_transcription_access
+
+    db = db_context["session_factory"]()
+    try:
+        with pytest.raises(HTTPException) as error:
+            enforce_transcription_access(db, 1, None)
+        assert error.value.status_code == 401
+    finally:
+        db.close()
 
 
 def test_only_one_job_creation_route_is_registered(db_context):

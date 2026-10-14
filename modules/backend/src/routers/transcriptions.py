@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
-from ..authorization import enforce_transcription_access, is_admin, ownership_filter
+from ..authorization import enforce_transcription_access, ownership_filter
 from ..config import settings
 from ..database import get_db
 from ..models import GuestSession, Transcription, TranscriptionJob, TranscriptionOwnership
@@ -61,16 +61,19 @@ async def list_transcriptions(
     ),
 ):
     """Lista transcrições com paginação e filtro opcional de status."""
-    query = db.query(Transcription)
+    if current_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    if current_user and not is_admin(current_user):
-        query = query.join(
-            TranscriptionOwnership,
-            TranscriptionOwnership.transcription_id == Transcription.id,
-        )
-        query = query.filter(
-            ownership_filter(current_user.user_id, current_user.username, current_user.registration_source)
-        )
+    query = db.query(Transcription).join(
+        TranscriptionOwnership,
+        TranscriptionOwnership.transcription_id == Transcription.id,
+    ).filter(
+        ownership_filter(current_user.user_id, current_user.username, current_user.registration_source)
+    )
 
     if status:
         query = query.filter(Transcription.status == status)
@@ -137,11 +140,16 @@ async def get_statistics(
     ),
 ):
     """Obtém estatísticas gerais do sistema."""
-    query = db.query(Transcription)
-    if current_user and not is_admin(current_user):
-        query = query.join(TranscriptionOwnership).filter(
-            ownership_filter(current_user.user_id, current_user.username, current_user.registration_source)
+    if current_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
         )
+
+    query = db.query(Transcription).join(TranscriptionOwnership).filter(
+        ownership_filter(current_user.user_id, current_user.username, current_user.registration_source)
+    )
     total = query.count()
     completed = query.filter(Transcription.status == "completed").count()
     failed = query.filter(Transcription.status == "failed").count()
