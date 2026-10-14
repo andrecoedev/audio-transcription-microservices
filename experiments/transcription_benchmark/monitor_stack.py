@@ -26,7 +26,7 @@ def sample(project):
     if not ids:
         raise RuntimeError("No running benchmark containers")
     result = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{json .}}", *ids],
-                            check=True, capture_output=True, text=True, timeout=20)
+                            check=False, capture_output=True, text=True, timeout=20)
     rows = []
     for line in result.stdout.splitlines():
         raw = json.loads(line)
@@ -36,6 +36,10 @@ def sample(project):
         rows.append(dict(service=name[len(project) + 1:], cpu_percent=float(raw["CPUPerc"].rstrip("%")),
                          memory_usage=raw["MemUsage"], memory_percent=float(raw["MemPerc"].rstrip("%")),
                          pids=int(raw["PIDs"])))
+    # A --rm driver may disappear between ps and stats. Retain valid samples;
+    # never report a successful observation if Docker supplies none.
+    if not rows:
+        raise RuntimeError("No valid resource samples returned")
     return rows
 
 

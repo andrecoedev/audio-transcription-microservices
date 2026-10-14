@@ -6,6 +6,7 @@ from pipeline_metrics import calculate, elapsed_between, hypothesis, require_iso
 from monitor_stack import project_name, sample
 from unittest.mock import patch
 import json
+from publish_pipeline import export_rows
 
 
 class PipelineMetricsTests(unittest.TestCase):
@@ -68,12 +69,26 @@ class PipelineMetricsTests(unittest.TestCase):
         name = "usagi-whisper-bench-1234abcd"
         raw = dict(Name=name + "-worker-1", CPUPerc="198.50%", MemUsage="1GiB / 6GiB", MemPerc="16.6%", PIDs="4",
                    Secret="synthetic-must-not-export")
-        responses = [SimpleNamespace(stdout="synthetic-container-id"), SimpleNamespace(stdout=json.dumps(raw))]
+        responses = [SimpleNamespace(stdout="synthetic-container-id"), SimpleNamespace(returncode=1, stdout=json.dumps(raw))]
         with patch("monitor_stack.subprocess.run", side_effect=responses):
             row = sample(name)[0]
         self.assertEqual(row["cpu_percent"], 198.5)
         self.assertNotIn("Secret", row)
         self.assertEqual(row["service"], "worker-1")
+
+    def test_private_pipeline_cannot_be_published(self):
+        with self.assertRaises(ValueError):
+            export_rows([{"fixture_id": "local-authorized-001"}])
+
+    def test_public_pipeline_does_not_export_secrets_or_domain_ids(self):
+        report = dict(fixture_id="fleurs-quality", environment="local_cpu_container", registered_workers=1,
+                      submission_concurrency=1, diarization=False, measured_at="2026-10-14T00:00:00Z",
+                      rows=[dict(asr_seconds=2, transcript="private", api_key="synthetic", transcription_id=123)])
+        row = export_rows([report])[0]
+        self.assertNotIn("api_key", row)
+        self.assertNotIn("transcript", row)
+        self.assertNotIn("transcription_id", row)
+        self.assertEqual(row["asr_seconds"], 2)
 
 
 if __name__ == "__main__":

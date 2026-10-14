@@ -5,6 +5,7 @@ Never used by production. No model is loaded before fork. No new queue/ledger.
 
 import importlib.metadata
 import json
+import logging
 import os
 from pathlib import Path
 import threading
@@ -104,8 +105,12 @@ def main():
             # Numeric ID is controlled by PostgreSQL; output is content-free.
             destination = Path("/evidence") / f"worker-{int(transcription_id)}.json"
             temporary = destination.with_suffix(f".{os.getpid()}.tmp")
-            temporary.write_text(json.dumps(metrics), encoding="utf-8")
-            os.replace(temporary, destination)
+            try:
+                temporary.write_text(json.dumps(metrics), encoding="utf-8")
+                os.replace(temporary, destination)
+            except OSError as error:
+                # Instrumentation may become unknown, never reverse a persisted result.
+                logging.getLogger(__name__).warning("Benchmark telemetry unavailable (%s)", type(error).__name__)
 
     worker.initialize_worker_engines = initialize
     worker._persist_completed_job = persist

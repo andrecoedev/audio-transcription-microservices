@@ -115,7 +115,9 @@ def run_one(args, sequence, authorization):
         queue_seconds = durable.pop("queue_seconds")
         row = dict(sequence=sequence, transcription_id=tid, status=result["status"],
                    meeting_ready=meeting_ready, poll_503_count=failures,
-                   num_speakers=result.get("num_speakers"), segment_count=len(result.get("segments", [])),
+                   num_speakers=result.get("num_speakers"), word_count=result.get("word_count"),
+                   segment_error_count=sum(s.get("text") == "[erro na transcrição]" for s in result.get("segments", [])),
+                   segment_count=len(result.get("segments", [])),
                    **calculate(worker, upload_seconds=upload_seconds,
                                end_to_end_seconds=end_to_end_seconds, queue_seconds=queue_seconds),
                    **score, **durable)
