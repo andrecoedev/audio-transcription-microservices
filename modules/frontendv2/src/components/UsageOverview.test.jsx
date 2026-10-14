@@ -84,6 +84,30 @@ it('identifies the real Free plan as unavailable when the account has no quota',
   expect(screen.getByText('Processamento local: indisponível.')).toBeTruthy()
 })
 
+it('shows development access and separates absent commercial limits from technical caps', async () => {
+  usageService.getPlan.mockResolvedValue(plan({
+    development_access: true,
+    quota: { limit_seconds: null, consumed_seconds: '120', reserved_seconds: '30', available_seconds: null },
+    limits: { max_audio_seconds: null, max_stored_bytes: null, max_queued_jobs: 2, max_processing_jobs: 1 },
+    technical_max_audio_seconds: 86400,
+  }))
+  usageService.getOverview.mockResolvedValue({ metrics: [] })
+
+  render(<UsageOverview />)
+
+  expect(await screen.findByText('Acesso de desenvolvimento')).toBeTruthy()
+  expect(screen.getByText('Cota USAGI').parentElement.textContent).toContain('Sem limite comercial de áudio')
+  expect(screen.getByText('Consumido pela USAGI').parentElement.textContent).toContain('2 min de áudio')
+  expect(screen.getByText('Reservado pela USAGI').parentElement.textContent).toContain('30 s de áudio')
+  expect(screen.getByText('Disponível na USAGI').parentElement.textContent).toContain('Sem limite comercial de áudio')
+  fireEvent.click(screen.getByText('Limites operacionais'))
+  expect(screen.getByText('Duração comercial por arquivo: Sem limite comercial')).toBeTruthy()
+  expect(screen.getByText('Duração técnica máxima por arquivo: 24 horas')).toBeTruthy()
+  expect(screen.getByText('Armazenamento comercial: Sem limite comercial')).toBeTruthy()
+  expect(screen.getByText('Trabalhos na fila: 2')).toBeTruthy()
+  expect(screen.getByText('Trabalhos em processamento: 1')).toBeTruthy()
+})
+
 it('shows a recoverable plan error and retries the account plan endpoint', async () => {
   usageService.getPlan.mockRejectedValueOnce(new Error('private plan detail')).mockResolvedValueOnce(plan())
   usageService.getOverview.mockResolvedValue({ metrics: [] })

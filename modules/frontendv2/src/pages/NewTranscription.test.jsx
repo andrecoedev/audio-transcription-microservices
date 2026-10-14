@@ -35,6 +35,7 @@ it('uses each authenticated account upload policy while guests keep their guest 
   useAuthStore.setState({ user: null, isAuthenticated: false })
   const guest = render(<MemoryRouter><NewTranscription guestPolicy={policy} /></MemoryRouter>)
   expect(screen.getByLabelText('Limites desta conta').textContent).toContain('100')
+  expect(screen.queryByText(/Acesso de desenvolvimento/)).toBeNull()
   guest.unmount()
 
   audioService.getProviderSettings.mockResolvedValue({ ...settings(true, true), upload_policy: policy })
@@ -48,6 +49,22 @@ it('falls back to public limits when an older provider settings response omits u
   useAuthStore.setState({ user: { registration_source: 'public' }, isAuthenticated: true })
   render(<MemoryRouter><NewTranscription /></MemoryRouter>)
   expect((await screen.findByLabelText('Limites desta conta')).textContent).toContain('100')
+})
+
+it('identifies development access while presenting upload and duration values as technical caps', async () => {
+  audioService.getProviderSettings.mockResolvedValue({
+    ...settings(true, true),
+    upload_policy: { ...policy, development_access: true, max_upload_mb: 5120, max_audio_seconds: 86400 },
+  })
+
+  render(<MemoryRouter><NewTranscription /></MemoryRouter>)
+
+  expect(await screen.findByText('Acesso de desenvolvimento. Os limites exibidos abaixo são tetos técnicos do ambiente.')).toBeTruthy()
+  expect(screen.getByLabelText('Limites desta conta').textContent).toContain('Teto técnico 5.120 MB por arquivo')
+  expect(screen.getByLabelText('Limites desta conta').textContent).toContain('Até 1.440 minutos de áudio (teto técnico)')
+  expect(screen.getByText('Tetos técnicos de envio')).toBeTruthy()
+  expect(screen.getByText(/Até 5\.120 MB e 1\.440 minutos por áudio \(teto técnico\)/)).toBeTruthy()
+  expect(screen.queryByText(/Sem limite comercial/)).toBeNull()
 })
 
 it.each([[true, false], [false, true]])('labels and blocks unavailable AssemblyAI (available=%s, allowed=%s)', async (available, allowed) => {

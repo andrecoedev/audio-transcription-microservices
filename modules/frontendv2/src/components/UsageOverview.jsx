@@ -84,6 +84,7 @@ export default function UsageOverview() {
   const planLoading = !currentPlanRequest || currentPlanRequest.loading
   const planError = Boolean(currentPlanRequest?.error)
   const plan = currentPlanRequest?.plan
+  const developmentAccess = plan?.development_access === true
   const metrics = Array.isArray(overview?.metrics) ? overview.metrics : []
   const hasRecordedData = metrics.some((metric) => (numberValue(metric.observations) ?? 0) > 0)
   const audio = aggregate(metrics, 'audio_seconds', 'second')
@@ -112,6 +113,7 @@ export default function UsageOverview() {
       {!planLoading && !planError && plan && <>
         <p className="text-xs text-gray-500">Fonte: plano efetivo da conta, informado pela API da USAGI.</p>
         <p className="text-sm font-medium text-gray-900">Plano atual: {planName(plan.plan)}</p>
+        {developmentAccess && <p className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900">Acesso de desenvolvimento</p>}
         {plan.plan === 'free' && !plan.local_processing_available && !plan.beta?.capabilities?.includes('transcription.platform') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
           A transcrição fornecida pela USAGI ainda não está disponível neste ambiente. Sua franquia não habilita esse serviço por si só.
         </p>}
@@ -119,10 +121,10 @@ export default function UsageOverview() {
           Período: {formatTimestamp(plan.period_start)} · Renovação: {formatTimestamp(plan.renews_at)}
         </p>
         <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <PlanValue label="Cota USAGI" value={`${formatPlanDuration(plan.quota?.limit_seconds)} de áudio`} />
+          <PlanValue label="Cota USAGI" value={`${formatCommercialLimit(plan.quota?.limit_seconds, developmentAccess)} de áudio`} />
           <PlanValue label="Consumido pela USAGI" value={`${formatPlanDuration(plan.quota?.consumed_seconds)} de áudio`} />
           <PlanValue label="Reservado pela USAGI" value={`${formatPlanDuration(plan.quota?.reserved_seconds)} de áudio`} />
-          <PlanValue label="Disponível na USAGI" value={`${formatPlanDuration(plan.quota?.available_seconds)} de áudio`} />
+          <PlanValue label="Disponível na USAGI" value={`${formatCommercialLimit(plan.quota?.available_seconds, developmentAccess)} de áudio`} />
         </dl>
         <div className="rounded-lg bg-gray-50 p-3 text-sm">
           <p className="font-medium text-gray-900">Uso com credenciais próprias (BYOK)</p>
@@ -137,8 +139,10 @@ export default function UsageOverview() {
         <details className="text-sm text-gray-600">
           <summary className="cursor-pointer">Limites operacionais</summary>
           <ul className="mt-2 space-y-1">
-            <li>Áudio por arquivo: {formatPlanDuration(plan.limits?.max_audio_seconds)}</li>
-            <li>Armazenamento: {formatBytes(plan.limits?.max_stored_bytes)}</li>
+            <li>{developmentAccess ? 'Duração comercial por arquivo' : 'Duração máxima por arquivo'}: {formatCommercialLimit(plan.limits?.max_audio_seconds, developmentAccess)}</li>
+            {developmentAccess && (plan.technical_max_audio_seconds != null || plan.limits?.technical_max_audio_seconds != null)
+              && <li>Duração técnica máxima por arquivo: {formatTechnicalDuration(plan.technical_max_audio_seconds ?? plan.limits.technical_max_audio_seconds)}</li>}
+            <li>Armazenamento comercial: {formatCommercialLimitBytes(plan.limits?.max_stored_bytes, developmentAccess)}</li>
             <li>Trabalhos na fila: {formatNumber(plan.limits?.max_queued_jobs)}</li>
             <li>Trabalhos em processamento: {formatNumber(plan.limits?.max_processing_jobs)}</li>
           </ul>
@@ -213,4 +217,22 @@ function formatPlanDuration(value) {
   if (seconds === null) return '—'
   if (seconds < 60) return `${formatNumber(seconds, { maximumFractionDigits: 2 })} s`
   return `${formatNumber(seconds / 60, { maximumFractionDigits: 2 })} min`
+}
+
+function formatTechnicalDuration(value) {
+  const seconds = numberValue(value)
+  if (seconds === null || seconds < 3600) return formatPlanDuration(seconds)
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  return minutes ? `${formatCount(hours, 'hora', 'horas')} e ${formatCount(minutes, 'minuto', 'minutos')}` : formatCount(hours, 'hora', 'horas')
+}
+
+function formatCommercialLimit(value, developmentAccess) {
+  if (value == null && developmentAccess) return 'Sem limite comercial'
+  return formatPlanDuration(value)
+}
+
+function formatCommercialLimitBytes(value, developmentAccess) {
+  if (value == null && developmentAccess) return 'Sem limite comercial'
+  return formatBytes(value)
 }

@@ -55,6 +55,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
   }, [guestPolicy, user, providerAttempt])
   const authenticatedUploadPolicy = user ? providerSettings?.upload_policy : null
   const limits = guestPolicy || (authenticatedUploadPolicy || (publicAccount ? publicLimits : null))
+  const developmentAccess = authenticatedUploadPolicy?.development_access === true
   const allowedExtensions = (guestPolicy || (user ? (authenticatedUploadPolicy || publicLimits) : publicLimits))?.allowed_extensions || EMPTY_EXTENSIONS
   const formatsLabel = allowedExtensions.map(extension => extension.toUpperCase()).join(', ')
   const policyReady = allowedExtensions.length > 0
@@ -153,11 +154,12 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
       <PageHeader title="Nova Transcrição" description="Envie um arquivo de áudio e obtenha uma transcrição para revisar e compartilhar.">
         {user && <Link to="/transcriptions" className="rounded-lg border bg-white px-4 py-2 text-sm hover:bg-gray-50">Histórico</Link>}
       </PageHeader>
+        {developmentAccess && <p className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900">Acesso de desenvolvimento. Os limites exibidos abaixo são tetos técnicos do ambiente.</p>}
         {guestPolicy && !processingAllowed && <p role="status" className="text-sm text-gray-600 mt-2">{guestPolicy.unavailable_reason}</p>}
 
       {limits && <div className="flex flex-wrap gap-2 text-sm text-gray-700" aria-label="Limites desta conta">
-        <span className="rounded-full bg-primary-50 px-3 py-1.5">Máximo de {formatNumber(limits.max_upload_mb)} MB por arquivo</span>
-        {limits.max_audio_seconds && <span className="rounded-full bg-primary-50 px-3 py-1.5">Até {formatCount(Math.floor(limits.max_audio_seconds / 60), 'minuto', 'minutos')} de áudio</span>}
+        <span className="rounded-full bg-primary-50 px-3 py-1.5">{developmentAccess ? 'Teto técnico' : 'Máximo de'} {formatNumber(limits.max_upload_mb)} MB por arquivo</span>
+        {limits.max_audio_seconds && <span className="rounded-full bg-primary-50 px-3 py-1.5">Até {formatCount(Math.floor(limits.max_audio_seconds / 60), 'minuto', 'minutos')} de áudio{developmentAccess ? ' (teto técnico)' : ''}</span>}
         {guestPolicy && <span className="rounded-full bg-primary-50 px-3 py-1.5">{formatCount(guestPolicy.jobs_per_session, 'transcrição temporária', 'transcrições temporárias')} por sessão</span>}
       </div>}
 
@@ -184,7 +186,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                 {isDragActive ? 'Solte o arquivo aqui' : 'Arraste um arquivo ou clique para selecionar'}
               </p>
               <p className="text-sm text-gray-500">
-                Formatos disponíveis: {formatsLabel || 'consultando…'} (máximo de {formatNumber(maxFileSize / (1024 * 1024), { maximumFractionDigits: 0 })} MB)
+                Formatos disponíveis: {formatsLabel || 'consultando…'} ({developmentAccess ? 'teto técnico' : 'máximo de'} {formatNumber(maxFileSize / (1024 * 1024), { maximumFractionDigits: 0 })} MB)
               </p>
               </div>
               <span className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium ${processingAllowed ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}`}><Upload className="h-4 w-4" aria-hidden="true" />Escolher arquivo</span>
@@ -222,7 +224,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
 
       <div className="grid gap-3 md:grid-cols-3">
         <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Formatos disponíveis</p><p className="mt-1 text-sm text-gray-800">{formatsLabel || 'Consultando os formatos disponíveis…'}</p></Card>
-        <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Limites de envio</p><p className="mt-1 text-sm text-gray-800">Máximo de {formatNumber(maxFileSize / (1024 * 1024), { maximumFractionDigits: 0 })} MB{limits?.max_audio_seconds ? ` e ${formatCount(Math.floor(limits.max_audio_seconds / 60), 'minuto', 'minutos')} por áudio` : ''}.</p></Card>
+        <Card className="!p-4"><p className="text-xs font-medium text-gray-500">{developmentAccess ? 'Tetos técnicos de envio' : 'Limites de envio'}</p><p className="mt-1 text-sm text-gray-800">{developmentAccess ? 'Até' : 'Máximo de'} {formatNumber(maxFileSize / (1024 * 1024), { maximumFractionDigits: 0 })} MB{limits?.max_audio_seconds ? ` e ${formatCount(Math.floor(limits.max_audio_seconds / 60), 'minuto', 'minutos')} por áudio${developmentAccess ? ' (teto técnico)' : ''}` : ''}.</p></Card>
         <Card className="!p-4"><p className="text-xs font-medium text-gray-500">Exportação</p><p className="mt-1 text-sm text-gray-800">Transcrição disponível em TXT, SRT, VTT e JSON após a conclusão.</p></Card>
       </div>
 
