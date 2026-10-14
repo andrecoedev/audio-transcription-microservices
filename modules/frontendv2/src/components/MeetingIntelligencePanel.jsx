@@ -75,6 +75,7 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange, in
     {status && <Button onClick={generate} disabled={submitting || busy || !status.configured}>
       {submitting ? 'Solicitando...' : result ? 'Gerar novamente' : state === 'failed' ? 'Tentar novamente' : 'Gerar resumo'}
     </Button>}
+    {status && <p className="text-sm text-gray-600">Ao gerar um resumo, a transcrição e o contexto da reunião são enviados ao serviço escolhido, inclusive com sua própria chave. Excluir na USAGI não remove automaticamente cópias desse serviço.</p>}
     {content && <div className="space-y-5">
       <p className="text-xs text-gray-500">Versão {result.revision} · {result.provider} · {result.model}</p>
       {visibleSections.includes('summary') && <section><h3 className="font-semibold text-gray-900">Resumo</h3><p className="mt-2 whitespace-pre-wrap leading-7">{content.summary}</p></section>}

@@ -20,6 +20,7 @@ it('requests first generation and displays a sanitized failure', async () => {
   audioService.requestMeetingIntelligence.mockRejectedValue(new Error('Serviço indisponível'))
   render(<MeetingIntelligencePanel meetingId="42" />)
   fireEvent.click(await screen.findByRole('button', { name: 'Gerar resumo' }))
+  expect(screen.getByText(/a transcrição e o contexto da reunião são enviados ao serviço escolhido/i)).toBeTruthy()
   expect((await screen.findByRole('alert')).textContent).toContain('Serviço indisponível')
   expect(audioService.requestMeetingIntelligence).toHaveBeenCalledWith('42', false)
 })

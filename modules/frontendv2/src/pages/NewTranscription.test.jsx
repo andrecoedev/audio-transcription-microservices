@@ -40,6 +40,7 @@ it('keeps AssemblyAI selectable when the server permits it', async () => {
   render(<MemoryRouter><NewTranscription /></MemoryRouter>)
   expect((await screen.findByRole('button', { name: /AssemblyAI/ })).disabled).toBe(false)
   expect(screen.queryByText('Indisponível')).toBeNull()
+  expect(screen.getByText(/o áudio necessário ao processamento é enviado ao serviço selecionado/i)).toBeTruthy()
 })
 
 it('shows Guest AssemblyAI as unavailable directly from guest policy', () => {
