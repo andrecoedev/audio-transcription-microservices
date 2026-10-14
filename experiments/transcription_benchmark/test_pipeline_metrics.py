@@ -7,6 +7,10 @@ from monitor_stack import project_name, sample
 from unittest.mock import patch
 import json
 from publish_pipeline import export_rows
+from prepare_failure_fixtures import prepare
+from pathlib import Path
+import tempfile
+import wave
 
 
 class PipelineMetricsTests(unittest.TestCase):
@@ -89,6 +93,16 @@ class PipelineMetricsTests(unittest.TestCase):
         self.assertNotIn("transcript", row)
         self.assertNotIn("transcription_id", row)
         self.assertEqual(row["asr_seconds"], 2)
+
+    def test_silence_probe_is_really_twenty_seconds_of_zero_pcm(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prepare(Path(directory))
+            with wave.open(str(Path(directory) / "silence.wav"), "rb") as audio:
+                self.assertEqual(audio.getnframes(), 320000)
+                self.assertEqual(audio.getframerate(), 16000)
+                self.assertFalse(any(audio.readframes(audio.getnframes())))
+            with self.assertRaises(FileExistsError):
+                prepare(Path(directory))
 
 
 if __name__ == "__main__":
