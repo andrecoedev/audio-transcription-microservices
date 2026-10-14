@@ -123,6 +123,41 @@ def test_dev_local_permission_requires_both_environment_flags(account, monkeypat
         policy.require_execution(account, 1, "whisper", "none")
 
 
+@pytest.mark.parametrize("environment,enabled,local_enabled,active", [
+    ("prod", True, True, True),
+    ("test", True, True, True),
+    ("dev", False, True, True),
+    ("dev", True, False, True),
+    ("dev", True, True, False),
+])
+def test_persisted_development_grant_cannot_escape_runtime_gates(
+    account, monkeypatch, environment, enabled, local_enabled, active
+):
+    user = account.get(User, 1)
+    user.development_local_access = True
+    user.is_active = active
+    user.is_superuser = True
+    account.commit()
+    monkeypatch.setattr(settings, "APP_ENV", environment)
+    monkeypatch.setattr(settings, "DEV_LOCAL_ACCESS_ENABLED", enabled)
+    monkeypatch.setattr(settings, "LOCAL_TRANSCRIPTION_ENABLED", local_enabled)
+    monkeypatch.setattr(settings, "LOCAL_TRANSCRIPTION_HOMOLOGATED", False)
+    with pytest.raises(HTTPException) as denied:
+        policy.require_execution(account, 1, "whisper", "none")
+    assert denied.value.status_code == 403
+
+
+@pytest.mark.parametrize("provider,source", [
+    ("assemblyai", "user"), ("assemblyai", "platform"),
+    ("gemini", "user"), ("gemini", "platform"), ("groq", "platform"),
+])
+def test_development_grant_never_authorizes_external_services(account, monkeypatch, provider, source):
+    enable_dev_local(monkeypatch, account)
+    with pytest.raises(HTTPException) as denied:
+        policy.require_execution(account, 1, provider, source)
+    assert denied.value.status_code == 403
+
+
 def test_starter_byok_is_separate_and_does_not_inherit_platform(account, monkeypatch):
     account.get(User, 1).plan = "starter"
     account.commit()

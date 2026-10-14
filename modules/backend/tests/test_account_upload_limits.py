@@ -134,6 +134,13 @@ def test_development_access_token_field_comes_from_persisted_user(db_context, mo
     assert response.json()["upload_policy"]["development_access"] is False
 
 
+def test_development_grant_body_is_bounded_before_parsing(db_context):
+    response = db_context["client"].patch("/admin/accounts/1/development-local-access",
+        headers=public_headers(1),
+        json={"enabled": True, "reason": "x" * (32 * 1024)})
+    assert response.status_code == 413
+
+
 def test_streaming_size_and_multipart_limits(db_context, monkeypatch, wav_bytes):
     from src.utils import http_limits
     monkeypatch.setattr(settings, "PUBLIC_MAX_UPLOAD_MB", 1)
