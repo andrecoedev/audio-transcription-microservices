@@ -90,6 +90,8 @@ Os endpoints síncronos antigos de processamento foram removidos.
 
 ## Documentação por assunto
 
+- [Privacidade no beta, exclusão e restauração](docs/privacy_beta.md)
+
 - [Arquitetura e ciclo de jobs](docs/architecture.md)
 - [Operação, banco, backup/restore e manutenção](docs/operations.md)
 - [Segurança, privacidade e advisories](docs/security.md)
