@@ -59,7 +59,7 @@ it('identifies development access while presenting upload and duration values as
 
   render(<MemoryRouter><NewTranscription /></MemoryRouter>)
 
-  expect(await screen.findByText('Acesso de desenvolvimento. Os limites exibidos abaixo são tetos técnicos do ambiente.')).toBeTruthy()
+  expect(await screen.findByText('Acesso de desenvolvimento para transcrição local. Os limites abaixo são tetos técnicos; serviços externos mantêm suas permissões e limites.')).toBeTruthy()
   expect(screen.getByLabelText('Limites desta conta').textContent).toContain('Teto técnico 5.120 MB por arquivo')
   expect(screen.getByLabelText('Limites desta conta').textContent).toContain('Até 1.440 minutos de áudio (teto técnico)')
   expect(screen.getByText('Tetos técnicos de envio')).toBeTruthy()

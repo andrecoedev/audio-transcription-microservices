@@ -113,7 +113,7 @@ export default function UsageOverview() {
       {!planLoading && !planError && plan && <>
         <p className="text-xs text-gray-500">Fonte: plano efetivo da conta, informado pela API da USAGI.</p>
         <p className="text-sm font-medium text-gray-900">Plano atual: {planName(plan.plan)}</p>
-        {developmentAccess && <p className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900">Acesso de desenvolvimento</p>}
+        {developmentAccess && <p className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900"><span>Acesso de desenvolvimento</span> — sem franquia comercial para transcrição local. Serviços externos mantêm suas permissões e limites.</p>}
         {plan.plan === 'free' && !plan.local_processing_available && !plan.beta?.capabilities?.includes('transcription.platform') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
           A transcrição fornecida pela USAGI ainda não está disponível neste ambiente. Sua franquia não habilita esse serviço por si só.
         </p>}

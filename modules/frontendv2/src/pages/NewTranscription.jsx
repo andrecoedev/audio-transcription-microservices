@@ -154,7 +154,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
       <PageHeader title="Nova Transcrição" description="Envie um arquivo de áudio e obtenha uma transcrição para revisar e compartilhar.">
         {user && <Link to="/transcriptions" className="rounded-lg border bg-white px-4 py-2 text-sm hover:bg-gray-50">Histórico</Link>}
       </PageHeader>
-        {developmentAccess && <p className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900">Acesso de desenvolvimento. Os limites exibidos abaixo são tetos técnicos do ambiente.</p>}
+        {developmentAccess && <p className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900">Acesso de desenvolvimento para transcrição local. Os limites abaixo são tetos técnicos; serviços externos mantêm suas permissões e limites.</p>}
         {guestPolicy && !processingAllowed && <p role="status" className="text-sm text-gray-600 mt-2">{guestPolicy.unavailable_reason}</p>}
 
       {limits && <div className="flex flex-wrap gap-2 text-sm text-gray-700" aria-label="Limites desta conta">
