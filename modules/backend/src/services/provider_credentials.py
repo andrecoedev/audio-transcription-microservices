@@ -6,6 +6,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from fastapi import HTTPException
 
 from ..config import settings
+from .upload_policy import upload_policy
 from ..models import UserProviderCredential, UserProviderPreferences
 from .provider_policy import require_provider_credential
 from .platform_budget import platform_budget_has_headroom
@@ -154,4 +155,5 @@ def providers_view(db, user):
                          "credential_source": "platform", "platform_access": groq_allowed,
                          "byok_allowed": False, "model": settings.GROQ_MODEL}
     return {"preferences": preferences_for(db, user.user_id), "providers": providers, "credentials": credentials,
-            "credential_storage_available": credential_storage_available()}
+            "credential_storage_available": credential_storage_available(),
+            "upload_policy": upload_policy(user)}

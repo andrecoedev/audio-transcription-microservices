@@ -121,6 +121,16 @@ class Settings(BaseSettings):
     )
     
     # File Upload
+    LARGE_UPLOAD_USER_IDS: list[int] = Field(default_factory=list)
+    LARGE_UPLOAD_SIZE_MB: int = Field(default=5120, ge=1, le=5120)
+
+    @field_validator("LARGE_UPLOAD_USER_IDS")
+    @classmethod
+    def validate_large_upload_users(cls, value):
+        if any(user_id <= 0 for user_id in value):
+            raise ValueError("Upload exceptions require positive internal user IDs")
+        return value
+
     OBJECT_STORAGE_BACKEND: Literal["local"] = Field(
         default="local", description="Object storage adapter; cloud adapters require separate deployment validation"
     )
