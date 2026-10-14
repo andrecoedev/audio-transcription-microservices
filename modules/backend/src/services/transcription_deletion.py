@@ -1,10 +1,12 @@
 """One deletion rule for the transcription and its 1:1 meeting."""
 
 import logging
+from fastapi import HTTPException
 
 from sqlalchemy.orm import Session
 
-from ..models import Transcription, TranscriptionJob
+from ..models import Transcription, TranscriptionJob, User
+from sqlalchemy.exc import OperationalError
 from .audit import append_audit_event
 from .audio_storage import input_reference, schedule_audio_cleanup, cleanup_after_commit
 
@@ -19,6 +21,18 @@ def delete_transcription_data(
     db: Session, transcription: Transcription, actor_user_id: int | None
 ) -> dict[str, bool]:
     """Cascade meeting/job/ownership in one DB commit, then clean the input."""
+    if actor_user_id is not None:
+        try:
+            owner = db.query(User).filter_by(id=actor_user_id).with_for_update(key_share=True, nowait=True).populate_existing().one_or_none()
+            if owner is None or not owner.is_active:
+                raise HTTPException(401, "Entre novamente na sua conta.")
+        except OperationalError as error:
+            db.rollback()
+            if getattr(error.orig, "sqlstate", None) == "55P03":
+                raise ActiveTranscriptionError("Account operation is active") from None
+            raise HTTPException(503, "Não foi possível excluir agora. Tente novamente.") from None
+    from .account_deletion import ensure_no_legacy_minutes_jobs
+    ensure_no_legacy_minutes_jobs([transcription.id])
     job = (
         db.query(TranscriptionJob)
         .filter(TranscriptionJob.transcription_id == transcription.id)

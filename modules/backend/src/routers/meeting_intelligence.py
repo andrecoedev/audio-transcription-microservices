@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..authorization import enforce_transcription_access
 from ..config import settings
 from ..database import get_db
-from ..models import Meeting, MeetingIntelligence
+from ..models import Meeting, MeetingIntelligence, User
 from ..security import TokenData, require_scope
 from ..services.audit import append_audit_event
 from ..services.meeting_intelligence import fingerprint, latest_revision, metadata_view, snapshot
@@ -33,6 +33,10 @@ def owned_meeting(db, meeting_id, user, *, lock=False):
 
 
 def request_generation(meeting_id, request, response, db, user, *, regenerate):
+    # Match account-erasure/admission lock order: User before Meeting.
+    owner = db.query(User).filter_by(id=user.user_id).with_for_update(key_share=True).populate_existing().one_or_none()
+    if owner is None or not owner.is_active:
+        raise HTTPException(401, "Entre novamente na sua conta.")
     meeting = owned_meeting(db, meeting_id, user, lock=True)
     current = latest_revision(db, meeting_id)
     if current and (current.status in {"pending", "processing"} or (current.status == "completed" and not regenerate)):

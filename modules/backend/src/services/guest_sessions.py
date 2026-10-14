@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import GuestSession, TranscriptionOwnership, UsageEvent
+from ..models import GuestSession, TranscriptionOwnership, UsageEvent, User
 from ..security import decode_verified_claims, oauth2_scheme
 from .audit import append_audit_event
 
@@ -35,6 +35,10 @@ def get_guest_session(token: str = Depends(oauth2_scheme), db: Session = Depends
 
 
 def claim_guest_results(db: Session, token: str, user) -> dict:
+    # Same lock order as erasure: account before the Guest session/FK writes.
+    owner = db.query(User).filter_by(id=user.user_id).with_for_update(key_share=True).populate_existing().one_or_none()
+    if owner is None or not owner.is_active:
+        raise HTTPException(401, "Entre novamente na sua conta.")
     guest = verified_guest(db, token, lock=True, allow_claimed=True)
     if guest.claimed_by_user_id is not None:
         if guest.claimed_by_user_id != user.user_id:

@@ -12,7 +12,7 @@ from ..config import settings
 from ..database import get_db
 from ..security import TokenData, create_access_token, get_authenticated_user, oauth2_scheme, verify_password
 from ..models import FirebaseIdentity, User
-from ..services.firebase_identity import VerifiedFirebaseIdentity, verify_firebase_token, resolve_firebase_user
+from ..services.firebase_identity import VerifiedFirebaseIdentity, verify_firebase_token, resolve_firebase_user, ensure_identity_not_erased
 from ..services.audit import append_audit_event
 from ..services.identity import authenticate_local_user, principal_for_user, register_public_user
 from ..services.rate_limit import enforce_rate_limit
@@ -171,10 +171,13 @@ def link_firebase(payload: FirebaseLinkRequest, request: Request,
     if current.auth_provider != 'local':
         raise HTTPException(403, 'Sign in with your existing USAGI password to link Firebase')
     enforce_rate_limit(request, 'firebase-link', str(current.user_id))
-    user = db.query(User).filter_by(id=current.user_id).with_for_update().one()
+    user = db.query(User).filter_by(id=current.user_id).with_for_update().populate_existing().one_or_none()
+    if user is None or not user.is_active:
+        raise HTTPException(401, 'Entre novamente na sua conta.')
     if not verify_password(payload.password.get_secret_value(), user.hashed_password):
         raise HTTPException(401, 'Unable to link Firebase; confirm your existing password')
     identity = verify_firebase_token(payload.id_token.get_secret_value())
+    ensure_identity_not_erased(db, identity)
     if not 0 <= time.time() - identity.auth_time <= 300:
         raise HTTPException(401, 'Authenticate with Firebase again to link your account')
     binding = db.get(FirebaseIdentity, (identity.project_id, identity.uid))

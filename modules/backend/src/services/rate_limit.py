@@ -52,6 +52,8 @@ def enforce_rate_limit(request: Request, category: str, identity: str | None = N
         rules = [("provider-settings-user", identity or "", settings.JOB_RATE_LIMIT_PER_USER, 3600)]
     elif category == "privacy-export-user":
         rules = [("privacy-export-user", identity or "", settings.PRIVACY_EXPORT_RATE_LIMIT_PER_USER, 3600)]
+    elif category == "privacy-delete-user":
+        rules = [("privacy-delete-user", identity or "", settings.LOGIN_RATE_LIMIT_PER_ACCOUNT, 300)]
     elif category == "signup":
         rules = [("signup-ip", ip, settings.SIGNUP_RATE_LIMIT_PER_IP, 3600)]
     elif category == "guest-session":

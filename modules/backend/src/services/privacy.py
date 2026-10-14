@@ -1,15 +1,22 @@
 """Internal, testable data export and erasure capabilities."""
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from uuid import uuid4
+import logging
 
 from sqlalchemy.orm import Session
 
-from ..models import AuditEvent, MeetingActionSuggestionReview, Transcription, TranscriptionOwnership, User, UsageEvent
+from ..models import AccountDeletion, AuditEvent, FirebaseIdentity, MeetingActionSuggestionReview, Transcription, TranscriptionOwnership, User, UsageEvent
 from ..authorization import ownership_filter
 from .audit import append_audit_event
 from .audio_storage import input_reference, schedule_audio_cleanup, cleanup_after_commit
 from .transcription_deletion import ActiveTranscriptionError
 from .provider_credentials import preferences_for
+from .account_deletion import ensure_no_legacy_minutes_jobs, retry_identity_cleanup
+from ..config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -18,6 +25,8 @@ class ErasureResult:
     transcriptions_deleted: int
     files_considered: int
     files_cleaned: int
+    cleanup_pending: bool = False
+    identity_cleanup_pending: bool = False
 
 
 def _owned_transcriptions_query(db: Session, user: User):
@@ -148,11 +157,33 @@ def export_user_data(db: Session, user: User) -> dict:
 def erase_user_data(db: Session, user: User) -> ErasureResult:
     """Delete DB data transactionally, then attempt idempotent file cleanup."""
     user_id = user.id
+    # Same first lock as admission: concurrent uploads/generation cannot appear
+    # after the active-operation check. HTTP uses NOWAIT for actionable feedback.
+    user = db.query(User).filter_by(id=user_id).with_for_update(key_share=True).populate_existing().one()
     transcriptions = _owned_transcriptions_query(db, user).all()
     if any(row.status in {"queued", "processing"} or
            (row.job and row.job.status in {"queued", "processing"}) for row in transcriptions):
         raise ActiveTranscriptionError("Active transcription jobs prevent user erasure")
+    if any(row.meeting and any(revision.status in {"pending", "processing"}
+           for revision in row.meeting.intelligence_revisions) for row in transcriptions):
+        raise ActiveTranscriptionError("Active analysis prevents user erasure")
+    ensure_no_legacy_minutes_jobs([row.id for row in transcriptions])
     paths = [input_reference(row.job) for row in transcriptions if row.job]
+    binding = db.query(FirebaseIdentity).filter_by(user_id=user_id).one_or_none()
+    receipt = AccountDeletion(id=str(uuid4()), deleted_user_id=user_id,
+        blocks_bootstrap=bool(user.is_superuser and user.username == settings.AUTH_ADMIN_USERNAME),
+        firebase_project_id=binding.project_id if binding else None,
+        firebase_uid=binding.uid if binding else None,
+        completed_at=None if binding else datetime.now(timezone.utc))
+    db.add(receipt)
+    receipt_id = receipt.id
+    identity_pending = binding is not None
+    # User FKs become NULL and claimed Guest sessions cascade. Opaque technical
+    # resource/operation/Guest IDs stay for replay integrity, not legal anonymity.
+    db.query(AuditEvent).filter(AuditEvent.actor_user_id == user_id).update(
+        {"event_metadata": {}}, synchronize_session=False)
+    db.query(AuditEvent).filter(AuditEvent.resource_type == "user", AuditEvent.resource_id == str(user_id)).update(
+        {"event_metadata": {}}, synchronize_session=False)
 
     append_audit_event(
         db,
@@ -169,10 +200,19 @@ def erase_user_data(db: Session, user: User) -> ErasureResult:
     db.delete(user)
     db.commit()
 
-    files_cleaned = cleanup_after_commit(db, paths)["deleted"]
+    cleanup = cleanup_after_commit(db, paths)
+    if identity_pending:
+        try:
+            retry_identity_cleanup(db, deletion_id=receipt_id, apply=True)
+            identity_pending = db.get(AccountDeletion, receipt_id).firebase_uid is not None
+        except Exception as error:
+            db.rollback()
+            logger.warning("Identity cleanup pending receipt=%s error=%s", receipt_id, type(error).__name__)
     return ErasureResult(
         user_id=user_id,
         transcriptions_deleted=len(transcriptions),
         files_considered=len(paths),
-        files_cleaned=files_cleaned,
+        files_cleaned=cleanup["deleted"],
+        cleanup_pending=bool(cleanup["pending"] or cleanup["failed"]),
+        identity_cleanup_pending=identity_pending,
     )

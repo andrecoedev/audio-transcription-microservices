@@ -46,12 +46,18 @@ def get_preferences(db: Session = Depends(get_db), user: TokenData = Depends(get
     return providers_view(db, user)
 
 
+def lock_account(db, user_id):
+    row = db.query(User).filter_by(id=user_id).with_for_update().populate_existing().one_or_none()
+    if row is None or not row.is_active:
+        raise HTTPException(401, "Entre novamente na sua conta.")
+
+
 @router.patch("")
 def save_preferences(body: PreferencesInput, request: Request, db: Session = Depends(get_db),
                      user: TokenData = Depends(get_authenticated_user)):
     enforce_rate_limit(request, "provider-settings-user", str(user.user_id))
     # Serialize settings changes with credential replacement for this account.
-    db.query(User).filter_by(id=user.user_id).with_for_update().one()
+    lock_account(db, user.user_id)
     if body.transcription_provider == "assemblyai":
         select_provider(db, user, "assemblyai")
     if body.intelligence_provider != "automatic":
@@ -78,7 +84,7 @@ def save_credential(provider: str, body: CredentialInput, request: Request, db: 
     require_execution(db, user.user_id, provider, "user")
     enforce_rate_limit(request, "provider-settings-user", str(user.user_id))
     ciphertext = encrypt_credential(user.user_id, provider, body.secret.get_secret_value())
-    db.query(User).filter_by(id=user.user_id).with_for_update().one()
+    lock_account(db, user.user_id)
     previous = credential_for(db, user.user_id, provider)
     if previous:
         db.delete(previous)
@@ -95,7 +101,7 @@ def remove_credential(provider: str, request: Request, db: Session = Depends(get
                       user: TokenData = Depends(get_authenticated_user)):
     valid_provider(provider)
     enforce_rate_limit(request, "provider-settings-user", str(user.user_id))
-    db.query(User).filter_by(id=user.user_id).with_for_update().one()
+    lock_account(db, user.user_id)
     row = credential_for(db, user.user_id, provider)
     if row:
         db.delete(row)

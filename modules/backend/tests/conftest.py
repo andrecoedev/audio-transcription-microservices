@@ -58,6 +58,9 @@ class FakeRedisConnection:
 
 
 class FakeStartedJobRegistry:
+    def get_job_ids(self):
+        return []
+
     def cleanup(self):
         return None
 
@@ -74,6 +77,9 @@ class FakeQueue:
 
     def __len__(self):
         return len(self.enqueued)
+
+    def get_job_ids(self):
+        return [kwargs["job_id"] for _, _, kwargs in self.enqueued if "job_id" in kwargs]
 
 
 @pytest.fixture
@@ -130,6 +136,8 @@ def db_context(tmp_path, monkeypatch):
 
     app.dependency_overrides[get_db] = override_get_db
     queue = FakeQueue()
+    from src.services import account_deletion
+    monkeypatch.setattr(account_deletion, "get_transcription_queue", lambda: queue)
     monkeypatch.setattr(transcriptions, "get_transcription_queue", lambda: queue)
     monkeypatch.setattr(meeting_intelligence, "get_transcription_queue", lambda: queue)
     monkeypatch.setattr(transcriptions, "_UPLOAD_DIRECTORY", tmp_path / "uploads")

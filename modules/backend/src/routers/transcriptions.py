@@ -225,7 +225,12 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
             allowed_extensions=settings.allowed_extensions_list,
             max_size_bytes=min(settings.max_upload_size_bytes, settings.PUBLIC_MAX_UPLOAD_MB * 1024 * 1024) if public else settings.max_upload_size_bytes,
         )
-
+        if guest_session is None:
+            # Lock before inserting ownership FKs; erasure checks the same row.
+            from ..models import User
+            owner = db.query(User).filter_by(id=current_user.user_id).with_for_update(key_share=True).populate_existing().one_or_none()
+            if owner is None or not owner.is_active:
+                raise HTTPException(401, "Entre novamente na sua conta.")
         transcription = Transcription(
             filename=saved_upload.key,
             original_filename=saved_upload.original_filename,
