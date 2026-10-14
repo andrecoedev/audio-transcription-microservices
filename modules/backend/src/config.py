@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT_PER_ACCOUNT: int = Field(default=10)
     UPLOAD_RATE_LIMIT_PER_IP: int = Field(default=300)
     JOB_RATE_LIMIT_PER_USER: int = Field(default=30)
+    PRIVACY_EXPORT_RATE_LIMIT_PER_USER: int = Field(default=5, ge=1)
     SIGNUP_RATE_LIMIT_PER_IP: int = Field(default=5, ge=1)
     PUBLIC_MAX_UPLOAD_MB: int = Field(default=100, ge=1, le=100)
     PUBLIC_MAX_AUDIO_SECONDS: int = Field(default=600, ge=1, le=600)

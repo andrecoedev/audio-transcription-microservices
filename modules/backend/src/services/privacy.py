@@ -4,11 +4,12 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from ..models import AuditEvent, MeetingActionSuggestionReview, Transcription, TranscriptionOwnership, User
+from ..models import AuditEvent, MeetingActionSuggestionReview, Transcription, TranscriptionOwnership, User, UsageEvent
 from ..authorization import ownership_filter
 from .audit import append_audit_event
 from .audio_storage import input_reference, schedule_audio_cleanup, cleanup_after_commit
 from .transcription_deletion import ActiveTranscriptionError
+from .provider_credentials import preferences_for
 
 
 @dataclass(frozen=True)
@@ -45,23 +46,40 @@ def export_user_data(db: Session, user: User) -> dict:
             "username": user.username,
             "email": user.email,
             "active": user.is_active,
+            "plan": user.plan,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "updated_at": user.updated_at.isoformat() if user.updated_at else None,
         },
         "transcriptions": [],
+        "preferences": preferences_for(db, user.id),
+        "usage": [
+            {
+                "id": row.id, "resource_type": row.resource_type,
+                "resource_id": row.resource_id, "operation": row.operation,
+                "provider": row.provider, "credential_source": row.credential_source,
+                "metric": row.metric, "unit": row.unit,
+                "quantity": str(row.quantity) if row.quantity is not None else None,
+                "status": row.status, "model": row.model,
+                "occurred_at": row.occurred_at.isoformat(),
+            }
+            for row in db.query(UsageEvent).filter_by(user_id=user.id)
+            .order_by(UsageEvent.occurred_at, UsageEvent.id).all()
+        ],
         "audit_events": [
             {
                 "timestamp": row.timestamp.isoformat() if row.timestamp else None,
                 "event": row.event,
                 "resource_type": row.resource_type,
                 "resource_id": row.resource_id,
-                "metadata": row.event_metadata,
             }
             for row in audit_rows
         ],
     }
     for transcription in transcriptions:
         item = transcription.to_dict()
+        # Storage identifiers and internal diagnostics are not portable user data.
+        item.pop("filename", None)
+        item.pop("error_message", None)
         item["meeting"] = (
             {
                 "title": transcription.meeting.title,
@@ -74,8 +92,7 @@ def export_user_data(db: Session, user: User) -> dict:
                 ],
                 "intelligence_revisions": [
                     {"revision": row.revision, "status": row.status, "schema_version": row.schema_version,
-                     "provider": row.provider, "model": row.model, "result": row.result,
-                     "source_metadata": row.source_metadata}
+                     "provider": row.provider, "model": row.model, "result": row.result}
                     for row in sorted(transcription.meeting.intelligence_revisions, key=lambda item: item.revision)
                 ],
                 "action_items": [

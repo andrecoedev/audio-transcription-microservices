@@ -50,6 +50,8 @@ def enforce_rate_limit(request: Request, category: str, identity: str | None = N
     elif category == "provider-settings-user":
         # Same configurable ceiling, independent counter from job creation.
         rules = [("provider-settings-user", identity or "", settings.JOB_RATE_LIMIT_PER_USER, 3600)]
+    elif category == "privacy-export-user":
+        rules = [("privacy-export-user", identity or "", settings.PRIVACY_EXPORT_RATE_LIMIT_PER_USER, 3600)]
     elif category == "signup":
         rules = [("signup-ip", ip, settings.SIGNUP_RATE_LIMIT_PER_IP, 3600)]
     elif category == "guest-session":
