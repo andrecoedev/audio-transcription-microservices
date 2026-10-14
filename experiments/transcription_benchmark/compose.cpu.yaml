@@ -108,6 +108,7 @@ services:
       WHISPER_MAX_DECODE_CHUNK_SECONDS: "300"
       FORCE_CPU: "true"
       HF_HUB_CACHE: /models/pyannote
+      PYANNOTE_CACHE: /models/pyannote
       # Offline placeholder, NOT a credential. Only accepted cached weights, no downloads.
       HF_TOKEN: ${BENCHMARK_OFFLINE_DIARIZATION_MARKER:-}
       TRANSCRIPTION_JOB_TIMEOUT_SECONDS: ${BENCHMARK_JOB_TIMEOUT_SECONDS:-3600}
