@@ -19,6 +19,18 @@ export const authService = {
     const { data } = await api.get('/auth/me', { timeout: 10000 })
     return data
   },
+  async exportData() {
+    const { data } = await api.get('/account/data', { timeout: 30000, headers: { Accept: 'application/json' } })
+    return data
+  },
+  async deleteAccount(body, token) {
+    const { data } = await api.delete('/account', {
+      data: body,
+      timeout: 30000,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+    return data
+  },
   async firebaseLogin(idToken) {
     const { data } = await api.post('/auth/firebase', null, {
       headers: { Authorization: `Bearer ${idToken}` }, timeout: 15000,

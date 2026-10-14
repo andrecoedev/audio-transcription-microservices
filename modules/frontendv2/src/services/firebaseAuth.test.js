@@ -24,6 +24,7 @@ const sdk = vi.hoisted(() => ({
   reload: vi.fn().mockResolvedValue(undefined),
   linkWithCredential: vi.fn(),
   reauthenticateWithCredential: vi.fn().mockResolvedValue(undefined),
+  reauthenticateWithPopup: vi.fn(),
   linkWithPopup: vi.fn(),
   EmailAuthProvider: { credential: vi.fn((email, password) => ({ email, password })) },
   signOut: vi.fn().mockResolvedValue(undefined),
@@ -54,6 +55,7 @@ vi.mock('firebase/auth', () => ({
   reload: sdk.reload,
   linkWithCredential: sdk.linkWithCredential,
   reauthenticateWithCredential: sdk.reauthenticateWithCredential,
+  reauthenticateWithPopup: sdk.reauthenticateWithPopup,
   linkWithPopup: sdk.linkWithPopup,
   EmailAuthProvider: sdk.EmailAuthProvider,
   signOut: sdk.signOut,
@@ -93,6 +95,7 @@ beforeEach(() => {
   sdk.reload.mockClear().mockResolvedValue(undefined)
   sdk.linkWithCredential.mockReset()
   sdk.reauthenticateWithCredential.mockClear().mockResolvedValue(undefined)
+  sdk.reauthenticateWithPopup.mockReset()
   sdk.linkWithPopup.mockReset()
   sdk.EmailAuthProvider.credential.mockClear()
   sdk.signOut.mockClear().mockResolvedValue(undefined)
@@ -294,13 +297,30 @@ describe('firebaseAuth', () => {
     sdk.auth.currentUser = user
     const service = await loadService()
 
-    await service.reauthenticatePassword('private-password')
+    await expect(service.reauthenticatePassword('private-password')).resolves.toEqual({ uid: 'uid-a' })
     const credential = { email: 'current@example.test', password: 'private-password' }
     expect(sdk.EmailAuthProvider.credential).toHaveBeenCalledWith('current@example.test', 'private-password')
     expect(sdk.reauthenticateWithCredential).toHaveBeenCalledWith(user, credential)
     await expect(service.linkPassword('other@example.test', 'private-password'))
       .rejects.toMatchObject({ code: 'auth/email-mismatch' })
     expect(sdk.linkWithCredential).not.toHaveBeenCalled()
+    sdk.reauthenticateWithCredential.mockImplementationOnce(async () => { sdk.auth.currentUser = { uid: 'uid-b' } })
+    await expect(service.reauthenticatePassword('private-password')).rejects.toMatchObject({ code: 'auth/account-changed' })
+  })
+
+  it('reauthenticates Google with the current Firebase user and rejects an account switch', async () => {
+    const user = { uid: 'uid-a' }
+    sdk.auth.currentUser = user
+    sdk.reauthenticateWithPopup.mockResolvedValue({ user })
+    const service = await loadService()
+    await expect(service.reauthenticateGoogle()).resolves.toEqual({ uid: 'uid-a' })
+    expect(sdk.reauthenticateWithPopup).toHaveBeenCalledWith(user, expect.any(sdk.GoogleAuthProvider))
+    expect(sdk.reauthenticateWithPopup.mock.calls[0][1].setCustomParameters).toHaveBeenCalledWith({ prompt: 'select_account' })
+    sdk.reauthenticateWithPopup.mockImplementationOnce(async () => {
+      sdk.auth.currentUser = { uid: 'uid-b' }
+      return { user }
+    })
+    await expect(service.reauthenticateGoogle()).rejects.toMatchObject({ code: 'auth/account-changed' })
   })
 
   it('returns only provider IDs and sanitizes SDK errors', async () => {
