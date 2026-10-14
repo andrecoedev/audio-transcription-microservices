@@ -162,7 +162,11 @@ def main():
         user_id = login(client)
         ensure_beta(client, user_id)
         authorization = client.headers["Authorization"]
+    ready_deadline = time.monotonic() + 30
     workers = Worker.all(connection=get_redis_connection())
+    while not workers and time.monotonic() < ready_deadline:
+        time.sleep(0.25)
+        workers = Worker.all(connection=get_redis_connection())
     if not workers:
         raise RuntimeError("No registered Worker; do not measure a phantom queue")
     cohort_start = time.monotonic()
