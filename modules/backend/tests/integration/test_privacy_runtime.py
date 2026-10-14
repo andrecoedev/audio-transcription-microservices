@@ -1,6 +1,7 @@
 """Real PostgreSQL locks, deletion receipts, cascades and no resurrection."""
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
+from threading import get_ident
 from uuid import uuid4
 import secrets
 
@@ -17,6 +18,8 @@ from src.models import AccountDeletion, AuditEvent, FirebaseIdentity, Meeting, M
 from src.routers.privacy import DeleteAccountInput, delete_account
 from src.security import TokenData, get_password_hash
 from src.services import privacy, account_deletion
+from src.services import firebase_identity
+from src.services.firebase_identity import VerifiedFirebaseIdentity
 from src.services.transcription_entitlements import access
 from src.workers import meeting_intelligence_worker
 
@@ -104,6 +107,50 @@ def test_worker_does_not_recreate_deleted_analysis(postgres_session_factory, mon
     with postgres_session_factory() as db:
         assert db.query(Meeting).count() == 0
         assert db.query(MeetingIntelligence).count() == 0
+
+
+def test_first_login_racing_erasure_cannot_reprovision_pending_uid(postgres_session_factory, postgres_engine, monkeypatch):
+    from sqlalchemy import event
+    import time
+    identifier, _resource, _password = seed(postgres_session_factory)
+    monkeypatch.setattr(privacy, "ensure_no_legacy_minutes_jobs", lambda _ids: None)
+    def unavailable(*_args):
+        raise ConnectionError("Synthetic Firebase outage")
+    monkeypatch.setattr(account_deletion, "delete_firebase_identity", unavailable)
+    paused, resume = Event(), Event()
+    lookup_thread = []
+    def pause_binding_lookup(_connection, _cursor, statement, _params, _context, _executemany):
+        if (lookup_thread and get_ident() == lookup_thread[0] and not paused.is_set()
+                and "FROM firebase_identities" in statement):
+            paused.set()
+            assert resume.wait(10)
+    event.listen(postgres_engine, "before_cursor_execute", pause_binding_lookup)
+    def login():
+        lookup_thread.append(get_ident())
+        with postgres_session_factory() as db:
+            identity = VerifiedFirebaseIdentity("synthetic-project", "synthetic-uid", "privacy@example.test", int(time.time()))
+            try:
+                firebase_identity.resolve_firebase_user(db, identity)
+            except HTTPException as error:
+                db.rollback()
+                return error.status_code
+            db.commit()
+            return 200
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(login)
+            try:
+                assert paused.wait(10)
+                with postgres_session_factory() as db:
+                    assert privacy.erase_user_data(db, db.get(User, identifier)).identity_cleanup_pending
+            finally:
+                resume.set()
+            assert future.result(timeout=10) == 410
+        with postgres_session_factory() as db:
+            assert db.query(User).count() == 0
+            assert db.query(FirebaseIdentity).count() == 0
+    finally:
+        event.remove(postgres_engine, "before_cursor_execute", pause_binding_lookup)
 
 
 def test_account_erasure_migration_is_additive_and_guards_receipts(postgres_engine):

@@ -122,6 +122,11 @@ def resolve_firebase_user(db: Session, identity: VerifiedFirebaseIdentity) -> tu
             db.flush()
             db.add(FirebaseIdentity(project_id=identity.project_id, uid=identity.uid, user_id=user.id))
             db.flush()
+            # The unique project+UID insert waits for a concurrent cascade to
+            # commit. Recheck AFTER that wait, inside the savepoint: a deletion
+            # receipt rolls back both provisional user and binding, not just
+            # the HTTP response. Avoid opposite User/binding lock ordering.
+            ensure_identity_not_erased(db, identity)
         return user, True
     except IntegrityError:
         # First-login race: only the same verified project+UID may reuse a user.
