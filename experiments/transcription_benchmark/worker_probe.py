@@ -66,7 +66,12 @@ def main():
     def initialize(*args, **kwargs):
         started = time.monotonic()
         try:
-            return original_init(*args, **kwargs)
+            status = original_init(*args, **kwargs)
+            from src import engine_registry
+            engine = engine_registry.whisper_engine
+            if engine is not None and (engine.device != "cpu" or engine.compute_type != "int8"):
+                raise RuntimeError("CPU INT8 benchmark device mismatch")
+            return status
         finally:
             metrics["engine_initialization_seconds"] = time.monotonic() - started
 
@@ -109,7 +114,20 @@ def main():
     # Record resolved versions, not dependency ranges from a requirements file.
     versions = {p: importlib.metadata.version(p) for p in
                 ("faster-whisper", "ctranslate2", "torch", "pyannote.audio", "rq", "psutil")}
-    Path("/evidence/runtime.json").write_text(json.dumps(versions), encoding="utf-8")
+    runtime = dict(packages=versions, device="cpu", compute_type="int8", model="small",
+                   language=settings.WHISPER_LANGUAGE, beam_size=settings.WHISPER_BEAM_SIZE,
+                   cpu_threads=settings.WHISPER_CPU_THREADS,
+                   decode_chunk_seconds=settings.WHISPER_MAX_DECODE_CHUNK_SECONDS,
+                   vad_filter=False, condition_on_previous_text=False,
+                   temperature=0.0, force_cpu=settings.FORCE_CPU,
+                   min_segment_duration=settings.MIN_SEGMENT_DURATION,
+                   silence_threshold=settings.SILENCE_THRESHOLD,
+                   offline=True)
+    for key, path in (("memory_limit_bytes", "/sys/fs/cgroup/memory.max"),
+                      ("cpu_quota_period", "/sys/fs/cgroup/cpu.max")):
+        file = Path(path)
+        runtime[key] = file.read_text().strip() if file.is_file() else None
+    Path("/evidence/runtime.json").write_text(json.dumps(runtime), encoding="utf-8")
     run_supervisor()
 
 

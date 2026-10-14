@@ -7,7 +7,6 @@ Outputs contain metrics, not transcripts, names, tokens, paths or provider secre
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -52,18 +51,20 @@ def observe_persistence(transcription_id):
     with SessionLocal() as db:
         job = db.query(TranscriptionJob).filter_by(transcription_id=transcription_id).one()
         reservation = db.query(TranscriptionReservation).filter_by(transcription_id=transcription_id).one()
-        events = db.query(UsageEvent).filter_by(resource_type="transcription", resource_id=transcription_id).all()
+        events = db.query(UsageEvent).filter_by(resource_type="transcription", resource_id=str(transcription_id)).all()
         # Immutable per-resource events, not another ledger or an aggregate of unequal units.
         metrics = [{"metric": e.metric, "unit": e.unit, "quantity": str(e.quantity) if e.quantity is not None else None,
                     "status": e.status, "provider": e.provider, "credential_source": e.credential_source}
                    for e in events]
         row = dict(database_status=job.status, reservation_state=reservation.state,
                    usage_attempt_count=sum(e.metric == "attempt" for e in events), ledger=metrics,
-                   queue_seconds=elapsed_between(job.created_at, job.started_at))
+                   durable_admission_to_claim_seconds=elapsed_between(job.created_at, job.started_at),
+                   queue_seconds=None)
     try:
         rq = Job.fetch(f"transcription_{transcription_id}", connection=get_redis_connection())
         status = rq.get_status(refresh=True)
         row["rq_status"] = getattr(status, "value", status)
+        row["queue_seconds"] = elapsed_between(rq.enqueued_at, rq.started_at)
     except NoSuchJobError:
         row["rq_status"] = "missing"
     return row
@@ -135,6 +136,8 @@ def main():
     parser.add_argument("--audio", type=Path, required=True)
     parser.add_argument("--reference", type=Path, help="Human-validated reference only; absent means unknown WER/CER")
     parser.add_argument("--fixture-id", required=True)
+    parser.add_argument("--environment", choices=("local_cpu_container", "vps_cpu"), required=True,
+                        help="Operator declaration; vps_cpu still requires separate server evidence")
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--concurrency", type=int, choices=(1, 2, 3), default=1,
                         help="Concurrent HTTP submissions; actual Worker count is recorded separately")
@@ -158,6 +161,8 @@ def main():
         ensure_beta(client, user_id)
         authorization = client.headers["Authorization"]
     workers = Worker.all(connection=get_redis_connection())
+    if not workers:
+        raise RuntimeError("No registered Worker; do not measure a phantom queue")
     cohort_start = time.monotonic()
     with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
         rows = list(pool.map(lambda i: run_one(args, i, authorization), range(1, args.repetitions + 1)))
@@ -166,7 +171,9 @@ def main():
                       "asr_seconds", "diarization_seconds", "persistence_seconds", "worker_seconds", "end_to_end_seconds",
                       "processing_rtf", "ram_peak_mib", "cpu_seconds", "wer", "cer")
     successful = [r for r in rows if r["status"] == "completed"]
-    report = dict(schema_version=1, measured_at=utc_now(), environment="local_or_remote_must_be_declared_by_operator",
+    runtime_path = Path("/evidence/runtime.json")
+    runtime = json.loads(runtime_path.read_text()) if runtime_path.is_file() else None
+    report = dict(schema_version=1, measured_at=utc_now(), environment=args.environment, runtime=runtime,
         fixture_id=args.fixture_id, diarization=args.diarization, submission_concurrency=args.concurrency,
         registered_workers=len(workers), repetitions=args.repetitions, wall_seconds=elapsed, rows=rows,
         summary={k: dispersion([r[k] for r in successful if r.get(k) is not None])
