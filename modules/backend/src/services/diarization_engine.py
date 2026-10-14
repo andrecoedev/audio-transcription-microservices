@@ -130,7 +130,9 @@ class DiarizationEngine:
             logger.info(f"✅ Pipeline de diarização carregado no device: {device}{memory_info}")
             
         except Exception as e:
-            logger.error(f"Erro ao carregar pipeline de diarização: {e}")
+            logger.error(
+                "Erro ao carregar pipeline de diarização (%s)", type(e).__name__
+            )
             raise
     
     def is_valid_segment(
@@ -163,7 +165,12 @@ class DiarizationEngine:
             
             return True
         except Exception as e:
-            logger.error(f"Erro ao verificar segmento {start:.2f}s-{end:.2f}s: {e}")
+            logger.error(
+                "Erro ao verificar segmento %.2fs-%.2fs (%s)",
+                start,
+                end,
+                type(e).__name__,
+            )
             return False
     
     def diarize(
@@ -224,7 +231,7 @@ class DiarizationEngine:
             return {"segments": segments, "num_speakers": len(speakers)}
         
         except Exception as e:
-            logger.error(f"Erro durante diarização: {e}")
+            logger.error("Erro durante diarização (%s)", type(e).__name__)
             raise
     
     def get_device(self) -> str:
