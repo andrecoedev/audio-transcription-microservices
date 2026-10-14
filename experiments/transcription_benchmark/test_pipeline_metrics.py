@@ -3,6 +3,9 @@ from types import SimpleNamespace
 import unittest
 
 from pipeline_metrics import calculate, elapsed_between, hypothesis, require_isolated
+from monitor_stack import project_name, sample
+from unittest.mock import patch
+import json
 
 
 class PipelineMetricsTests(unittest.TestCase):
@@ -55,6 +58,22 @@ class PipelineMetricsTests(unittest.TestCase):
 
     def test_preserves_persisted_segment_order_for_scoring(self):
         self.assertEqual(hypothesis([{"text": "uma"}, {"text": "reunião"}]), "uma reunião")
+
+    def test_monitor_refuses_other_projects(self):
+        for project in ("usagidev", "backend", "usagi-whisper-bench-../../etc"):
+            with self.subTest(project=project), self.assertRaises(ValueError):
+                project_name(project)
+
+    def test_resource_export_has_closed_fields(self):
+        name = "usagi-whisper-bench-1234abcd"
+        raw = dict(Name=name + "-worker-1", CPUPerc="198.50%", MemUsage="1GiB / 6GiB", MemPerc="16.6%", PIDs="4",
+                   Secret="synthetic-must-not-export")
+        responses = [SimpleNamespace(stdout="synthetic-container-id"), SimpleNamespace(stdout=json.dumps(raw))]
+        with patch("monitor_stack.subprocess.run", side_effect=responses):
+            row = sample(name)[0]
+        self.assertEqual(row["cpu_percent"], 198.5)
+        self.assertNotIn("Secret", row)
+        self.assertEqual(row["service"], "worker-1")
 
 
 if __name__ == "__main__":
