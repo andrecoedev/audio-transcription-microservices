@@ -18,6 +18,7 @@ import Card, { CardContent, CardHeader, CardTitle } from './components/Card'
 import { restoreSession } from './services/sessionService'
 import { firebaseAuth } from './services/firebaseAuth'
 import { useAuthStore } from './stores/authStore'
+import AdminSettings from './pages/AdminSettings'
 
 function AccountRequired({ children }) {
   const authenticated = useAuthStore((state) => state.isAuthenticated)
@@ -28,6 +29,14 @@ function AccountRequired({ children }) {
     <CardContent><p className="text-gray-600 mb-4">Entre ou crie uma conta para usar este recurso. Sua transcrição temporária continua disponível nesta aba.</p>
       <div className="flex gap-4 text-primary-700"><Link to={`/login${context}`}>Entrar</Link><Link to={`/signup${context}`}>Criar conta</Link><Link to="/new-transcription">Transcrever um arquivo</Link></div>
     </CardContent></Card>
+}
+
+function AdminRequired({ children }) {
+  const roles = useAuthStore((state) => state.user?.roles || [])
+  if (roles.includes('admin')) return children
+  return <Card><CardHeader><CardTitle>Acesso restrito</CardTitle></CardHeader>
+    <CardContent><p className="text-gray-600">Esta área está disponível apenas para administradores.</p></CardContent>
+  </Card>
 }
 
 function App() {
@@ -131,6 +140,7 @@ function App() {
           <Route path="new-transcription" element={isAuthenticated ? <><Guest /><NewTranscription /></> : <><Guest /><GuestDemo /></>} />
           <Route path="meeting-minutes" element={<AccountRequired><MeetingMinutes /></AccountRequired>} />
           <Route path="settings" element={<AccountRequired><Settings /></AccountRequired>} />
+          <Route path="admin/settings" element={<AccountRequired><AdminRequired><AdminSettings /></AdminRequired></AccountRequired>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
