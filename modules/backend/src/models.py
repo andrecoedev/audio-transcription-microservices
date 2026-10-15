@@ -428,6 +428,11 @@ class PlatformProviderBudget(Base):
     project_reference = Column(String(64), nullable=True)
     review_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     invited_count = Column(Integer, nullable=False, default=0, server_default="0")
+    operational_policy = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    configuration_version = Column(Integer, nullable=False, default=0, server_default="0")
+    price_version = Column(String(64), nullable=True)
+    configuration_updated_at = Column(DateTime(timezone=True), nullable=True)
+    configuration_updated_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
 class PlatformProviderCall(Base):
