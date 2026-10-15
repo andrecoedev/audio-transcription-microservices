@@ -16,13 +16,14 @@ def enable_test_policy(monkeypatch):
     policy = {"monthly_usagi_seconds": 36000, "max_audio_seconds": 600,
               "max_stored_bytes": 1024 * 1024 * 1024, "max_queued_jobs": 100, "max_processing_jobs": 10}
     monkeypatch.setattr(settings, "PLAN_POLICIES_JSON", json.dumps({k: policy for k in ("free", "starter", "business", "beta")}))
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
     monkeypatch.setattr(settings, "LOCAL_TRANSCRIPTION_ENABLED", True)
     monkeypatch.setattr(settings, "LOCAL_TRANSCRIPTION_HOMOLOGATED", True)
 
 
 def grant_test_beta(db, user_id):
     db.add(BetaAccessGrant(id=str(uuid4()), user_id=user_id, capabilities=sorted(CAPABILITIES),
-        expires_at=now_utc() + timedelta(hours=1)))
+        round_id="test-round", expires_at=now_utc() + timedelta(hours=1)))
     db.flush()
 
 

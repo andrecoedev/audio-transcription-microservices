@@ -38,6 +38,7 @@ class BetaInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     capabilities: list[str] = Field(min_length=1, max_length=5)
     expires_at: datetime
+    round_id: str | None = Field(default=None, min_length=1, max_length=64)
 
     @field_validator("capabilities")
     @classmethod
@@ -45,6 +46,11 @@ class BetaInput(BaseModel):
         if set(value) - CAPABILITIES or len(set(value)) != len(value):
             raise ValueError("Invalid beta permissions")
         return value
+
+    @field_validator("round_id")
+    @classmethod
+    def valid_round_id(cls, value):
+        return value.strip() if value is not None else None
 
     @field_validator("expires_at")
     @classmethod
@@ -101,18 +107,31 @@ def grant_beta(user_id: int, body: BetaInput, request: Request, db: Session = De
                admin: TokenData = Depends(require_admin)):
     enforce_rate_limit(request, "provider-settings-user", str(admin.user_id))
     locked_user(db, user_id)
+    platform_access = "transcription.platform" in body.capabilities
+    configured_round = settings.AAI_BETA_ROUND_ID.strip()
+    if platform_access and (not configured_round or body.round_id != configured_round):
+        raise HTTPException(422, "Acesso AssemblyAI exige a rodada beta configurada.")
+    if not platform_access and body.round_id is not None:
+        raise HTTPException(422, "A rodada beta só pode ser informada para acesso AssemblyAI.")
     # One active grant at a time makes revocation and expiry unambiguous.
     if db.query(BetaAccessGrant).filter(BetaAccessGrant.user_id == user_id,
         BetaAccessGrant.revoked_at.is_(None), BetaAccessGrant.expires_at > now_utc()).count():
         raise HTTPException(409, "Revogue o acesso beta atual antes de conceder outro.")
+    if platform_access:
+        # Import at the boundary so the budget service remains the owner of
+        # global invite serialization and this router can still serve BYOK-only grants.
+        from ..services.platform_budget import lock_beta_enrollment
+        lock_beta_enrollment(db, body.round_id, user_id)
     row = BetaAccessGrant(id=str(uuid4()), user_id=user_id, granted_by_user_id=admin.user_id,
-        capabilities=body.capabilities, expires_at=body.expires_at)
+        capabilities=body.capabilities, round_id=body.round_id, expires_at=body.expires_at)
     db.add(row)
     append_audit_event(db, event="account.beta_granted", actor_user_id=admin.user_id,
         resource_type="user", resource_id=user_id, metadata={"grant_id": row.id,
-        "capabilities": body.capabilities, "expires_at": body.expires_at.isoformat()})
+        "capabilities": body.capabilities, "round_id": row.round_id,
+        "expires_at": body.expires_at.isoformat()})
     db.commit()
-    return {"id": row.id, "user_id": user_id, "capabilities": row.capabilities, "expires_at": body.expires_at}
+    return {"id": row.id, "user_id": user_id, "capabilities": row.capabilities,
+            "round_id": row.round_id, "expires_at": body.expires_at}
 
 
 @router.delete("/admin/accounts/{user_id}/beta/{grant_id}")
@@ -126,7 +145,8 @@ def revoke_beta(user_id: int, grant_id: str, request: Request, db: Session = Dep
     if row.revoked_at is None:
         row.revoked_at = now_utc()
         append_audit_event(db, event="account.beta_revoked", actor_user_id=admin.user_id,
-            resource_type="user", resource_id=user_id, metadata={"grant_id": grant_id})
+            resource_type="user", resource_id=user_id,
+            metadata={"grant_id": grant_id, "round_id": row.round_id})
         db.commit()
     return {"revoked": True}
 
