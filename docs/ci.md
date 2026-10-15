@@ -23,7 +23,9 @@ python -m pytest -q --ignore=tests/test_diarization_filter.py
 
 `DATABASE_URL` aponta para o banco vazio usado pelo Alembic;
 `P2A_TEST_DATABASE_URL` aponta para o mesmo banco e habilita os testes
-PostgreSQL. `REDIS_URL` habilita integração RQ. `APP_ENV=test` e `AUTH_MODE=strict`
+PostgreSQL. `REDIS_URL` configura a conexão padrão; `P2A_TEST_REDIS_URL`, em um
+database Redis descartável separado, habilita explicitamente os testes RQ.
+`APP_ENV=test` e `AUTH_MODE=strict`
 mantêm a configuração de teste. O conftest gera a chave JWT em runtime e usa
 SQLite em memória para testes unitários. Não são necessárias credenciais reais.
 
@@ -32,7 +34,7 @@ As fixtures PostgreSQL executam TRUNCATE e testes de migration exercitam
 downgrade. Os services Actions têm dados sintéticos e existem apenas no runner.
 Não reutilizar a senha sintética do service em ambientes reais.
 
-Não definir os dois URLs deixa testes de integração ignorados ou sem schema;
+Não definir os URLs de integração deixa testes ignorados ou sem schema;
 isso não representa a validação completa deste baseline.
 
 ## Frontend
@@ -56,7 +58,7 @@ administrativas. Os registros de pacotes são necessários para instalar.
 
 | Categoria | Tratamento |
 | --- | --- |
-| `tests/test_diarization_filter.py` (5 testes) | Imports globais de librosa/Torch/Pyannote exigem a matriz Worker. Preservado, não convertido em skip. Executar na imagem Worker estável com engines mockados, sem baixar modelos. |
+| `tests/test_diarization_filter.py` (8 testes) | Imports globais de librosa/Torch/Pyannote exigem a matriz Worker. Preservado, não convertido em skip. Executar na imagem Worker estável com engines mockados, sem baixar modelos. |
 | Demais testes de áudio/Whisper/AssemblyAI/intelligence/Firebase | Incluídos no baseline com modelos/providers/tokens mockados; não exigem GPU ou APIs reais. |
 | Benchmarks em `modules/backend/benchmarks/` | Homologação separada com fixtures públicas, referências e matriz ML controlada; não são testes pytest. |
 | Inferência CUDA, WER/CER/DER e estabilidade | Gate de release ML em GPU autorizada; fora de runners CI CPU. Não promover Pyannote 4 por este baseline. |
