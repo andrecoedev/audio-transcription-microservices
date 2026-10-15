@@ -108,7 +108,8 @@ def initialize_policy(db, *, version, confirmed, actor_user_id):
 
 def _check_version(row, version):
     if row.configuration_version != version:
-        raise HTTPException(409, "A configuração mudou em outra aba. Recarregue antes de salvar.")
+        raise HTTPException(409, {"code": "admin_settings_revision_conflict",
+            "message": "A configuração mudou em outra aba. Recarregue antes de salvar."})
 
 
 def _changed(db, row, actor, event, before, after):

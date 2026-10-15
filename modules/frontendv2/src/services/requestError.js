@@ -1,5 +1,11 @@
 // Translate known API failures without changing contracts or exposing diagnostics.
 const messages = {
+  'O máximo não pode ficar abaixo das vagas já utilizadas nesta rodada.': 'O limite de participantes não pode ficar abaixo das vagas já utilizadas nesta rodada.',
+  'A identificação da rodada não pode mudar após convites ou uso.': 'A rodada já tem convites ou uso registrado; seu identificador não pode ser alterado.',
+  'O teto exige conferência operacional suficiente.': 'Confira a autorização financeira com o operador antes de aumentar o teto.',
+  'Revogue o acesso beta atual antes de conceder outro.': 'Esta conta já tem acesso beta ativo. Revogue o acesso atual antes de conceder outro.',
+  'O limite de convidados desta rodada foi atingido.': 'Todas as vagas desta rodada já foram utilizadas. Revogar um convite não repõe a vaga.',
+  'A configuração já foi preparada. Recarregue a página.': 'A configuração já foi preparada. Recarregue a página para continuar.',
   'File content does not match a supported audio/video format': 'O arquivo não corresponde ao formato indicado. Exporte o áudio novamente como WAV ou MP3; não basta trocar a extensão do nome.',
   'Audio exceeds the public duration limit': 'O áudio ultrapassa o limite de duração. Confira o limite e envie um arquivo mais curto.',
   'AssemblyAI credential unavailable or invalid': 'Não foi possível acessar o AssemblyAI. Confira a conexão do serviço em Configurações; visitantes podem tentar novamente mais tarde.',
@@ -29,6 +35,7 @@ const messages = {
 }
 
 export function requestErrorMessage(status, detail) {
+  if (detail?.code === 'admin_settings_revision_conflict') return 'A configuração mudou em outra aba. Recarregue antes de salvar.'
   if (typeof detail === 'string' && messages[detail]) return messages[detail]
   // Keep actionable Portuguese policy messages provided by the API. Never return
   // unknown internal/provider diagnostics, validation payloads or request config.

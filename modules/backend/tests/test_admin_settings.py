@@ -56,6 +56,7 @@ def test_updates_are_allowlisted_confirmed_versioned_and_audited(db_context, aut
     stale = client.patch("/admin/settings/beta", headers=headers,
         json={"version": 1, "round_name": "Outdated"})
     assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "admin_settings_revision_conflict"
     assert client.get("/admin/settings", headers=headers).json()["version"] == 2
     with db_context["session_factory"]() as db:
         event = db.query(AuditEvent).filter_by(event="admin.settings_changed").one()

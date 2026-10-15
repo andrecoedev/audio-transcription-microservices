@@ -34,7 +34,7 @@ const fieldLabels = {
 }
 
 function message(error, fallback) {
-  if (error?.status === 409) return 'A configuração mudou em outra sessão. Seu rascunho foi mantido; recarregue os dados antes de decidir o que salvar.'
+  if (error?.status === 409 && error?.code === 'admin_settings_revision_conflict') return 'A configuração mudou em outra sessão. Seu rascunho foi mantido; recarregue os dados antes de decidir o que salvar.'
   return error?.message || fallback
 }
 

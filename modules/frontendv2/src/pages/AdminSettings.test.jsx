@@ -156,7 +156,7 @@ it('preserves dirty fields in another section when one section is saved', async 
 
 it('keeps a draft after a version conflict and saves only after explicit confirmation', async () => {
   const current = settings()
-  adminSettingsService.save.mockRejectedValueOnce(Object.assign(new Error('conflict'), { status: 409 }))
+  adminSettingsService.save.mockRejectedValueOnce(Object.assign(new Error('conflict'), { status: 409, code: 'admin_settings_revision_conflict' }))
   render(<AdminSettings />)
   await screen.findByText('Visão geral')
   fireEvent.change(screen.getByRole('combobox', { name: 'Ativação da rodada' }), { target: { value: 'true' } })
@@ -168,6 +168,17 @@ it('keeps a draft after a version conflict and saves only after explicit confirm
   expect(adminSettingsService.getSettings).toHaveBeenCalledOnce()
   expect(current.values['beta.enabled']).toBe(false)
   expect(screen.getByRole('combobox', { name: 'Ativação da rodada' }).value).toBe('true')
+})
+
+it('shows the operational conflict without suggesting draft loss or another-session changes', async () => {
+  adminSettingsService.save.mockRejectedValueOnce(Object.assign(new Error('O limite de participantes não pode ficar abaixo das vagas já utilizadas nesta rodada.'), { status: 409 }))
+  render(<AdminSettings />)
+  await screen.findByText('Visão geral')
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Limite de participantes (contas)' }), { target: { value: '1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar Beta fechado' }))
+  expect(await screen.findByText(/limite de participantes não pode/)).toBeTruthy()
+  expect(screen.queryByText(/mudou em outra sessão/)).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Recarregar e descartar rascunho' })).toBeNull()
 })
 
 it('requires confirmation before granting or revoking participant access', async () => {
