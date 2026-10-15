@@ -135,3 +135,53 @@ def test_operational_views_are_admin_only_and_exclude_external_balance_and_secre
     assert client.get("/admin/settings/accounts?q=%25%25", headers=headers).json()["items"] == []
     history = client.get("/admin/settings/history", headers=headers).json()
     assert history["items"][0]["event"] == "admin.settings_initialized"
+
+
+def test_quota_reduction_below_eight_committed_hours_keeps_history(db_context, auth_headers):
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    from src.models import TranscriptionReservation
+    headers = admin_headers(db_context, auth_headers)
+    client = db_context["client"]
+    client.post("/admin/settings/initialize", headers=headers, json={"version": 0, "confirmed": True}).raise_for_status()
+    with db_context["session_factory"]() as db:
+        for identity, state, seconds in [("finished", "consumed", 21600), ("pending", "unknown", 7200)]:
+            db.add(TranscriptionReservation(id=identity, operation_key="synthetic:" + identity,
+                user_id=1, period_start=datetime.now(timezone.utc).date(), round_id="test-round",
+                source="usagi", provider="assemblyai", credential_source="platform", state=state,
+                reserved_seconds=seconds, stored_bytes=0, input_reference="synthetic:" + identity))
+        db.commit()
+    response = client.patch("/admin/settings/beta", headers=headers,
+        json={"version": 1, "confirmed": True, "quota_minutes_per_participant": 360})
+    assert response.status_code == 200
+    own = client.get("/account/plan", headers=headers).json()["quota"]
+    assert Decimal(own["consumed_seconds"]) == 21600
+    assert Decimal(own["reserved_seconds"]) == 7200
+    assert Decimal(own["available_seconds"]) == 0
+    participant = client.get("/admin/settings/participants", headers=headers).json()["items"][0]
+    assert participant["committed_above_limit"] is True
+    with db_context["session_factory"]() as db:
+        assert db.get(TranscriptionReservation, "pending").state == "unknown"
+        assert db.query(TranscriptionReservation).count() == 2
+
+
+def test_limits_show_environment_ceiling_but_preserve_individual_upload_exception(db_context, auth_headers, monkeypatch):
+    from src.config import settings
+    from src.services.upload_policy import upload_limit_mb
+    headers = admin_headers(db_context, auth_headers)
+    client = db_context["client"]
+    client.post("/admin/settings/initialize", headers=headers, json={"version": 0, "confirmed": True}).raise_for_status()
+    monkeypatch.setattr(settings, "AAI_MAX_AUDIO_SECONDS", 120)
+    view = client.get("/admin/settings", headers=headers).json()
+    assert view["values"]["limits.max_audio_seconds"] == 120
+    assert view["saved_values"]["limits.max_audio_seconds"] == 600
+    assert "limits.max_audio_seconds" in view["overrides"]
+    # Environment changes must not prevent an emergency pause or a label edit.
+    assert client.patch("/admin/settings/beta", headers=headers,
+        json={"version": 1, "round_name": "Rodada teste"}).status_code == 200
+    assert client.patch("/admin/settings/limits", headers=headers,
+        json={"version": 2, "max_upload_mb": 5}).status_code == 200
+    monkeypatch.setattr(settings, "LARGE_UPLOAD_USER_IDS", [1])
+    with db_context["session_factory"]() as db:
+        assert upload_limit_mb(2, "public", db=db) == 5
+        assert upload_limit_mb(1, "public", db=db) == min(settings.LARGE_UPLOAD_SIZE_MB, settings.MAX_UPLOAD_SIZE_MB)

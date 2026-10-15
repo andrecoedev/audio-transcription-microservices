@@ -98,6 +98,9 @@ def initialize_policy(db, *, version, confirmed, actor_user_id):
     # Preserve old spending and round, never import enabled flags or a new cap.
     if not row.round_id:
         row.round_id = settings.AAI_BETA_ROUND_ID.strip() or None
+    if row.round_id:
+        invited = db.query(BetaAccessGrant).filter_by(round_id=row.round_id).all()
+        row.invited_count = max(row.invited_count, len({g.user_id for g in invited if "transcription.platform" in g.capabilities}))
     row.operational_policy = policy.model_dump()
     _changed(db, row, actor_user_id, "admin.settings_initialized", {"policy": None}, {"policy": row.operational_policy})
     return row
@@ -138,7 +141,8 @@ def update_policy(db, *, section, changes, version, confirmed, actor_user_id):
     for key, value in changed.items():
         if key in POLICY_FIELDS:
             data[POLICY_FIELDS[key]] = value
-    if data["max_audio_seconds"] > min(600, settings.AAI_MAX_AUDIO_SECONDS) or data["max_upload_mb"] > settings.MAX_UPLOAD_SIZE_MB:
+    if (("limits.max_audio_seconds" in changed and data["max_audio_seconds"] > min(600, settings.AAI_MAX_AUDIO_SECONDS))
+        or ("limits.max_upload_mb" in changed and data["max_upload_mb"] > settings.MAX_UPLOAD_SIZE_MB)):
         raise HTTPException(422, "O limite solicitado excede a capacidade técnica configurada neste ambiente.")
     try:
         updated = BetaPolicy.model_validate(data)
@@ -241,6 +245,7 @@ def settings_view(db):
     definitions[len(POLICY_FIELDS)]["editable"] = not (row and (row.invited_count or
         db.query(PlatformProviderCall).count() or db.query(BetaAccessGrant).filter(BetaAccessGrant.round_id.is_not(None)).count()))
     definitions[len(POLICY_FIELDS)]["requires_confirmation"] = True
+    definitions[len(POLICY_FIELDS)]["runtime"] = definitions[len(POLICY_FIELDS)]["editable"]
     return {"configured": policy is not None, "version": row.configuration_version if row else 0,
         "values": values, "saved_values": saved_values, "overrides": overrides, "definitions": definitions,
         "updated_at": row.configuration_updated_at if row else None}

@@ -166,10 +166,12 @@ def test_interrupted_platform_attempt_recovery_marks_old_cancelled_and_blocks_se
         ))
         db.add(TranscriptionOwnership(transcription_id=transcription.id, owner_sub="alice", user_id=1))
         db.flush()
-        from .entitlement_helpers import reserve_test_job, start_test_reservation
+        from .entitlement_helpers import reserve_test_job, start_test_reservation, prepare_test_round
+        prepare_test_round(db)
         reserve_test_job(db, db.query(TranscriptionJob).filter_by(transcription_id=transcription.id).one())
         start_test_reservation(db, transcription.id, 10)
-        db.add(PlatformProviderBudget(provider="assemblyai", limit_cents=100, reserved_cents=10))
+        budget = db.get(PlatformProviderBudget, "assemblyai")
+        budget.limit_cents, budget.reserved_cents = 100, 10
         db.add(PlatformProviderCall(
             transcription_id=transcription.id, provider="assemblyai", context="local",
             credential_source="platform", reserved_cents=10, state="attempted",
