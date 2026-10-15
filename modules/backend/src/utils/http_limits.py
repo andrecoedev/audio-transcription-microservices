@@ -40,22 +40,20 @@ class BodyLimitedRoute(APIRoute):
                 upload_mb = settings.PUBLIC_MAX_UPLOAD_MB
                 development_access = False
                 if principal and principal.user_id is not None:
-                    def current_development_access():
+                    def current_upload_policy():
                         db = SessionLocal()
                         try:
                             user = db.get(User, principal.user_id)
-                            return (has_development_local_access(user),
-                                    user.registration_source if user else None)
+                            development = has_development_local_access(user)
+                            return (development, upload_limit_mb(principal.user_id,
+                                user.registration_source if user else "public", development, db=db))
                         finally:
                             db.close()
                     try:
-                        development_access, registration_source = await run_in_threadpool(current_development_access)
-                        if registration_source is not None:
-                            upload_mb = upload_limit_mb(principal.user_id, registration_source,
-                                                         development_access)
+                        development_access, upload_mb = await run_in_threadpool(current_upload_policy)
                     except Exception:
-                        logger.warning("Upload policy lookup unavailable; applying public body limit")
-                        development_access = False
+                        logger.warning("Upload policy lookup unavailable; upload denied")
+                        raise HTTPException(503, "Não foi possível verificar o limite de envio. Tente novamente em alguns instantes.") from None
                 if development_access:
                     upload_mb = settings.MAX_UPLOAD_SIZE_MB
             if path in {"/guest/transcriptions/jobs", "/transcriptions/jobs"}:

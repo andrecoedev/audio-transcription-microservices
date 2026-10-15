@@ -98,6 +98,8 @@ def db_context(tmp_path, monkeypatch):
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
     testing_session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    from src.utils import http_limits
+    monkeypatch.setattr(http_limits, "SessionLocal", testing_session)
     Base.metadata.create_all(bind=engine)
     seed = testing_session()
     seed.add_all(
