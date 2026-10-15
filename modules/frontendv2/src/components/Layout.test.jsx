@@ -56,6 +56,20 @@ describe('USAGI application shell', () => {
     fireEvent.click(adminLinks[1])
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
   })
+  it('keeps admin section heading IDs unique when desktop and mobile sidebars are mounted', () => {
+    useAuthStore.setState({ user: { name: 'Fixture', roles: ['admin'] }, token: 'synthetic-session', isAuthenticated: true })
+    open()
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir navegação' }))
+
+    const sections = screen.getAllByRole('region', { name: 'Administração' })
+    expect(sections).toHaveLength(2)
+    const headingIds = sections.map(section => section.getAttribute('aria-labelledby'))
+    expect(new Set(headingIds).size).toBe(2)
+    headingIds.forEach(id => {
+      expect(document.getElementById(id)?.textContent).toBe('Administração')
+      expect(Array.from(document.querySelectorAll('[id]')).filter(element => element.id === id)).toHaveLength(1)
+    })
+  })
   it('offers an authenticated logout and clears the session', () => {
     useAuthStore.setState({ user: { name: 'Fixture', initials: 'FI' }, token: 'synthetic-session', isAuthenticated: true })
     open()

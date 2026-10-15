@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { Home, FileAudio, Plus, Settings, Users, ListChecks, ChevronUp, LogOut, Shield } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
@@ -18,6 +18,7 @@ export default function Sidebar({ onNavigate }) {
   const { user, isAuthenticated } = useAuthStore()
   const isAdmin = isAuthenticated && user?.roles?.includes('admin')
   const [accountOpen, setAccountOpen] = useState(false)
+  const adminHeadingId = useId()
   return <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-gray-200 bg-white px-4 py-7">
     <Link to="/" onClick={onNavigate} className="mb-10 px-3">
       <span className="block text-2xl font-semibold tracking-[0.16em] text-primary-600">USAGI</span>
@@ -29,8 +30,8 @@ export default function Sidebar({ onNavigate }) {
         <Icon className="h-4 w-4" aria-hidden="true" />{name}
       </NavLink>)}
     </nav>
-    {isAdmin && <section aria-labelledby="admin-navigation-heading" className="mt-4 border-t border-gray-200 pt-4">
-      <h2 id="admin-navigation-heading" className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Administração</h2>
+    {isAdmin && <section aria-labelledby={adminHeadingId} className="mt-4 border-t border-gray-200 pt-4">
+      <h2 id={adminHeadingId} className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Administração</h2>
       <nav aria-label="Administração" className="space-y-1">
         <NavLink to="/admin/settings" onClick={onNavigate}
           className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? 'bg-primary-50 font-medium text-primary-800' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
