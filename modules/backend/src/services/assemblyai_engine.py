@@ -10,11 +10,12 @@ import assemblyai as aai
 
 logger = logging.getLogger(__name__)
 _TRANSCRIPT_ID = re.compile(r"(?=.{1,128}$)[A-Za-z0-9-]+\Z")
+_MODEL_ID = re.compile(r"(?=.{1,128}$)[A-Za-z0-9._-]+\Z")
 _TIMESTAMP_TOLERANCE_SECONDS = 0.1
 
 
 def _transcript_usage(
-    transcript: dict[str, Any], transcript_id: str, use_diarization: bool
+    transcript: dict[str, Any], transcript_id: str, use_diarization: bool, model: str
 ) -> dict[str, Any]:
     event: dict[str, Any] = {
         "phase": "polled",
@@ -23,7 +24,7 @@ def _transcript_usage(
             if transcript.get("status") in {"completed", "error"}
             else "unknown"
         ),
-        "model": "universal-2",
+        "model": model,
         "use_diarization": bool(use_diarization),
     }
     provider_id = transcript.get("id", transcript_id)
@@ -62,16 +63,21 @@ class AssemblyAIEngine:
         http_timeout: float = 30.0,
         timeout_seconds: float = 180.0,
         poll_interval: float = 3.0,
+        model: str = "universal-2",
     ):
         if not api_key:
             raise AssemblyAIProcessingError("credential")
         if http_timeout <= 0 or timeout_seconds <= 0 or poll_interval <= 0:
             raise ValueError("AssemblyAI timeout values must be positive")
+        if not isinstance(model, str) or not _MODEL_ID.fullmatch(model):
+            raise AssemblyAIProcessingError("invalid_response")
 
+        self.model = model
         self.http_timeout = float(http_timeout)
         self.timeout_seconds = float(timeout_seconds)
         self.poll_interval = float(poll_interval)
         self._usage_observer = None
+        self._execution_observer = None
         self.client = aai.Client(
             settings=aai.Settings(
                 api_key=api_key,
@@ -86,6 +92,18 @@ class AssemblyAIEngine:
     def set_usage_observer(self, callback) -> None:
         """Set an optional observer for safe provider usage metadata."""
         self._usage_observer = callback
+
+    def set_execution_observer(self, callback) -> None:
+        """Set a mandatory observer for accepted and terminal provider work."""
+        self._execution_observer = callback
+
+    def _observe_execution(self, event: dict[str, Any]) -> None:
+        if self._execution_observer is None:
+            return
+        try:
+            self._execution_observer(event)
+        except Exception:
+            raise AssemblyAIProcessingError("observer") from None
 
     def _observe_usage(self, event: dict[str, Any]) -> None:
         if self._usage_observer is None:
@@ -109,12 +127,12 @@ class AssemblyAIEngine:
             language_code="pt",
             speaker_labels=use_diarization,
             raw_transcription_config=aai.RawTranscriptionConfig(
-                speech_models=["universal-2"]
+                speech_models=[self.model]
             ),
         )
         deadline = time.monotonic() + self.timeout_seconds
         self._observe_usage({
-            "phase": "submitted", "status": "unknown", "model": "universal-2",
+            "phase": "submitted", "status": "unknown", "model": self.model,
             "use_diarization": bool(use_diarization),
         })
         try:
@@ -130,15 +148,27 @@ class AssemblyAIEngine:
         ):
             raise AssemblyAIProcessingError("invalid_response")
 
+        self._observe_execution({
+            "phase": "accepted",
+            "status": "queued",
+            "model": self.model,
+            "use_diarization": bool(use_diarization),
+            "provider_id": transcript_id,
+        })
+
         try:
             transcript = self._poll(transcript_id, deadline)
         except AssemblyAIProcessingError:
-            self._observe_usage({
-                "phase": "polled", "status": "unknown", "model": "universal-2",
+            event = {
+                "phase": "polled", "status": "unknown", "model": self.model,
                 "use_diarization": bool(use_diarization), "provider_id": transcript_id,
-            })
+            }
+            self._observe_usage(event)
+            self._observe_execution(event)
             raise
-        self._observe_usage(_transcript_usage(transcript, transcript_id, use_diarization))
+        event = _transcript_usage(transcript, transcript_id, use_diarization, self.model)
+        self._observe_usage(event)
+        self._observe_execution(event)
         if transcript.get("status") != "completed":
             code = _state_error_code(transcript.get("error"))
             raise AssemblyAIProcessingError(code)
@@ -255,7 +285,7 @@ class AssemblyAIEngine:
     def get_metadata(self) -> dict[str, str]:
         return {
             "engine": "assemblyai",
-            "model": "universal-2",
+            "model": self.model,
             "device": "cloud",
             "language": "pt",
         }

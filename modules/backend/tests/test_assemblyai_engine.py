@@ -116,6 +116,34 @@ def test_submit_config_pins_universal_2_and_never_changes_global_settings(monkey
     }
 
 
+def test_universal_3_5_pro_is_sent_as_explicit_speech_model(monkeypatch):
+    engine, _client, transcriber = make_engine(
+        monkeypatch,
+        [FakeResponse({"status": "completed", "text": "", "utterances": []})],
+        model="universal-3-5-pro",
+    )
+
+    engine.transcribe_file("normalized.wav", 2.0, True)
+
+    config = transcriber.calls[0][1]
+    assert config._raw_transcription_config.model_dump(exclude_none=True)["speech_models"] == [
+        "universal-3-5-pro"
+    ]
+    assert engine.get_metadata()["model"] == "universal-3-5-pro"
+
+
+@pytest.mark.parametrize("model", ["", "universal-2?x", "https://example.com", "x" * 129])
+def test_model_identifier_rejects_unbounded_or_non_identifier_values(monkeypatch, model):
+    created = []
+    monkeypatch.setattr(module.aai, "Client", lambda **_kwargs: created.append(True))
+
+    with pytest.raises(AssemblyAIProcessingError) as error:
+        AssemblyAIEngine("test-key", model=model)
+
+    assert error.value.code == "invalid_response"
+    assert created == []
+
+
 def test_non_diarized_flow_uses_word_timestamps_for_single_segment(monkeypatch):
     engine, _client, transcriber = make_engine(
         monkeypatch,
