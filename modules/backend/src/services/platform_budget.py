@@ -84,7 +84,7 @@ def _amount(seconds, hourly_rate_cents):
 
 def platform_reservation_amount_cents(db, duration_seconds=None):
     budget, policy = _policy(db)
-    return _amount(duration_seconds or settings.AAI_MAX_AUDIO_SECONDS,
+    return _amount(duration_seconds or min(policy.max_audio_seconds, settings.AAI_MAX_AUDIO_SECONDS),
                    platform_price(db, budget).unit_price * 100)
 
 
@@ -92,7 +92,7 @@ def platform_budget_has_headroom(db):
     try:
         budget, policy = _policy(db)
         ceiling = _ceiling(budget)
-        return budget.reserved_cents + platform_reservation_amount_cents(db, policy.max_audio_seconds) <= ceiling
+        return budget.reserved_cents + platform_reservation_amount_cents(db) <= ceiling
     except HTTPException:
         return False
 
@@ -126,7 +126,7 @@ def reserve_platform_call(db, transcription_id, context, *, duration_seconds=Non
     if queued >= policy.max_platform_queued:
         raise HTTPException(429, UNAVAILABLE)
     price = platform_price(db, budget)
-    amount = _amount(duration_seconds or policy.max_audio_seconds, price.unit_price * 100)
+    amount = _amount(duration_seconds or min(policy.max_audio_seconds, settings.AAI_MAX_AUDIO_SECONDS), price.unit_price * 100)
     if duration_seconds is not None and duration_seconds > policy.max_audio_seconds:
         raise HTTPException(422, "O áudio excede a duração permitida nesta rodada.")
     if budget.reserved_cents + amount > ceiling:
@@ -163,7 +163,7 @@ def begin_platform_call(db, transcription_id, *, duration_seconds=None):
     # Do not free an old hold implicitly to make a queued call fit the new cap.
     if budget.reserved_cents > ceiling:
         raise HTTPException(429, UNAVAILABLE)
-    amount = _amount(duration_seconds or settings.AAI_MAX_AUDIO_SECONDS, call.hourly_rate_cents)
+    amount = _amount(duration_seconds or min(policy.max_audio_seconds, settings.AAI_MAX_AUDIO_SECONDS), call.hourly_rate_cents)
     if amount > call.reserved_cents or (duration_seconds is not None and duration_seconds > policy.max_audio_seconds):
         raise HTTPException(429, UNAVAILABLE)
     revised_total = budget.reserved_cents - call.reserved_cents + amount

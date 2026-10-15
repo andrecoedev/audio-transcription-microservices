@@ -242,3 +242,16 @@ def test_missing_or_invalid_policy_fails_closed_without_implicit_bootstrap(db_co
         with pytest.raises(HTTPException) as denied:
             finance.reserve_platform_call(db, 999, "local", duration_seconds=60)
         assert denied.value.status_code == 503
+
+
+def test_provider_availability_uses_effective_duration_ceiling(db_context, auth_headers, monkeypatch):
+    from src.config import settings
+    from .platform_helpers import configure_platform, confirm_test_balance
+    configure_platform(monkeypatch)
+    with db_context["session_factory"]() as db:
+        confirm_test_balance(db)
+    monkeypatch.setattr(settings, "AAI_MAX_AUDIO_SECONDS", 120)
+    view = db_context["client"].get("/settings/providers", headers=auth_headers())
+    assert view.status_code == 200
+    assert view.json()["upload_policy"]["max_audio_seconds"] == 120
+    assert view.json()["providers"]["assemblyai"]["platform_access"] is True
