@@ -185,3 +185,58 @@ def test_limits_show_environment_ceiling_but_preserve_individual_upload_exceptio
     with db_context["session_factory"]() as db:
         assert upload_limit_mb(2, "public", db=db) == 5
         assert upload_limit_mb(1, "public", db=db) == min(settings.LARGE_UPLOAD_SIZE_MB, settings.MAX_UPLOAD_SIZE_MB)
+
+
+def test_worker_uses_db_price_and_policy_and_finishes_submitted_call_after_pause(db_context, monkeypatch):
+    from decimal import Decimal
+    from src.config import settings
+    from src.models import PlatformProviderBudget, PlatformProviderCall, Transcription
+    from src.services import platform_budget as finance
+    from src.services.beta_settings import update_policy
+    from .platform_helpers import configure_platform, confirm_test_balance
+    configure_platform(monkeypatch)
+    with db_context["session_factory"]() as db:
+        confirm_test_balance(db)
+        row = Transcription(filename="synthetic.wav", original_filename="synthetic.wav", file_size_mb=0.1,
+            duration_seconds=60, transcription_model="assemblyai", status="queued")
+        db.add(row)
+        db.flush()
+        finance.reserve_platform_call(db, row.id, "local", duration_seconds=60)
+        db.commit()
+        # Simulate an API/Worker process whose old deployment values differ.
+        monkeypatch.setattr(settings, "AAI_PLATFORM_ENABLED", False)
+        monkeypatch.setattr(settings, "AAI_PLATFORM_BUDGET_CENTS", 0)
+        monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "outdated-round")
+        monkeypatch.setattr(settings, "AAI_PLATFORM_HOURLY_USD", Decimal(0))
+        monkeypatch.setattr(settings, "AAI_PLATFORM_PRICE_VERSION", "outdated-price")
+        assert finance.begin_platform_call(db, row.id, duration_seconds=60) == "local"
+        budget = db.get(PlatformProviderBudget, "assemblyai")
+        update_policy(db, section="beta", changes={"beta.enabled": False},
+            version=budget.configuration_version, confirmed=True, actor_user_id=1)
+        db.commit()
+        finance.observe_platform_call(db, row.id, {"provider_id": "synthetic-final", "status": "completed",
+            "audio_duration_seconds": 60})
+        db.commit()
+        call = db.query(PlatformProviderCall).one()
+        assert call.provider_status == "completed" and call.released_at is None
+        assert call.price_version == "synthetic-price-version"
+        assert call.estimated_cost_cents == Decimal("0.38333334")
+
+
+def test_missing_or_invalid_policy_fails_closed_without_implicit_bootstrap(db_context, monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    from src.models import PlatformProviderBudget
+    from src.services import platform_budget as finance
+    from .platform_helpers import configure_platform
+    configure_platform(monkeypatch)
+    with db_context["session_factory"]() as db:
+        assert finance.platform_budget_has_headroom(db) is False
+        assert db.query(PlatformProviderBudget).count() == 0
+        db.add(PlatformProviderBudget(provider="assemblyai", limit_cents=1500, reserved_cents=0,
+            operational_policy={"beta_enabled": "true", "unknown": True}))
+        db.commit()
+        assert finance.platform_budget_has_headroom(db) is False
+        with pytest.raises(HTTPException) as denied:
+            finance.reserve_platform_call(db, 999, "local", duration_seconds=60)
+        assert denied.value.status_code == 503
