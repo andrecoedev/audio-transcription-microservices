@@ -114,7 +114,8 @@ def reconcile_call(call_id: int, body: CallReconciliationInput, request: Request
         if call.provider_status != body.decision:
             raise HTTPException(409, "A operação já possui confirmação terminal diferente.")
         return {"reconciled": True}
-    if call.state != "attempted" or not call.operation_key:
+    if (call.state not in {"reserved", "attempted"} or not call.operation_key
+        or (call.state == "reserved" and body.decision != "not_submitted")):
         raise HTTPException(409, "A operação não possui tentativa conciliável.")
     prefix, _, tid = call.operation_key.partition(":")
     if prefix != "transcription" or not tid.isdigit():

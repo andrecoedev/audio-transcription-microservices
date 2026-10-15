@@ -168,3 +168,64 @@ def test_recorded_balance_and_budget_changes_require_admin(db_context, auth_head
     monkeypatch.setattr(settings, "AAI_PLATFORM_BUDGET_CENTS", 2000)
     with db_context["session_factory"]() as db:
         assert finance._ceiling(db.get(PlatformProviderBudget, "assemblyai")) == 1600
+
+
+@pytest.mark.parametrize("attempted", [False, True])
+def test_manual_reconciliation_releases_only_inactive_proven_unsubmitted_calls(
+    db_context, auth_headers, monkeypatch, attempted
+):
+    from types import SimpleNamespace
+    from rq.exceptions import NoSuchJobError
+    from rq.job import Job
+    from src.models import AuditEvent, User
+    from src.workers import config
+
+    with db_context["session_factory"]() as db:
+        checked(db, monkeypatch)
+        db.get(User, 1).is_superuser = True
+        row = transcription(db)
+        finance.reserve_platform_call(db, row.id, "local")
+        if attempted:
+            finance.begin_platform_call(db, row.id, duration_seconds=60)
+        call_id = db.query(PlatformProviderCall).one().id
+        # Deletion must not erase the immutable queue reference or release money.
+        db.delete(row)
+        db.commit()
+
+    monkeypatch.setattr(config, "get_transcription_queue", lambda: db_context["queue"])
+    monkeypatch.setattr(Job, "fetch", lambda *args, **kwargs: SimpleNamespace(get_status=lambda **kw: "started"))
+    client = db_context["client"]
+    path = f"/admin/providers/assemblyai/calls/{call_id}/reconcile"
+    payload = {"decision": "not_submitted", "reason": "dashboard_verified"}
+    assert client.post(path, headers=auth_headers(), json=payload).status_code == 409
+
+    def missing(*args, **kwargs):
+        raise NoSuchJobError("synthetic queue has no job")
+
+    monkeypatch.setattr(Job, "fetch", missing)
+    assert client.post(path, headers=auth_headers(), json=payload).status_code == 200
+    assert client.post(path, headers=auth_headers(), json=payload).status_code == 200
+    with db_context["session_factory"]() as db:
+        assert db.get(PlatformProviderBudget, "assemblyai").reserved_cents == 0
+        assert db.get(PlatformProviderCall, call_id).provider_status == "not_submitted"
+        assert db.query(AuditEvent).filter_by(event="provider.call_reconciled").count() == 1
+
+
+def test_manual_balance_recheck_never_resets_accumulated_authorization(db_context, monkeypatch):
+    with db_context["session_factory"]() as db:
+        checked(db, monkeypatch)
+        row = transcription(db)
+        finance.reserve_platform_call(db, row.id, "local")
+        finance.begin_platform_call(db, row.id, duration_seconds=60)
+        with pytest.raises(HTTPException) as denied:
+            finance.record_balance_check(db, available_usd=Decimal("49"), checked_at=finance.now_utc(),
+                key_reference="beta-primary", project_reference="beta", exclusive=True, actor_user_id=1)
+        assert denied.value.status_code == 409
+        finance.observe_platform_call(db, row.id, {"provider_id": "synthetic-completed", "status": "completed",
+                                                 "audio_duration_seconds": 60})
+        db.commit()
+        finance.record_balance_check(db, available_usd=Decimal("49"), checked_at=finance.now_utc(),
+            key_reference="beta-primary", project_reference="beta", exclusive=True, actor_user_id=1)
+        db.commit()
+        budget = db.get(PlatformProviderBudget, "assemblyai")
+        assert budget.reserved_cents == budget.balance_baseline_cents == Decimal("0.38333334")
