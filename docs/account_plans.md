@@ -2,6 +2,10 @@
 
 ## Estado implementado
 
+O acesso à beta fechada de AssemblyAI é uma concessão operacional explícita,
+separada do plano da conta. Rodada, quota por pessoa e operação estão no
+[runbook da beta fechada](closed_beta.md).
+
 Guest permanece demonstração sintética. Todas as contas novas e existentes,
 inclusive administradores e contas locais, começam em Free. Não há promoção
 automática para Starter, checkout, cobrança nem preços comerciais nesta entrega.
