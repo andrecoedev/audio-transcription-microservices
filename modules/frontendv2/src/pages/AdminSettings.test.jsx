@@ -181,6 +181,16 @@ it('shows the operational conflict without suggesting draft loss or another-sess
   expect(screen.queryByRole('button', { name: 'Recarregar e descartar rascunho' })).toBeNull()
 })
 
+it('shows who changed a setting and its previous and new values in history', async () => {
+  adminSettingsService.getHistory.mockResolvedValue({ items: [{ id: 1, event: 'admin.settings_changed',
+    actor_user_id: 7, created_at: '2026-10-15T12:00:00Z', changes: { version: 2,
+      before: { 'assemblyai.hard_stop_usd': '15' }, after: { 'assemblyai.hard_stop_usd': '25' } } }] })
+  render(<AdminSettings />)
+  fireEvent.click(await screen.findByText('Histórico de alterações (1)'))
+  expect(screen.getByText(/Administrador 7/)).toBeTruthy()
+  expect(screen.getByText(/Teto interno.*15.*25/)).toBeTruthy()
+})
+
 it('requires confirmation before granting or revoking participant access', async () => {
   adminSettingsService.getParticipants.mockResolvedValue({ items: [{ user_id: 9, username: 'alice', email: 'alice@example.test', grant_id: 44,
     active: true, expires_at: '2026-11-01T12:00:00Z', quota_seconds: 3600, consumed_seconds: '900', reserved_seconds: '0',

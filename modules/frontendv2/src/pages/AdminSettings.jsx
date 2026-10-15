@@ -103,7 +103,7 @@ function ConfirmDialog({ confirmation, onCancel, onConfirm, busy }) {
       if (event.key === 'Escape' && !busyAction.current) { event.preventDefault(); cancelAction.current(); return }
       if (event.key !== 'Tab') return
       const focusable = dialogRef.current?.querySelectorAll('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')
-      if (!focusable?.length) return
+      if (!focusable?.length) { event.preventDefault(); dialogRef.current?.focus(); return }
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
       if (event.shiftKey && (document.activeElement === first || !dialogRef.current.contains(document.activeElement))) {
@@ -120,7 +120,7 @@ function ConfirmDialog({ confirmation, onCancel, onConfirm, busy }) {
   }, [isOpen])
   if (!confirmation) return null
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4" role="presentation">
-    <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="admin-confirm-title" tabIndex={-1} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+    <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="admin-confirm-title" tabIndex={-1} className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
       <h2 id="admin-confirm-title" className="text-lg font-semibold text-gray-900">Confirme a alteração</h2>
       <p className="mt-2 text-sm text-gray-600">{confirmation.text}</p>
       {confirmation.changes?.length > 0 && <ul className="mt-4 space-y-2 rounded-lg bg-gray-50 p-3 text-sm">
@@ -276,7 +276,9 @@ export default function AdminSettings() {
         <Status label="Firebase" value={overview.system.firebase_configured ? 'Configurado' : 'Não configurado'} /><Status label="Redis" value={overview.system.redis || 'Estado indisponível'} />
         <Status label="Workers" value={overview.system.worker_available ? `${overview.system.worker_count ?? 0} registrado(s)` : 'Nenhum registrado'} /><Status label="Fila" value={overview.system.queue || 'Estado indisponível'} />
       </div><p className="mt-3 text-xs text-gray-500">O estado exibido não testa inferência nem consulta saldo externo.</p></div>}
-    {history.length > 0 && <details className="mt-5 border-t pt-4"><summary className="cursor-pointer text-sm font-medium text-primary-700">Histórico de alterações ({history.length})</summary><ol className="mt-4 space-y-3">{history.map((entry) => <li key={entry.id} className="break-words border-l-2 border-gray-200 pl-3 text-sm"><p className="font-medium">{entry.event === 'admin.settings_initialized' ? 'Configuração preparada' : 'Configuração alterada'} · {new Date(entry.created_at).toLocaleString('pt-BR')}</p><p className="text-xs text-gray-500">Administrador {entry.actor_user_id} · versão {entry.changes?.version ?? '—'}</p></li>)}</ol></details>}
+    {history.length > 0 && <details className="mt-5 border-t pt-4"><summary className="cursor-pointer text-sm font-medium text-primary-700">Histórico de alterações ({history.length})</summary><ol className="mt-4 space-y-3">{history.map((entry) => <li key={entry.id} className="break-words border-l-2 border-gray-200 pl-3 text-sm"><p className="font-medium">{entry.event === 'admin.settings_initialized' ? 'Configuração preparada' : 'Configuração alterada'} · {new Date(entry.created_at).toLocaleString('pt-BR')}</p><p className="text-xs text-gray-500">Administrador {entry.actor_user_id ?? 'removido'} · versão {entry.changes?.version ?? '—'}</p>
+      <ul className="mt-1 space-y-1">{Object.entries(entry.changes?.after || {}).filter(([key]) => fieldLabels[key]).map(([key, value]) => <li key={key} className="text-xs text-gray-700">{fieldLabels[key]}: {fieldValue(key, entry.changes.before?.[key])} → {fieldValue(key, value)}</li>)}</ul>
+    </li>)}</ol></details>}
     </CardContent></Card>
 
     {sections.map((section) => <Card key={section.id}><CardHeader className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{section.title}</CardTitle><p className="mt-1 text-xs text-gray-500">Versão {snapshot?.version ?? 0} · salvamento independente desta seção</p></div><HelpPopover label={`Ajuda: ${section.title}`}>Os limites efetivos podem ser menores por capacidade técnica do ambiente. Valores monetários são tetos internos em USD, não saldos do provedor.</HelpPopover></CardHeader>
