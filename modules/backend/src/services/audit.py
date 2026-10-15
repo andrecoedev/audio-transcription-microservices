@@ -12,6 +12,8 @@ from ..models import AuditEvent
 
 
 ALLOWED_EVENTS = {
+    "admin.settings_initialized",
+    "admin.settings_changed",
     "provider.balance_checked",
     "provider.budget_changed",
     "provider.budget_alert",
