@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import AdminSettings from './AdminSettings'
 import { adminSettingsService } from '../services/adminSettingsService'
 
@@ -60,6 +60,17 @@ it('requires explicit confirmation for activation and leaves the draft unchanged
   expect(adminSettingsService.save).not.toHaveBeenCalled()
 })
 
+it('saves an activation only after confirmation', async () => {
+  adminSettingsService.save.mockResolvedValue(settings({ 'beta.enabled': true }))
+  render(<AdminSettings />)
+  await screen.findByText('Visão geral')
+  fireEvent.change(screen.getByRole('combobox', { name: 'enabled' }), { target: { value: 'true' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar Beta fechado' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Confirmar' }))
+  expect(await screen.findByText('Alteração salva.')).toBeTruthy()
+  expect(adminSettingsService.save).toHaveBeenCalledWith('beta', 2, true, { enabled: true })
+})
+
 it('keeps a draft after a version conflict and saves only after explicit confirmation', async () => {
   const current = settings()
   adminSettingsService.save.mockRejectedValueOnce(Object.assign(new Error('conflict'), { status: 409 }))
@@ -72,4 +83,33 @@ it('keeps a draft after a version conflict and saves only after explicit confirm
   expect(adminSettingsService.save).toHaveBeenCalledWith('beta', 2, true, { enabled: true })
   expect(adminSettingsService.getSettings).toHaveBeenCalledOnce()
   expect(current.values['beta.enabled']).toBe(false)
+})
+
+it('requires confirmation before granting or revoking participant access', async () => {
+  adminSettingsService.getParticipants.mockResolvedValue({ items: [{ user_id: 9, username: 'alice', email: 'alice@example.test', grant_id: 44,
+    active: true, expires_at: '2026-11-01T12:00:00Z', quota_seconds: 3600, consumed_seconds: '900', reserved_seconds: '0',
+    available_seconds: '2700', committed_above_limit: false }], used_slots: 1, maximum: 5 })
+  adminSettingsService.searchAccounts.mockResolvedValue({ items: [{ user_id: 10, username: 'bob', email: 'bob@example.test' }] })
+  render(<AdminSettings />)
+  await screen.findByText('alice')
+  fireEvent.change(screen.getByRole('textbox', { name: 'Buscar contas' }), { target: { value: 'bob' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Buscar contas' }))
+  expect(await screen.findByText('bob')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('Expira em'), { target: { value: '2026-11-30' } })
+  fireEvent.click(await screen.findByRole('button', { name: 'Conceder acesso' }))
+  expect(await screen.findByRole('dialog')).toBeTruthy()
+  expect(adminSettingsService.grant).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(adminSettingsService.grant).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Conceder acesso' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Confirmar' }))
+  await waitFor(() => expect(adminSettingsService.grant).toHaveBeenCalledOnce())
+  expect(adminSettingsService.grant).toHaveBeenCalledWith(10, 'round-one', expect.any(String))
+  expect(Number.isNaN(Date.parse(adminSettingsService.grant.mock.calls[0][2]))).toBe(false)
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Revogar acesso' }))
+  expect(await screen.findByRole('dialog')).toBeTruthy()
+  expect(adminSettingsService.revoke).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+  await waitFor(() => expect(adminSettingsService.revoke).toHaveBeenCalledWith(9, 44))
 })
