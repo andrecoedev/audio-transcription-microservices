@@ -1,5 +1,12 @@
 # Operação da beta fechada de AssemblyAI
 
+> **Estado da documentação:** este runbook é histórico para detalhes de
+> configuração por ambiente. A interface administrativa e o armazenamento
+> versionado em banco estão descritos em
+> [Configurações administrativas da beta fechada](admin_beta_settings.md).
+> Consulte o documento novo para o fluxo atual; os registros históricos de
+> orçamento, reservas e concessões continuam válidos.
+
 ## Escopo e estado
 
 Esta rodada concede acesso a no máximo cinco contas convidadas, por concessão
