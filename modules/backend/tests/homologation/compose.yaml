@@ -1,0 +1,69 @@
+# Disposable, synthetic and network-isolated; never combine with project overlays.
+name: usagi-beta-e2e
+x-runtime: &runtime
+  image: usagi-beta-e2e:test
+  build:
+    context: ../../../..
+    dockerfile: modules/backend/tests/homologation/Dockerfile
+  environment: &environment
+    APP_ENV: test
+    SECRET_KEY: synthetic-only-beta-e2e-signing-key-not-for-production
+    DATABASE_URL: postgresql+psycopg://e2e:synthetic-only@postgres:5432/usagi_beta_e2e_test
+    P2A_TEST_DATABASE_URL: postgresql+psycopg://e2e:synthetic-only@postgres:5432/usagi_beta_e2e_test
+    REDIS_URL: redis://redis:6379/0
+    P2A_TEST_REDIS_URL: redis://redis:6379/1
+    CORS_ALLOWED_ORIGINS: http://127.0.0.1:4180
+    HF_HUB_OFFLINE: '1'
+    TRANSFORMERS_OFFLINE: '1'
+    AUDIO_UPLOAD_DIRECTORY: /synthetic-audio
+    USAGE_SPOOL_DIRECTORY: /tmp/usage
+  volumes:
+    - audio:/synthetic-audio
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: synthetic-only
+      POSTGRES_DB: usagi_beta_e2e_test
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U e2e -d usagi_beta_e2e_test]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  migrate:
+    <<: *runtime
+    command: [python, -m, alembic, upgrade, head]
+  seed:
+    <<: *runtime
+    command: [python, -m, tests.homologation.server, seed]
+  api:
+    <<: *runtime
+    networks: [default, browser]
+    command: [python, -m, tests.homologation.server, api]
+    ports: [127.0.0.1:2029:2020]
+  worker:
+    <<: *runtime
+    command: [python, -m, tests.homologation.server, worker]
+  tests:
+    <<: *runtime
+    profiles: [test]
+    command: [python, -m, pytest, -q, --ignore=tests/test_diarization_filter.py]
+volumes:
+  audio: {}
+networks:
+  default:
+    internal: true
+  browser: {}
