@@ -45,7 +45,7 @@ Os campos da política são:
 | `AAI_BALANCE_REVIEW_HOURS` | `24` | Validade máxima da última conferência do saldo |
 | `AAI_BETA_ROUND_ID` | vazio | Identificador da rodada exigido na concessão |
 | `AAI_BETA_ROUND_SECONDS` | `36000` | Franquia total em segundos por conta na rodada |
-| `AAI_BETA_MAX_USERS` | `5` | Máximo de convites platform ativos na rodada |
+| `AAI_BETA_MAX_USERS` | `5` | Máximo de contas distintas convidadas na rodada (até cinco) |
 | `AAI_PLATFORM_MAX_PROCESSING` | `1` | Chamadas simultâneas autorizadas globalmente |
 | `AAI_PLATFORM_MAX_QUEUED` | `10` | Reservas aguardando execução globalmente |
 | `AAI_MAX_AUDIO_SECONDS` | `600` | Limite por arquivo, inclusive para BYOK |
@@ -182,8 +182,10 @@ técnico nem devolve orçamento AssemblyAI.
 O endpoint administrativo `POST /admin/accounts/{user_id}/beta` recebe
 `capabilities`, `expires_at` com timezone e `round_id`. Para usar a chave da
 plataforma, inclua `transcription.platform` e o `round_id` igual à configuração
-ativa. O banco impede ultrapassar o máximo de cinco convites ativos daquela
-rodada. Existe uma concessão ativa por usuário; revogue a anterior antes de
+ativa. O banco impede ultrapassar o máximo de cinco contas distintas naquela
+rodada; revogação, expiração ou exclusão de conta não repõem vagas. Um contador
+anônimo mantém esse limite após a exclusão, sem preservar identidade. Existe
+uma concessão ativa por usuário; revogue a anterior antes de
 substituí-la. Revogar ou expirar bloqueia novas execuções, inclusive jobs ainda
 na fila. Concessões e revogações são auditadas.
 

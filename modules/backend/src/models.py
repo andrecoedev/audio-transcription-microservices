@@ -427,6 +427,7 @@ class PlatformProviderBudget(Base):
     key_reference = Column(String(64), nullable=True)
     project_reference = Column(String(64), nullable=True)
     review_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    invited_count = Column(Integer, nullable=False, default=0, server_default="0")
 
 
 class PlatformProviderCall(Base):

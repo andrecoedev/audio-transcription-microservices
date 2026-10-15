@@ -254,3 +254,28 @@ def test_legacy_budget_requires_explicit_quiescent_check_and_preserves_amount(db
         assert budget.round_id == "round-one"
         assert budget.reserved_cents == budget.balance_baseline_cents == 17
         assert budget.limit_cents == 200
+
+
+def test_round_invitation_slots_do_not_reset_after_revocation_expiry_or_account_erasure(db_context, monkeypatch):
+    from uuid import uuid4
+    from src.models import BetaAccessGrant, User
+    with db_context["session_factory"]() as db:
+        checked(db, monkeypatch)
+        db.add_all([User(id=i, username=f"synthetic-{i}", email=f"{i}@example.invalid",
+                         hashed_password="unused") for i in range(3, 7)])
+        db.flush()
+        for user_id in range(1, 6):
+            finance.lock_beta_enrollment(db, "round-one", user_id)
+            db.add(BetaAccessGrant(id=str(uuid4()), user_id=user_id, round_id="round-one",
+                capabilities=["transcription.platform"], expires_at=finance.now_utc() - timedelta(hours=1)))
+            db.flush()
+        db.query(BetaAccessGrant).filter_by(user_id=1).update({"revoked_at": finance.now_utc()})
+        db.delete(db.get(User, 5))
+        db.commit()
+        assert db.get(PlatformProviderBudget, "assemblyai").invited_count == 5
+        # The same surviving participant can receive a new grant, not a new slot.
+        finance.lock_beta_enrollment(db, "round-one", 1)
+        with pytest.raises(HTTPException) as denied:
+            finance.lock_beta_enrollment(db, "round-one", 6)
+        assert denied.value.status_code == 409
+        assert db.get(PlatformProviderBudget, "assemblyai").invited_count == 5

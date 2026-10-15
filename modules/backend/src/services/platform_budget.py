@@ -124,11 +124,15 @@ def lock_beta_enrollment(db, round_id, user_id):
     budget = _budget(db, create=True, lock=True)
     if round_id != settings.AAI_BETA_ROUND_ID or budget.round_id != round_id:
         raise HTTPException(409, "A rodada Beta precisa ser configurada pelo operador.")
-    active = db.query(BetaAccessGrant).filter(BetaAccessGrant.round_id == round_id,
-        BetaAccessGrant.revoked_at.is_(None), BetaAccessGrant.expires_at > now_utc()).all()
-    invited = {g.user_id for g in active if "transcription.platform" in g.capabilities}
-    if user_id not in invited and len(invited) >= settings.AAI_BETA_MAX_USERS:
-        raise HTTPException(409, "O limite de convidados desta rodada foi atingido.")
+    grants = db.query(BetaAccessGrant).filter_by(round_id=round_id).all()
+    invited = {g.user_id for g in grants if "transcription.platform" in g.capabilities}
+    # Revocation/expiry must not make a round invitation renewable. Retain an
+    # anonymous count too, because erasure deliberately removes a user's grants.
+    budget.invited_count = max(budget.invited_count, len(invited))
+    if user_id not in invited:
+        if budget.invited_count >= settings.AAI_BETA_MAX_USERS:
+            raise HTTPException(409, "O limite de convidados desta rodada foi atingido.")
+        budget.invited_count += 1
 
 
 def reserve_platform_call(db, transcription_id, context, *, duration_seconds=None):

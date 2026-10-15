@@ -28,6 +28,7 @@ def upgrade():
         sa.Column("key_reference", sa.String(64)),
         sa.Column("project_reference", sa.String(64)),
         sa.Column("review_required", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("invited_count", sa.Integer(), nullable=False, server_default="0"),
     ]
     call_columns = [
         sa.Column("operation_key", sa.String(100)),
@@ -54,7 +55,7 @@ def downgrade():
     for query in (
         "SELECT 1 FROM beta_access_grants WHERE round_id IS NOT NULL LIMIT 1",
         "SELECT 1 FROM transcription_reservations WHERE round_id IS NOT NULL LIMIT 1",
-        "SELECT 1 FROM platform_provider_budgets WHERE balance_checked_at IS NOT NULL OR round_id IS NOT NULL OR reserved_cents <> trunc(reserved_cents) OR limit_cents <> trunc(limit_cents) LIMIT 1",
+        "SELECT 1 FROM platform_provider_budgets WHERE invited_count > 0 OR balance_checked_at IS NOT NULL OR round_id IS NOT NULL OR reserved_cents <> trunc(reserved_cents) OR limit_cents <> trunc(limit_cents) LIMIT 1",
         "SELECT 1 FROM platform_provider_calls WHERE model IS NOT NULL OR remote_transcript_id IS NOT NULL OR provider_status IS NOT NULL OR settled_at IS NOT NULL OR released_at IS NOT NULL OR hourly_rate_cents IS NOT NULL OR reserved_cents <> trunc(reserved_cents) LIMIT 1",
     ):
         if db.execute(sa.text(query)).first():
@@ -65,7 +66,7 @@ def downgrade():
         op.drop_column("platform_provider_calls", column)
     op.drop_constraint("uq_platform_provider_calls_operation_key", "platform_provider_calls", type_="unique")
     op.drop_column("platform_provider_calls", "operation_key")
-    for column in ("review_required", "project_reference", "key_reference", "balance_exclusive",
+    for column in ("invited_count", "review_required", "project_reference", "key_reference", "balance_exclusive",
                    "balance_checked_at", "balance_baseline_cents", "balance_cents", "round_id",
                    "alerted_at", "alert_cents"):
         op.drop_column("platform_provider_budgets", column)
