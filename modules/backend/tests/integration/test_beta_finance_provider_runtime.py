@@ -65,12 +65,12 @@ def _seed_platform_job(factory, input_path, *, label):
         db.add(TranscriptionOwnership(
             transcription_id=transcription.id, owner_sub=f"user:{user.id}", user_id=user.id,
         ))
+        confirm_test_balance(db)
         reserve_transcription(
             db, user.id, transcription.id,
             {"provider": "assemblyai", "credential_source": "platform"},
             1, str(input_path),
         )
-        confirm_test_balance(db)
         reserve_platform_call(db, transcription.id, "local")
         db.commit()
         return transcription.id
@@ -136,7 +136,7 @@ class _SimulatedCloudService:
         )
 
 
-def _run_real_rq(factory, monkeypatch, transcription_id, *, fail_after_submission=False):
+def _run_real_rq(factory, monkeypatch, transcription_id, *, fail_after_submission=False, before_inference=None):
     from redis import Redis
     from rq import Queue, SimpleWorker
     from src.workers import transcription_worker
@@ -147,6 +147,14 @@ def _run_real_rq(factory, monkeypatch, transcription_id, *, fail_after_submissio
         engine, factory, transcription_id, calls,
         fail_after_submission=fail_after_submission,
     )
+    if before_inference:
+        original_process = service.process_transcription
+
+        def process_with_policy_change(**kwargs):
+            before_inference()
+            return original_process(**kwargs)
+
+        service.process_transcription = process_with_policy_change
 
     def service_factory():
         return service
@@ -161,6 +169,30 @@ def _run_real_rq(factory, monkeypatch, transcription_id, *, fail_after_submissio
     assert SimpleWorker([queue], connection=connection).work(burst=True, logging_level="WARNING")
     job.refresh()
     return job, queue, connection, calls
+
+
+def test_real_rq_revalidates_new_admin_policy_before_provider_submission(postgres_session_factory, monkeypatch, tmp_path):
+    from src.services.beta_settings import read_policy, update_policy
+    configure_platform(monkeypatch)
+    path = tmp_path / "synthetic-paused.wav"
+    path.write_bytes(b"synthetic audio")
+    transcription_id = _seed_platform_job(postgres_session_factory, path, label="paused")
+
+    def pause_round():
+        with postgres_session_factory() as db:
+            row, _ = read_policy(db)
+            update_policy(db, section="beta", changes={"beta.enabled": False},
+                version=row.configuration_version, confirmed=True, actor_user_id=None)
+            db.commit()
+
+    job, _, _, calls = _run_real_rq(postgres_session_factory, monkeypatch, transcription_id, before_inference=pause_round)
+    assert job.get_status() == "failed"
+    assert calls == []
+    with postgres_session_factory() as db:
+        assert db.get(Transcription, transcription_id).status == "failed"
+        call = db.query(PlatformProviderCall).filter_by(transcription_id=transcription_id).one()
+        assert call.state == "reserved" and call.released_at is not None
+        assert db.get(PlatformProviderBudget, "assemblyai").reserved_cents == 0
 
 
 def test_real_rq_persists_platform_result_and_usage_after_rq_record_is_deleted(

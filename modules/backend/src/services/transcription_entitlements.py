@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..config import settings
 from ..models import BetaAccessGrant, TranscriptionReservation, TranscriptionJob, TranscriptionOwnership, Transcription, User
+from .beta_settings import read_policy
 
 CAPABILITIES = {"transcription.byok", "transcription.local", "transcription.platform", "intelligence.byok", "intelligence.platform", "intelligence.groq.platform"}
 ACTIVE = {"queued", "processing", "started"}
@@ -71,10 +72,12 @@ def access(db, user_id, *, now=None, lock=False):
         raise HTTPException(403, "A conta não está disponível para processamento.")
     grants = db.query(BetaAccessGrant).filter(BetaAccessGrant.user_id == user_id,
         BetaAccessGrant.revoked_at.is_(None), BetaAccessGrant.expires_at > now).all()
-    round_id = settings.AAI_BETA_ROUND_ID.strip()
+    budget, beta = read_policy(db, lock=lock and any("transcription.platform" in g.capabilities for g in grants))
+    round_id = budget.round_id if beta else None
+    round_grants = [g for g in grants if round_id and g.round_id == round_id and "transcription.platform" in g.capabilities]
     caps = set().union(*(set(g.capabilities) for g in grants)) if grants else set()
     # A historical or mismatched grant must never unlock platform spending.
-    if not round_id or not any(g.round_id == round_id and "transcription.platform" in g.capabilities for g in grants):
+    if not round_grants or not (beta.beta_enabled and beta.platform_enabled):
         caps.discard("transcription.platform")
     if user.plan in {"starter", "business"}:
         caps |= {"transcription.byok", "intelligence.byok"}
@@ -91,6 +94,10 @@ def access(db, user_id, *, now=None, lock=False):
         policy = PlanLimits.model_validate(policies.get("beta" if grants else user.plan, {}))
     except (ValueError, TypeError, ValidationError):
         raise HTTPException(503, "Os limites de processamento precisam ser configurados pelo administrador.") from None
+    if round_grants:
+        policy = policy.model_copy(update={"max_audio_seconds": min(beta.max_audio_seconds, settings.AAI_MAX_AUDIO_SECONDS),
+            "max_stored_bytes": beta.max_stored_bytes, "max_queued_jobs": beta.max_queued_per_account,
+            "max_processing_jobs": beta.max_processing_per_account})
     return user, caps, policy, grants
 
 
@@ -122,7 +129,8 @@ def plan_view(db, user_id, *, now=None):
     user, caps, limits, grants = access(db, user_id, now=now)
     start, end = month_window(now)
     rows = _rows(db, user_id, start.date())
-    round_id = settings.AAI_BETA_ROUND_ID.strip()
+    budget, beta = read_policy(db)
+    round_id = budget.round_id if beta else None
     round_grants = [g for g in grants if round_id and g.round_id == round_id
                     and "transcription.platform" in g.capabilities]
     beta_capabilities = set().union(*(set(g.capabilities) for g in grants)) if grants else set()
@@ -132,8 +140,8 @@ def plan_view(db, user_id, *, now=None):
     if round_grants:
         used = _total(round_rows, "usagi", {"consumed"})
         reserved = _total(round_rows, "usagi", HELD)
-        round_limit = Decimal(settings.AAI_BETA_ROUND_SECONDS)
-        quota = {"limit_seconds": settings.AAI_BETA_ROUND_SECONDS,
+        round_limit = Decimal(beta.quota_minutes * 60)
+        quota = {"limit_seconds": beta.quota_minutes * 60,
                  "consumed_seconds": str(used), "reserved_seconds": str(reserved),
                  "available_seconds": str(max(Decimal(0), round_limit - used - reserved))}
     else:
@@ -153,7 +161,7 @@ def plan_view(db, user_id, *, now=None):
         "development_access": dev_access}
     if round_grants:
         result["period_kind"] = "beta_round"
-        result["beta_round"] = {"id": round_id, "limit_seconds": settings.AAI_BETA_ROUND_SECONDS,
+        result["beta_round"] = {"id": round_id, "limit_seconds": beta.quota_minutes * 60,
             "consumed_seconds": str(used), "reserved_seconds": str(reserved),
             "available_seconds": str(max(Decimal(0), round_limit - used - reserved)),
             "expires_at": max(_aware(g.expires_at) for g in round_grants).isoformat()}
@@ -203,7 +211,8 @@ def reserve_transcription(db, user_id, transcription_id, selection, size_bytes, 
         raise HTTPException(429, "O limite de armazenamento foi atingido. Exclua arquivos que não precisa manter.")
     start, _ = month_window(now)
     source = "byok" if selection["credential_source"] == "user" else "usagi"
-    round_id = (settings.AAI_BETA_ROUND_ID.strip() if selection["provider"] == "assemblyai"
+    budget, beta = read_policy(db)
+    round_id = (budget.round_id if beta and selection["provider"] == "assemblyai"
                 and selection["credential_source"] == "platform" else "")
     if round_id and "transcription.platform" not in access(db, user_id, now=now)[1]:
         raise HTTPException(403, "Este serviço exige um plano autorizado ou acesso beta válido.")
@@ -214,7 +223,7 @@ def reserve_transcription(db, user_id, transcription_id, selection, size_bytes, 
     else:
         if round_id:
             round_rows = [r for r in rows if r.round_id == round_id]
-            round_remaining = Decimal(settings.AAI_BETA_ROUND_SECONDS) - _total(round_rows, "usagi", HELD | {"consumed"})
+            round_remaining = Decimal(beta.quota_minutes * 60) - _total(round_rows, "usagi", HELD | {"consumed"})
             seconds = min(Decimal(limits.max_audio_seconds), round_remaining)
         else:
             seconds = Decimal(limits.max_audio_seconds) if source == "byok" else min(Decimal(limits.max_audio_seconds), remaining)
@@ -236,9 +245,10 @@ def reservation_for(db, transcription_id):
     return db.query(TranscriptionReservation).filter_by(transcription_id=transcription_id).one_or_none()
 
 
-def _require_reservation_round(row):
+def _require_reservation_round(db, row):
     if row.provider == "assemblyai" and row.credential_source == "platform":
-        round_id = settings.AAI_BETA_ROUND_ID.strip()
+        budget, _ = read_policy(db, required=True)
+        round_id = budget.round_id
         if not round_id or row.round_id != round_id:
             raise HTTPException(403, "A reserva não pertence à rodada beta ativa.")
     elif row.round_id is not None:
@@ -251,7 +261,7 @@ def claim_reservation(db, transcription_id):
         raise HTTPException(403, "Esta transcrição não possui autorização de processamento válida.")
     user, _, limits, _ = access(db, row.user_id, lock=True)
     db.refresh(row)
-    _require_reservation_round(row)
+    _require_reservation_round(db, row)
     require_execution(db, row.user_id, row.provider, row.credential_source)
     if row.state != "queued":
         raise HTTPException(409, "A reserva não está disponível para iniciar processamento.")
@@ -274,7 +284,7 @@ def authorize_inference(db, transcription_id, duration):
         raise HTTPException(403, "Autorização de processamento ausente.")
     user, _, limits, _ = access(db, row.user_id, lock=True)
     db.refresh(row)
-    _require_reservation_round(row)
+    _require_reservation_round(db, row)
     require_execution(db, row.user_id, row.provider, row.credential_source)
     # Round only to millisecond precision, always upwards; never trust client metadata.
     seconds = Decimal(str(duration))
@@ -293,7 +303,8 @@ def authorize_inference(db, transcription_id, duration):
             TranscriptionReservation.id != row.id,
         ).all()
         consumed_or_held = _total(other_round_rows, "usagi", HELD | {"consumed"})
-        if consumed_or_held + seconds > Decimal(settings.AAI_BETA_ROUND_SECONDS):
+        _, beta = read_policy(db, required=True)
+        if consumed_or_held + max(seconds, row.reserved_seconds) > Decimal(beta.quota_minutes * 60):
             raise HTTPException(429, "A franquia da rodada beta foi reduzida e não comporta este áudio.")
     row.measured_seconds = seconds
     row.reserved_seconds = seconds  # Release unused maximum before irreversible inference.

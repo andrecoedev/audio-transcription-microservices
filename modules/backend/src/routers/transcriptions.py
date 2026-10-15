@@ -235,6 +235,7 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
                 current_user.user_id if current_user else None,
                 "public" if guest_session else current_user.registration_source,
                 dev_local,
+                db=db,
             ) * 1024 * 1024,
         )
         if guest_session is None:
@@ -272,6 +273,11 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
             job.timeout_seconds = settings.PUBLIC_JOB_TIMEOUT_SECONDS
         elif dev_local:
             job.max_duration_seconds = settings.DEV_LOCAL_MAX_AUDIO_SECONDS
+        if not dev_local and current_user:
+            from ..services.beta_settings import round_policy_for_user
+            beta = round_policy_for_user(db, current_user.user_id)
+            if beta:
+                job.max_duration_seconds = min(beta.max_audio_seconds, settings.AAI_MAX_AUDIO_SECONDS)
         if transcription_model == "assemblyai":
             job.max_duration_seconds = min(job.max_duration_seconds or settings.AAI_MAX_AUDIO_SECONDS,
                                            settings.AAI_MAX_AUDIO_SECONDS)

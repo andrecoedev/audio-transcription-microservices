@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Home, FileAudio, Plus, Settings, Users, ListChecks, ChevronUp, LogOut } from 'lucide-react'
+import { Home, FileAudio, Plus, Settings, Users, ListChecks, ChevronUp, LogOut, Shield } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { endSession } from '../services/sessionService'
 import toast from 'react-hot-toast'
@@ -16,6 +16,7 @@ const navigation = [
 
 export default function Sidebar({ onNavigate }) {
   const { user, isAuthenticated } = useAuthStore()
+  const isAdmin = isAuthenticated && user?.roles?.includes('admin')
   const [accountOpen, setAccountOpen] = useState(false)
   return <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-gray-200 bg-white px-4 py-7">
     <Link to="/" onClick={onNavigate} className="mb-10 px-3">
@@ -27,6 +28,10 @@ export default function Sidebar({ onNavigate }) {
         className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? 'bg-primary-50 font-medium text-primary-800' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
         <Icon className="h-4 w-4" aria-hidden="true" />{name}
       </NavLink>)}
+      {isAdmin && <NavLink to="/admin/settings" onClick={onNavigate}
+        className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? 'bg-primary-50 font-medium text-primary-800' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+        <Shield className="h-4 w-4" aria-hidden="true" />Administração
+      </NavLink>}
     </nav>
     <div className="relative mt-auto pt-8">
       {accountOpen && <div className="mb-2 space-y-1 rounded-xl border bg-white p-2 text-sm shadow-sm">

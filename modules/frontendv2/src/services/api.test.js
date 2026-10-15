@@ -11,6 +11,11 @@ beforeEach(() => {
 })
 
 describe('HTTP credential boundaries', () => {
+  it('retains only the allowlisted settings revision code for explicit conflict recovery', async () => {
+    await expect(api.patch('/admin/settings/beta', {}, { adapter: async config => {
+      throw { config, response: { status: 409, data: { detail: { code: 'admin_settings_revision_conflict', message: 'not trusted' } } } }
+    } })).rejects.toMatchObject({ status: 409, code: 'admin_settings_revision_conflict', message: 'A configuração mudou em outra aba. Recarregue antes de salvar.' })
+  })
   it('clears an SDK-revoked identity before sending a request', async () => {
     useAuthStore.getState().setFirebaseSession({ id: 7 })
     firebaseAuth.getTokenContext.mockRejectedValue({ code: 'auth/user-disabled' })

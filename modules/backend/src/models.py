@@ -411,7 +411,7 @@ class PlatformProviderBudget(Base):
 
     __tablename__ = "platform_provider_budgets"
     __table_args__ = (
-        CheckConstraint("limit_cents >= 0 AND reserved_cents >= 0 AND reserved_cents <= limit_cents",
+        CheckConstraint("limit_cents >= 0 AND reserved_cents >= 0",
                         name="ck_platform_provider_budget_amounts"),
     )
     provider = Column(String(32), primary_key=True)
@@ -428,6 +428,11 @@ class PlatformProviderBudget(Base):
     project_reference = Column(String(64), nullable=True)
     review_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     invited_count = Column(Integer, nullable=False, default=0, server_default="0")
+    operational_policy = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    configuration_version = Column(Integer, nullable=False, default=0, server_default="0")
+    price_version = Column(String(64), nullable=True)
+    configuration_updated_at = Column(DateTime(timezone=True), nullable=True)
+    configuration_updated_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
 class PlatformProviderCall(Base):

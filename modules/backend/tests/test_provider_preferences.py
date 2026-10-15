@@ -325,7 +325,12 @@ def test_platform_access_is_separate_from_byok_and_storage_capability(
     assert public_view["providers"]["assemblyai"]["allowed"] is True
 
     # A user credential remains usable when platform access is off.
-    monkeypatch.setattr(settings, "AAI_PLATFORM_ENABLED", False)
+    with db_context["session_factory"]() as db:
+        from src.services.beta_settings import update_policy
+        budget = db.get(PlatformProviderBudget, "assemblyai")
+        update_policy(db, section="assemblyai", changes={"assemblyai.platform_enabled": False},
+            version=budget.configuration_version, confirmed=True, actor_user_id=1)
+        db.commit()
     byok = _save(client, headers, secret=secrets.token_urlsafe(32))
     assert byok.status_code == 200
     byok_view = byok.json()
@@ -338,6 +343,9 @@ def test_platform_access_is_separate_from_byok_and_storage_capability(
     try:
         db.get(User, 1).registration_source = "local"
         db.query(UserProviderCredential).filter_by(user_id=1, provider="assemblyai").delete()
+        budget = db.get(PlatformProviderBudget, "assemblyai")
+        update_policy(db, section="assemblyai", changes={"assemblyai.platform_enabled": True},
+            version=budget.configuration_version, confirmed=True, actor_user_id=1)
         db.commit()
     finally:
         db.close()
@@ -356,7 +364,7 @@ def test_platform_access_is_separate_from_byok_and_storage_capability(
     # Exhausted cumulative budget removes platform access without disclosing amounts.
     exhausted = db_context["session_factory"]()
     try:
-        exhausted.get(PlatformProviderBudget, "assemblyai").reserved_cents = 100 - platform_reservation_amount_cents() + 1
+        exhausted.get(PlatformProviderBudget, "assemblyai").reserved_cents = 100 - platform_reservation_amount_cents(exhausted) + 1
         exhausted.commit()
     finally:
         exhausted.close()

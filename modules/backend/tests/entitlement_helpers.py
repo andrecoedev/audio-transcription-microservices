@@ -27,6 +27,17 @@ def grant_test_beta(db, user_id):
     db.flush()
 
 
+def prepare_test_round(db, **changes):
+    """Explicit synthetic DB policy for entitlement-only tests (no funding)."""
+    from src.services.beta_settings import initialize_policy, read_policy
+    row, policy = read_policy(db)
+    if policy is None:
+        initialize_policy(db, version=0, confirmed=True, actor_user_id=None)
+        row, policy = read_policy(db)
+    row.operational_policy = policy.model_copy(update={"beta_enabled": True, "platform_enabled": True, **changes}).model_dump()
+    db.commit()
+
+
 def reserve_test_job(db, job, user_id=1):
     return reserve_transcription(db, user_id, job.transcription_id,
         {"provider": job.transcription_model, "credential_source": job.credential_source or "platform"},

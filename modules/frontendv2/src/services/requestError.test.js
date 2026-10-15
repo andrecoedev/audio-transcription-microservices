@@ -20,3 +20,10 @@ it('explains size limits, rate limiting, unavailability and connection errors', 
   expect(requestErrorMessage(502)).toContain('temporariamente indisponível')
   expect(requestErrorMessage()).toContain('Verifique sua conexão')
 })
+
+it('distinguishes settings revision conflicts from operational business conflicts', () => {
+  expect(requestErrorMessage(409, { code: 'admin_settings_revision_conflict' })).toContain('outra aba')
+  expect(requestErrorMessage(409, 'O máximo não pode ficar abaixo das vagas já utilizadas nesta rodada.')).toContain('limite de participantes')
+  expect(requestErrorMessage(409, 'Revogue o acesso beta atual antes de conceder outro.')).toContain('acesso beta ativo')
+  expect(requestErrorMessage(409, { code: 'unknown', message: 'synthetic-secret' })).not.toContain('synthetic-secret')
+})

@@ -199,3 +199,40 @@ def test_dev_account_upload_uses_db_flag_and_technical_limits(db_context, monkey
         job_row = db.query(TranscriptionJob).one()
         assert job_row.max_duration_seconds == settings.DEV_LOCAL_MAX_AUDIO_SECONDS
         assert job_row.timeout_seconds is None
+
+
+def test_beta_upload_admission_and_duration_use_db_not_public_bootstrap(db_context, auth_headers, monkeypatch, wav_bytes):
+    from src.models import PlatformProviderBudget, TranscriptionJob
+    from src.services.beta_settings import update_policy
+    from tests.platform_helpers import configure_platform, confirm_test_balance
+    from src.utils import http_limits
+    monkeypatch.setattr(settings, "PUBLIC_MAX_UPLOAD_MB", 1)
+    monkeypatch.setattr(settings, "PUBLIC_MAX_AUDIO_SECONDS", 120)
+    monkeypatch.setattr(http_limits, "SessionLocal", db_context["session_factory"])
+    configure_platform(monkeypatch)
+    with db_context["session_factory"]() as db:
+        db.get(User, 1).registration_source = "public"
+        confirm_test_balance(db)
+        budget = db.get(PlatformProviderBudget, "assemblyai")
+        update_policy(db, section="limits", changes={"limits.max_upload_mb": 2, "limits.max_audio_seconds": 600},
+            version=budget.configuration_version, confirmed=False, actor_user_id=1)
+        db.commit()
+    audio = wav_bytes + b"\0" * (1200 * 1024)
+    response = db_context["client"].post("/transcriptions/jobs", headers=auth_headers(),
+        data={"transcription_model": "assemblyai", "credential_source": "platform"},
+        files={"file": ("synthetic.wav", audio)})
+    assert response.status_code == 202, response.text
+    with db_context["session_factory"]() as db:
+        assert db.query(TranscriptionJob).one().max_duration_seconds == 600
+
+
+def test_upload_policy_lookup_failure_rejects_before_queueing(db_context, auth_headers, monkeypatch, wav_bytes):
+    from src.utils import http_limits
+    def unavailable():
+        raise RuntimeError("synthetic database outage")
+    monkeypatch.setattr(http_limits, "SessionLocal", unavailable)
+    response = db_context["client"].post("/transcriptions/jobs", headers=auth_headers(),
+        files={"file": ("synthetic.wav", wav_bytes)})
+    assert response.status_code == 503
+    assert len(db_context["queue"].enqueued) == 0
+    assert "synthetic database outage" not in response.text

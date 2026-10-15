@@ -36,7 +36,7 @@ from sqlalchemy.pool import StaticPool
 from src.database import get_db
 from src.models import Base, User
 from src.routers import auth, guests, meeting_actions, meeting_intelligence, meeting_minutes, meetings, provider_preferences, reviewed_meeting_minutes, transcriptions
-from src.routers import account_plans, privacy, platform_operations
+from src.routers import account_plans, privacy, platform_operations, admin_settings
 from src.security import create_access_token
 
 
@@ -98,6 +98,8 @@ def db_context(tmp_path, monkeypatch):
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
     testing_session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    from src.utils import http_limits
+    monkeypatch.setattr(http_limits, "SessionLocal", testing_session)
     Base.metadata.create_all(bind=engine)
     seed = testing_session()
     seed.add_all(
@@ -118,6 +120,7 @@ def db_context(tmp_path, monkeypatch):
     app.include_router(auth.router)
     app.include_router(account_plans.router)
     app.include_router(platform_operations.router)
+    app.include_router(admin_settings.router)
     app.include_router(privacy.router)
     app.include_router(provider_preferences.router)
     app.include_router(guests.router)

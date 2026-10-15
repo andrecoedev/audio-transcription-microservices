@@ -64,3 +64,4 @@ env/
 *.swp
 *.swo
 .DS_Store
+.playwright-mcp/

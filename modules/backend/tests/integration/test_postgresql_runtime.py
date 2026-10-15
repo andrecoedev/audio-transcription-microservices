@@ -531,6 +531,10 @@ def test_api_worker_status_flow_uses_same_postgresql_records(
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    # The pre-body upload policy lookup uses its own session, before get_db.
+    # It must share the same disposable PostgreSQL as the HTTP route and Worker.
+    from src.utils import http_limits
+    monkeypatch.setattr(http_limits, "SessionLocal", postgres_session_factory)
     monkeypatch.setattr(transcriptions_router, "get_transcription_queue", lambda: queue)
     monkeypatch.setattr(transcriptions_router, "_UPLOAD_DIRECTORY", tmp_path / "uploads")
     from src.config import settings

@@ -92,6 +92,7 @@ api.interceptors.response.use(
     const detail = error.response?.data?.detail
     const failure = new Error(requestErrorMessage(error.response?.status, detail))
     failure.status = error.response?.status
+    if (detail?.code === 'admin_settings_revision_conflict') failure.code = detail.code
     return Promise.reject(failure)
   }
 )

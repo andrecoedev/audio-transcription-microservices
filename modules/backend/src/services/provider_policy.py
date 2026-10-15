@@ -16,8 +16,8 @@ def require_guest_processing() -> None:
 
 
 def require_platform_processing() -> None:
-    if not (settings.AAI_PLATFORM_ENABLED and settings.AAI_PLATFORM_BUDGET_CENTS > 0
-            and (settings.AAI_API_KEY_CONFIGURED or settings.AAI_API_KEY)):
+    # Runtime permission and budget come from PostgreSQL at selection/admission.
+    if not (settings.AAI_API_KEY_CONFIGURED or settings.AAI_API_KEY):
         raise HTTPException(503, "Platform transcription is unavailable")
 
 
