@@ -28,11 +28,16 @@ export default function Sidebar({ onNavigate }) {
         className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? 'bg-primary-50 font-medium text-primary-800' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
         <Icon className="h-4 w-4" aria-hidden="true" />{name}
       </NavLink>)}
-      {isAdmin && <NavLink to="/admin/settings" onClick={onNavigate}
-        className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? 'bg-primary-50 font-medium text-primary-800' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
-        <Shield className="h-4 w-4" aria-hidden="true" />Administração
-      </NavLink>}
     </nav>
+    {isAdmin && <section aria-labelledby="admin-navigation-heading" className="mt-4 border-t border-gray-200 pt-4">
+      <h2 id="admin-navigation-heading" className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Administração</h2>
+      <nav aria-label="Administração" className="space-y-1">
+        <NavLink to="/admin/settings" onClick={onNavigate}
+          className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? 'bg-primary-50 font-medium text-primary-800' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+          <Shield className="h-4 w-4" aria-hidden="true" />Administração
+        </NavLink>
+      </nav>
+    </section>}
     <div className="relative mt-auto pt-8">
       {accountOpen && <div className="mb-2 space-y-1 rounded-xl border bg-white p-2 text-sm shadow-sm">
         {isAuthenticated ? <><Link to="/settings" onClick={() => { setAccountOpen(false); onNavigate?.() }} className="block rounded-lg p-2 hover:bg-gray-50">Minha conta</Link>
