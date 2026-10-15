@@ -203,3 +203,31 @@ def test_auto_language_enables_detection(monkeypatch):
     engine.transcribe_segment("audio.wav", end=1.0)
 
     assert model.calls[0][1]["language"] is None
+
+
+def test_exact_digital_silence_never_invokes_inference(monkeypatch):
+    engine, model, _ = _engine(monkeypatch)
+    engine._decode_segment = lambda *_args, **_kwargs: np.zeros(320_000, dtype=np.float32)
+
+    assert engine.transcribe_segment("silence.wav", end=20.0) == ""
+    assert model.calls == []
+
+
+def test_quiet_nonzero_audio_is_not_filtered_by_a_volume_threshold(monkeypatch):
+    engine, model, _ = _engine(monkeypatch)
+    pcm = np.zeros(16_000, dtype=np.float32)
+    pcm[0] = 1e-8
+    engine._decode_segment = lambda *_args, **_kwargs: pcm
+
+    assert engine.transcribe_segment("quiet.wav", end=1.0) == "olá mundo"
+    assert len(model.calls) == 1
+
+
+def test_silent_window_does_not_skip_subsequent_speech(monkeypatch):
+    engine, model, _ = _engine(monkeypatch)
+    engine.max_decode_chunk_seconds = 2.0
+    windows = iter([np.zeros(10, dtype=np.float32), np.ones(10, dtype=np.float32)])
+    engine._decode_segment = lambda *_args, **_kwargs: next(windows)
+
+    assert engine.transcribe_segment("mixed.wav", end=4.0) == "olá mundo"
+    assert len(model.calls) == 1

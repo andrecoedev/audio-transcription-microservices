@@ -165,7 +165,10 @@ class FasterWhisperEngine:
                 start=current_start,
                 duration=window_duration,
             )
-            if len(pcm):
+            # An exactly zero PCM window contains no speech. Sending it to
+            # Whisper can hallucinate text (observed in the HTTP benchmark).
+            # No amplitude threshold: quiet, nonzero speech still reaches ASR.
+            if len(pcm) and pcm.any():
                 try:
                     segments, _ = self.model.transcribe(
                         pcm,

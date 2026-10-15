@@ -4,6 +4,11 @@ Esta pasta não é um provider do produto. Nenhum módulo é importado pela API 
 pelo Worker. Não muda Guest Mode, AssemblyAI, preferências ou a matriz ML estável.
 Todas as inferências são locais; não usa Groq, Gemini ou AssemblyAI.
 
+Para a jornada HTTP/PostgreSQL/RQ/Meeting, veja
+[harness do pipeline CPU](PIPELINE_README.md) e
+[resultados e gates de VPS/Beta](PIPELINE_REPORT.md). O benchmark isolado abaixo
+permanece como histórico; não é substituído por medições de Docker local como VPS.
+
 ## Medição e limites
 
 - Modelos multilíngues tiny/base/small/medium; large-v3 quando houver headroom.

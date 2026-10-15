@@ -1,0 +1,147 @@
+# Experimental stack. Do NOT overlay onto the product Compose or use its .env.
+# All data volumes are new, project-scoped; no host ports/external volumes/credentials.
+name: ${BENCHMARK_PROJECT:?Generate an isolated benchmark env first}
+
+x-runtime: &runtime
+  APP_ENV: test
+  DATABASE_URL: postgresql+psycopg://benchmark:${BENCHMARK_DATABASE_PASSWORD:?Required}@postgres:5432/usagi_whisper_benchmark
+  REDIS_URL: redis://redis:6379/0
+  AUDIO_UPLOAD_DIRECTORY: database/uploads
+  OBJECT_STORAGE_BACKEND: local
+  USAGE_SPOOL_DIRECTORY: database/usage-spool
+  LOCAL_TRANSCRIPTION_ENABLED: "true"
+  # Test-only admission, NOT evidence of homologation; never change the real .env.
+  LOCAL_TRANSCRIPTION_HOMOLOGATED: "true"
+  PLAN_POLICIES_JSON: '{"beta":{"monthly_usagi_seconds":86400,"max_audio_seconds":3600,"max_stored_bytes":2147483648,"max_queued_jobs":3,"max_processing_jobs":3}}'
+  HF_HUB_OFFLINE: "1"
+  TRANSFORMERS_OFFLINE: "1"
+  FIREBASE_AUTH_ENABLED: "false"
+  AAI_PLATFORM_ENABLED: "false"
+  AAI_GUEST_ENABLED: "false"
+  GROQ_PLATFORM_ENABLED: "false"
+  AAI_API_KEY: ""
+  GEMINI_API_KEY: ""
+  GROQ_API_KEY: ""
+  PROVIDER_CREDENTIAL_ENCRYPTION_KEY: ""
+
+x-code: &code
+  - ../../modules/backend/src:/app/modules/backend/src:ro
+  - ../../modules/backend/alembic:/app/modules/backend/alembic:ro
+  - ../../modules/backend/alembic.ini:/app/modules/backend/alembic.ini:ro
+  - ../../modules/backend/run_worker.py:/app/modules/backend/run_worker.py:ro
+  - .:/harness:ro
+  - processing:/app/modules/backend/database
+  - ${BENCHMARK_EVIDENCE:?Required}:/evidence
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: usagi_whisper_benchmark
+      POSTGRES_USER: benchmark
+      POSTGRES_PASSWORD: ${BENCHMARK_DATABASE_PASSWORD:?Required}
+    volumes: ["database:/var/lib/postgresql/data"]
+    mem_limit: 384m
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U benchmark -d usagi_whisper_benchmark"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    mem_limit: 128m
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  migrate:
+    image: ${BENCHMARK_API_IMAGE:?Build/select a verified API image}
+    working_dir: /app/modules/backend
+    environment: *runtime
+    volumes: *code
+    command: [python, -m, alembic, upgrade, head]
+    depends_on:
+      postgres: {condition: service_healthy}
+  api:
+    image: ${BENCHMARK_API_IMAGE:?Required}
+    working_dir: /app/modules/backend
+    mem_limit: 384m
+    environment:
+      <<: *runtime
+      AUTH_MODE: strict
+      SECRET_KEY: ${BENCHMARK_JWT_SECRET:?Required}
+      AUTH_ADMIN_USERNAME: benchmark
+      AUTH_ADMIN_EMAIL: benchmark@local.invalid
+      AUTH_ADMIN_PASSWORD: ${BENCHMARK_LOGIN_PASSWORD:?Required}
+      AUTH_ALLOW_DEMO_LOGIN: "false"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "120"
+      TRANSCRIPTION_JOB_TIMEOUT_SECONDS: ${BENCHMARK_JOB_TIMEOUT_SECONDS:-3600}
+      WHISPER_MODEL: small
+      WHISPER_DEVICE: cpu
+      WHISPER_COMPUTE_TYPE: int8
+    volumes: *code
+    command: [python, -m, uvicorn, "src.main:app", --host, 0.0.0.0, --port, "2020"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:2020/health', timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+  worker:
+    image: ${BENCHMARK_WORKER_IMAGE:?Select a verified stable Worker image}
+    working_dir: /app/modules/backend
+    # Per Worker; 2/3 replicas require aggregate memory budgeting, not 3x 6400m on 8GB.
+    mem_limit: ${BENCHMARK_WORKER_MEMORY:-6400m}
+    cpus: ${BENCHMARK_WORKER_CPUS:-2}
+    environment:
+      <<: *runtime
+      PYTHONPATH: /harness:/app/modules/backend
+      WHISPER_MODEL: /models/faster-small
+      WHISPER_DEVICE: cpu
+      WHISPER_COMPUTE_TYPE: int8
+      WHISPER_LANGUAGE: pt
+      WHISPER_CPU_THREADS: ${BENCHMARK_THREADS:-2}
+      WHISPER_BEAM_SIZE: ${BENCHMARK_BEAM_SIZE:-1}
+      WHISPER_MAX_DECODE_CHUNK_SECONDS: "300"
+      FORCE_CPU: "true"
+      HF_HUB_CACHE: /models/pyannote
+      PYANNOTE_CACHE: /models/pyannote
+      # Offline placeholder, NOT a credential. Only accepted cached weights, no downloads.
+      HF_TOKEN: ${BENCHMARK_OFFLINE_DIARIZATION_MARKER:-}
+      TRANSCRIPTION_JOB_TIMEOUT_SECONDS: ${BENCHMARK_JOB_TIMEOUT_SECONDS:-3600}
+    volumes:
+      - ../../modules/backend/src:/app/modules/backend/src:ro
+      - ../../modules/backend/run_worker.py:/app/modules/backend/run_worker.py:ro
+      - .:/harness:ro
+      - processing:/app/modules/backend/database
+      - ${BENCHMARK_EVIDENCE:?Required}:/evidence
+      - ${BENCHMARK_MODELS:?Required}:/models:ro
+    command: [python, /harness/worker_probe.py]
+    depends_on:
+      api: {condition: service_healthy}
+  driver:
+    profiles: [measure]
+    image: ${BENCHMARK_API_IMAGE:?Required}
+    working_dir: /app/modules/backend
+    mem_limit: 384m
+    environment:
+      <<: *runtime
+      PYTHONPATH: /harness:/app/modules/backend
+      AUTH_ADMIN_PASSWORD: ${BENCHMARK_LOGIN_PASSWORD:?Required}
+    volumes:
+      - ../../modules/backend/src:/app/modules/backend/src:ro
+      - .:/harness:ro
+      - ${BENCHMARK_FIXTURES:?Required}:/fixtures:ro
+      - ${BENCHMARK_EVIDENCE:?Required}:/evidence
+    entrypoint: [python, /harness/run_pipeline.py]
+    depends_on:
+      api: {condition: service_healthy}
+
+networks:
+  default: {internal: true}
+volumes:
+  database:
+  processing:
