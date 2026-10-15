@@ -5,9 +5,9 @@
 Esta documentação descreve a implementação administrativa desta branch. A
 interface e a API permitem preparar e revisar uma política persistida, mas isso
 não significa que a integração foi homologada para produção, que uma chave está
-configurada ou que o provider está online. A validação final da entrega ainda
-está pendente. Não faça chamadas pagas nem conceda acesso real durante essa
-validação.
+configurada ou que o provider está online. A validação humana e a ativação real
+da rodada são etapas separadas. Não faça chamadas pagas nem conceda acesso real
+durante a validação técnica desta entrega.
 
 A página é privada e exige administrador autenticado. Ela oferece quatro
 seções: **Visão geral** (inclui Sistema), **Beta**, **AssemblyAI** e **Limites**.
