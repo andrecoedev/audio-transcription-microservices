@@ -47,7 +47,7 @@ def main():
     elif mode in {"presentation", "verify", "erase-rq"}:
         from src.database import SessionLocal
         from src.models import (User, FirebaseIdentity, Transcription, TranscriptionOwnership,
-            Meeting, MeetingIntelligence, MeetingActionItem)
+            Meeting, MeetingSpeaker, MeetingIntelligence, MeetingActionItem)
         with SessionLocal() as db:
             binding = db.get(FirebaseIdentity, ("usagi-beta-e2e", "member"))
             if binding is None:
@@ -63,7 +63,14 @@ def main():
                     ("silêncio", "completed", []), ("falha", "failed", []),
                 ):
                     title = f"Fixture sintética {label}.wav"
-                    if db.query(Transcription).filter_by(original_filename=title).first():
+                    existing = db.query(Transcription).filter_by(original_filename=title).first()
+                    if existing:
+                        if label == "longa":
+                            meeting = db.get(Meeting, existing.id)
+                            known = {speaker.speaker_id for speaker in meeting.speakers}
+                            for speaker_id in ("SPEAKER_00", "SPEAKER_01"):
+                                if speaker_id not in known:
+                                    meeting.speakers.append(MeetingSpeaker(speaker_id=speaker_id))
                         continue
                     row = Transcription(filename="synthetic-presentation", original_filename=title,
                         file_size_mb=0, duration_seconds=2000 if label == "longa" else 40,
@@ -76,7 +83,10 @@ def main():
                     db.add(TranscriptionOwnership(transcription_id=row.id, user_id=binding.user_id,
                         owner_sub=db.get(User, binding.user_id).username))
                     if status == "completed":
-                        db.add(Meeting(id=row.id, title=title, language="pt"))
+                        meeting = Meeting(id=row.id, title=title, language="pt")
+                        if segments:
+                            meeting.speakers = [MeetingSpeaker(speaker_id=s) for s in ("SPEAKER_00", "SPEAKER_01")]
+                        db.add(meeting)
                 db.commit()
             if mode == "erase-rq":
                 from src.workers.config import get_transcription_queue
