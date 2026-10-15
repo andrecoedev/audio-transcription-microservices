@@ -58,7 +58,7 @@ beforeEach(() => {
     credential_storage_available: true,
     providers: {
       whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
-      assemblyai: { available: true, allowed: false, configured: false, credential_source: null },
+      assemblyai: { available: true, allowed: false, configured: false, credential_source: null, platform_access: false, byok_allowed: false },
       gemini: { available: true, allowed: false, configured: false, credential_source: null },
     },
     credentials: { assemblyai: { configured: false, updated_at: null }, gemini: { configured: false, updated_at: null } },
@@ -102,7 +102,7 @@ describe('Guest and account boundaries', () => {
     useAuthStore.setState({ user: { registration_source: 'public' }, token: 'test-user-proof', isAuthenticated: true })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
     expect(await screen.findByText((_, element) => element.textContent === 'Máximo de 100 MB por arquivo')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /AssemblyAI/ }).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Transcrição do Beta' }).disabled).toBe(true)
     expect(screen.getByLabelText('Detecção de falantes')).toBeTruthy()
   })
 
@@ -212,7 +212,7 @@ describe('Guest and account boundaries', () => {
   it('keeps platform AssemblyAI unavailable to a newly registered account', async () => {
     useAuthStore.setState({ user: { registration_source: 'public' }, isAuthenticated: true })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-    expect((await screen.findByRole('button', { name: /AssemblyAI/ })).disabled).toBe(true)
+    expect((await screen.findByRole('button', { name: 'Transcrição do Beta' })).disabled).toBe(true)
     expect(screen.getByLabelText('Detecção de falantes')).toBeTruthy()
   })
 
@@ -223,13 +223,13 @@ describe('Guest and account boundaries', () => {
       credential_storage_available: true,
       providers: {
         whisper: { available: true, allowed: true, configured: true, credential_source: 'none' },
-        assemblyai: { available: true, allowed: true, configured: true, credential_source: 'user' },
+        assemblyai: { available: true, allowed: true, configured: true, credential_source: 'user', platform_access: false, byok_allowed: true },
         gemini: { available: true, allowed: true, configured: true, credential_source: 'user' },
       },
       credentials: { assemblyai: { configured: true, updated_at: null }, gemini: { configured: true, updated_at: null } },
     })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-    expect(await screen.findByRole('button', { name: /AssemblyAI/ })).toBeTruthy()
+    expect((await screen.findByRole('button', { name: 'Minha conta AssemblyAI' })).disabled).toBe(false)
     expect(screen.getByLabelText('Detecção de falantes').checked).toBe(true)
   })
 

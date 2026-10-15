@@ -37,6 +37,10 @@ export const audioService = {
       formData.append('transcription_model', options.transcriptionModel)
     }
 
+    if (options.transcriptionModel === 'assemblyai' && options.credentialSource) {
+      formData.append('credential_source', options.credentialSource)
+    }
+
     const { data } = await api.post('/transcriptions/jobs', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
