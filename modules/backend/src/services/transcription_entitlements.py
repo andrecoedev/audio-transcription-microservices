@@ -304,7 +304,7 @@ def authorize_inference(db, transcription_id, duration):
         ).all()
         consumed_or_held = _total(other_round_rows, "usagi", HELD | {"consumed"})
         _, beta = read_policy(db, required=True)
-        if consumed_or_held + seconds > Decimal(beta.quota_minutes * 60):
+        if consumed_or_held + max(seconds, row.reserved_seconds) > Decimal(beta.quota_minutes * 60):
             raise HTTPException(429, "A franquia da rodada beta foi reduzida e não comporta este áudio.")
     row.measured_seconds = seconds
     row.reserved_seconds = seconds  # Release unused maximum before irreversible inference.

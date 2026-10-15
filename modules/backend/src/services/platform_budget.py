@@ -159,6 +159,10 @@ def begin_platform_call(db, transcription_id, *, duration_seconds=None):
         or call.price_version != budget.price_version
         or call.hourly_rate_cents != price.unit_price * 100):
         raise HTTPException(503, UNAVAILABLE)
+    # Reductions below already committed use stop all NEW authorizations.
+    # Do not free an old hold implicitly to make a queued call fit the new cap.
+    if budget.reserved_cents > ceiling:
+        raise HTTPException(429, UNAVAILABLE)
     amount = _amount(duration_seconds or settings.AAI_MAX_AUDIO_SECONDS, call.hourly_rate_cents)
     if amount > call.reserved_cents or (duration_seconds is not None and duration_seconds > policy.max_audio_seconds):
         raise HTTPException(429, UNAVAILABLE)

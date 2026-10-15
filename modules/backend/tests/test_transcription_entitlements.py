@@ -279,7 +279,7 @@ def test_platform_inference_rechecks_round_limit_after_configuration_reduction(a
     account.commit()
     prepare_test_round(account, quota_minutes=1)
     with pytest.raises(HTTPException) as denied:
-        policy.authorize_inference(account, second.id, 50)
+        policy.authorize_inference(account, second.id, 10)
     assert denied.value.status_code == 429
     assert hold.state == "processing"
 

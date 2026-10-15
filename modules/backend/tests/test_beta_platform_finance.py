@@ -64,7 +64,9 @@ def test_reduced_budget_rejects_already_queued_call_before_attempt(db_context, m
             version=budget.configuration_version, confirmed=True, actor_user_id=1)
         db.commit()
         with pytest.raises(HTTPException):
-            finance.begin_platform_call(db, row.id, duration_seconds=600)
+            # Even a smaller measured file cannot authorize a NEW call while
+            # the earlier total commitments exceed the newly reduced cap.
+            finance.begin_platform_call(db, row.id, duration_seconds=60)
         assert db.query(PlatformProviderCall).one().state == "reserved"
 
 
