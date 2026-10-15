@@ -26,6 +26,8 @@ class BodyLimitedRoute(APIRoute):
             limit = 16 * 1024
         if scope.get("method") == "PATCH" and path.startswith("/admin/accounts/"):
             limit = 16 * 1024
+        if scope.get("method") in {"POST", "PATCH"} and path.startswith("/admin/settings"):
+            limit = 16 * 1024
         if scope.get("method") == "POST":
             if path in {"/auth/signup", "/auth/login", "/guest/claim"}:
                 limit = 16 * 1024

@@ -235,6 +235,7 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
                 current_user.user_id if current_user else None,
                 "public" if guest_session else current_user.registration_source,
                 dev_local,
+                db=db,
             ) * 1024 * 1024,
         )
         if guest_session is None:

@@ -186,16 +186,17 @@ def test_platform_round_spans_months_and_regrant_without_refill(account, monkeyp
     monkeypatch.setattr(entitlement_helpers, "now_utc", lambda: december)
     from .entitlement_helpers import grant_test_beta
     grant_test_beta(account, 1)
-    limits(monkeypatch, max_audio_seconds=10)
+    limits(monkeypatch, max_audio_seconds=60)
     monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
-    monkeypatch.setattr(settings, "AAI_BETA_ROUND_SECONDS", 10)
+    from .entitlement_helpers import prepare_test_round
+    prepare_test_round(account, quota_minutes=1)
     first = job(account, provider="assemblyai", source="platform")
     hold = reserve(account, first, provider="assemblyai", source="platform", now=december)
     assert hold.round_id == "test-round"
     account.commit()
     policy.claim_reservation(account, first.id)
     account.commit()
-    policy.authorize_inference(account, first.id, 6)
+    policy.authorize_inference(account, first.id, 36)
     account.commit()
     policy.finish_reservation(account, first.id, success=True)
     account.commit()
@@ -209,14 +210,14 @@ def test_platform_round_spans_months_and_regrant_without_refill(account, monkeyp
     second = job(account, provider="assemblyai", source="platform")
     next_month = december + timedelta(minutes=2)
     second_hold = reserve(account, second, provider="assemblyai", source="platform", now=next_month)
-    assert second_hold.reserved_seconds == Decimal("4.000")
+    assert second_hold.reserved_seconds == Decimal("24.000")
     account.commit()
     view = policy.plan_view(account, 1, now=next_month)
     assert view["period_kind"] == "beta_round"
     assert view["renews_at"] is None
     assert view["beta_round"]["id"] == "test-round"
-    assert Decimal(view["beta_round"]["consumed_seconds"]) == 6
-    assert Decimal(view["beta_round"]["reserved_seconds"]) == 4
+    assert Decimal(view["beta_round"]["consumed_seconds"]) == 36
+    assert Decimal(view["beta_round"]["reserved_seconds"]) == 24
     assert Decimal(view["quota"]["available_seconds"]) == 0
 
 
@@ -241,6 +242,8 @@ def test_historical_or_mismatched_platform_reservation_cannot_be_claimed(account
     grant_test_beta(account, 1)
     limits(monkeypatch)
     monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
+    from .entitlement_helpers import prepare_test_round
+    prepare_test_round(account)
     row = job(account, provider="assemblyai", source="platform")
     hold = reserve(account, row, provider="assemblyai", source="platform")
     account.commit()
@@ -254,28 +257,29 @@ def test_historical_or_mismatched_platform_reservation_cannot_be_claimed(account
 def test_platform_inference_rechecks_round_limit_after_configuration_reduction(account, monkeypatch):
     from .entitlement_helpers import grant_test_beta
     grant_test_beta(account, 1)
-    limits(monkeypatch, max_audio_seconds=10)
+    limits(monkeypatch, max_audio_seconds=120)
     monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
-    monkeypatch.setattr(settings, "AAI_BETA_ROUND_SECONDS", 10)
+    from .entitlement_helpers import prepare_test_round
+    prepare_test_round(account, quota_minutes=2)
     first = job(account, provider="assemblyai", source="platform")
     reserve(account, first, provider="assemblyai", source="platform")
     account.commit()
     policy.claim_reservation(account, first.id)
     account.commit()
-    policy.authorize_inference(account, first.id, 4)
+    policy.authorize_inference(account, first.id, 40)
     account.commit()
     policy.finish_reservation(account, first.id, success=True)
     account.commit()
 
     second = job(account, provider="assemblyai", source="platform")
     hold = reserve(account, second, provider="assemblyai", source="platform")
-    assert hold.reserved_seconds == Decimal("6.000")
+    assert hold.reserved_seconds == Decimal("80.000")
     account.commit()
     policy.claim_reservation(account, second.id)
     account.commit()
-    monkeypatch.setattr(settings, "AAI_BETA_ROUND_SECONDS", 8)
+    prepare_test_round(account, quota_minutes=1)
     with pytest.raises(HTTPException) as denied:
-        policy.authorize_inference(account, second.id, 5)
+        policy.authorize_inference(account, second.id, 50)
     assert denied.value.status_code == 429
     assert hold.state == "processing"
 
@@ -285,7 +289,8 @@ def test_round_reservations_do_not_change_byok_monthly_quota_or_dev_local(accoun
     grant_test_beta(account, 1)
     limits(monkeypatch, monthly_usagi_seconds=60, max_audio_seconds=10)
     monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
-    monkeypatch.setattr(settings, "AAI_BETA_ROUND_SECONDS", 10)
+    from .entitlement_helpers import prepare_test_round
+    prepare_test_round(account, quota_minutes=1)
     round_job = job(account, provider="assemblyai", source="platform")
     reserve(account, round_job, provider="assemblyai", source="platform")
     byok_job = job(account, provider="assemblyai", source="user")
@@ -514,6 +519,8 @@ def test_admin_platform_grant_requires_round_and_locks_global_enrollment(account
     account.query(BetaAccessGrant).filter_by(user_id=2).delete()
     account.commit()
     monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
+    from .entitlement_helpers import prepare_test_round
+    prepare_test_round(account)
     calls = []
     monkeypatch.setattr(platform_budget, "lock_beta_enrollment",
         lambda db, round_id, user_id: calls.append((round_id, user_id)))

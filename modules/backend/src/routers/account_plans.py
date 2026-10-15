@@ -108,7 +108,9 @@ def grant_beta(user_id: int, body: BetaInput, request: Request, db: Session = De
     enforce_rate_limit(request, "provider-settings-user", str(admin.user_id))
     locked_user(db, user_id)
     platform_access = "transcription.platform" in body.capabilities
-    configured_round = settings.AAI_BETA_ROUND_ID.strip()
+    from ..services.beta_settings import read_policy
+    budget, policy = read_policy(db)
+    configured_round = budget.round_id if policy else None
     if platform_access and (not configured_round or body.round_id != configured_round):
         raise HTTPException(422, "Acesso AssemblyAI exige a rodada beta configurada.")
     if not platform_access and body.round_id is not None:

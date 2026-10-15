@@ -10,11 +10,11 @@ from decimal import Decimal, ROUND_CEILING
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy.exc import IntegrityError
 
 from ..config import settings
 from ..models import BetaAccessGrant, PlatformProviderBudget, PlatformProviderCall, UsagePrice
 from .audit import append_audit_event
+from .beta_settings import PLATFORM_MODEL, read_policy, platform_price
 
 logger = logging.getLogger(__name__)
 UNAVAILABLE = "Este recurso está temporariamente indisponível no Beta."
@@ -31,35 +31,26 @@ def aware(value):
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
-def _policy(*, enabled=True):
-    references = (settings.AAI_BETA_ROUND_ID, settings.AAI_PLATFORM_PRICE_VERSION,
-                  settings.AAI_PLATFORM_KEY_REFERENCE, settings.AAI_PLATFORM_PROJECT_REFERENCE)
-    if ((enabled and not settings.AAI_PLATFORM_ENABLED)
-        or settings.AAI_PLATFORM_BUDGET_CENTS <= 0 or settings.AAI_PLATFORM_HOURLY_USD <= 0
-        or not all(REFERENCE.fullmatch(ref) for ref in references)
-        or settings.AAI_PLATFORM_ALERT_CENTS > settings.AAI_PLATFORM_BUDGET_CENTS):
+def _policy(db, *, enabled=True, lock=False):
+    budget, policy = read_policy(db, required=True, lock=lock)
+    references = (budget.round_id or "", settings.AAI_PLATFORM_KEY_REFERENCE,
+                  settings.AAI_PLATFORM_PROJECT_REFERENCE)
+    if ((enabled and not (policy.beta_enabled and policy.platform_enabled))
+        or not all(REFERENCE.fullmatch(ref) for ref in references)):
         raise HTTPException(503, UNAVAILABLE)
+    return budget, policy
 
 
-def _budget(db, *, create=False, lock=False):
+def _budget(db, *, lock=False):
     if lock and db.get_bind().dialect.name != "postgresql" and settings.APP_ENV != "test":
         raise HTTPException(503, UNAVAILABLE)
-    if create and db.get(PlatformProviderBudget, "assemblyai") is None:
-        try:
-            with db.begin_nested():
-                db.add(PlatformProviderBudget(provider="assemblyai",
-                    limit_cents=settings.AAI_PLATFORM_BUDGET_CENTS, reserved_cents=0,
-                    alert_cents=settings.AAI_PLATFORM_ALERT_CENTS, round_id=settings.AAI_BETA_ROUND_ID))
-                db.flush()
-        except IntegrityError:
-            pass
     query = db.query(PlatformProviderBudget).filter_by(provider="assemblyai")
     return (query.with_for_update() if lock else query).populate_existing().one_or_none()
 
 
 def _valid_balance(budget):
     if (budget is None or budget.review_required or not budget.balance_exclusive
-        or budget.round_id != settings.AAI_BETA_ROUND_ID
+        or not budget.round_id
         or budget.key_reference != settings.AAI_PLATFORM_KEY_REFERENCE
         or budget.project_reference != settings.AAI_PLATFORM_PROJECT_REFERENCE
         or budget.balance_cents is None or budget.balance_baseline_cents is None
@@ -71,28 +62,16 @@ def _valid_balance(budget):
 
 def _ceiling(budget):
     _valid_balance(budget)
-    return min(Decimal(budget.limit_cents), Decimal(settings.AAI_PLATFORM_BUDGET_CENTS),
+    return min(Decimal(budget.limit_cents),
                budget.balance_baseline_cents + budget.balance_cents)
 
 
-def change_platform_budget(db, *, hard_stop_usd, alert_usd, reason, actor_user_id):
-    """Manual, audited change; configuration remains a second independent cap."""
-    _policy(enabled=False)
-    budget = _budget(db, create=True, lock=True)
-    new_limit, alert = hard_stop_usd * 100, alert_usd * 100
-    if alert > new_limit or new_limit < budget.reserved_cents:
-        raise HTTPException(409, "O teto não pode ficar abaixo das reservas existentes ou do alerta.")
-    if new_limit > budget.limit_cents:
-        _valid_balance(budget)
-        if new_limit > budget.balance_baseline_cents + budget.balance_cents:
-            raise HTTPException(409, "O teto exige uma conferência de saldo suficiente.")
-    before = str(budget.limit_cents)
-    budget.limit_cents, budget.alert_cents = new_limit, alert
-    append_audit_event(db, event="provider.budget_changed", actor_user_id=actor_user_id,
-        resource_type="provider", resource_id="assemblyai", metadata={
-            "previous_limit_cents": before, "limit_cents": str(new_limit),
-            "alert_cents": str(alert), "reason": reason})
-    db.flush()
+def change_platform_budget(db, *, hard_stop_usd, alert_usd, reason, actor_user_id, version, confirmed):
+    """Compatibility route uses the same revision and confirmation as Central."""
+    from .beta_settings import update_policy
+    return update_policy(db, section="assemblyai", changes={
+        "assemblyai.hard_stop_usd": hard_stop_usd, "assemblyai.alert_usd": alert_usd},
+        version=version, confirmed=confirmed, actor_user_id=actor_user_id)
 
 
 def _amount(seconds, hourly_rate_cents):
@@ -103,26 +82,25 @@ def _amount(seconds, hourly_rate_cents):
             / Decimal(3600)).quantize(PRECISION, rounding=ROUND_CEILING)
 
 
-def platform_reservation_amount_cents(duration_seconds=None):
+def platform_reservation_amount_cents(db, duration_seconds=None):
+    budget, policy = _policy(db)
     return _amount(duration_seconds or settings.AAI_MAX_AUDIO_SECONDS,
-                   settings.AAI_PLATFORM_HOURLY_USD * 100)
+                   platform_price(db, budget).unit_price * 100)
 
 
 def platform_budget_has_headroom(db):
     try:
-        _policy()
-        budget = _budget(db)
+        budget, policy = _policy(db)
         ceiling = _ceiling(budget)
-        return budget.reserved_cents + platform_reservation_amount_cents() <= ceiling
+        return budget.reserved_cents + platform_reservation_amount_cents(db, policy.max_audio_seconds) <= ceiling
     except HTTPException:
         return False
 
 
 def lock_beta_enrollment(db, round_id, user_id):
     """Called after locking the target User, before adding a platform grant."""
-    _policy(enabled=False)
-    budget = _budget(db, create=True, lock=True)
-    if round_id != settings.AAI_BETA_ROUND_ID or budget.round_id != round_id:
+    budget, policy = _policy(db, enabled=False, lock=True)
+    if budget.round_id != round_id:
         raise HTTPException(409, "A rodada Beta precisa ser configurada pelo operador.")
     grants = db.query(BetaAccessGrant).filter_by(round_id=round_id).all()
     invited = {g.user_id for g in grants if "transcription.platform" in g.capabilities}
@@ -130,14 +108,13 @@ def lock_beta_enrollment(db, round_id, user_id):
     # anonymous count too, because erasure deliberately removes a user's grants.
     budget.invited_count = max(budget.invited_count, len(invited))
     if user_id not in invited:
-        if budget.invited_count >= settings.AAI_BETA_MAX_USERS:
+        if budget.invited_count >= policy.max_participants:
             raise HTTPException(409, "O limite de convidados desta rodada foi atingido.")
         budget.invited_count += 1
 
 
 def reserve_platform_call(db, transcription_id, context, *, duration_seconds=None):
-    _policy()
-    budget = _budget(db, lock=True)
+    budget, policy = _policy(db, lock=True)
     ceiling = _ceiling(budget)
     existing = db.query(PlatformProviderCall).filter_by(transcription_id=transcription_id).one_or_none()
     if existing:
@@ -146,18 +123,21 @@ def reserve_platform_call(db, transcription_id, context, *, duration_seconds=Non
         return existing
     queued = db.query(PlatformProviderCall).filter_by(provider="assemblyai", state="reserved",
         released_at=None).count()
-    if queued >= settings.AAI_PLATFORM_MAX_QUEUED:
+    if queued >= policy.max_platform_queued:
         raise HTTPException(429, UNAVAILABLE)
-    amount = platform_reservation_amount_cents(duration_seconds)
+    price = platform_price(db, budget)
+    amount = _amount(duration_seconds or policy.max_audio_seconds, price.unit_price * 100)
+    if duration_seconds is not None and duration_seconds > policy.max_audio_seconds:
+        raise HTTPException(422, "O áudio excede a duração permitida nesta rodada.")
     if budget.reserved_cents + amount > ceiling:
         raise HTTPException(429, UNAVAILABLE)
     budget.reserved_cents += amount
     call = PlatformProviderCall(transcription_id=transcription_id, operation_key=f"transcription:{transcription_id}",
         provider="assemblyai", context=context,
         credential_source="platform", reserved_cents=amount, round_id=budget.round_id,
-        model=settings.AAI_PLATFORM_MODEL, use_diarization=True,
-        price_version=settings.AAI_PLATFORM_PRICE_VERSION,
-        hourly_rate_cents=settings.AAI_PLATFORM_HOURLY_USD * 100)
+        model=PLATFORM_MODEL, use_diarization=True,
+        price_version=budget.price_version,
+        hourly_rate_cents=price.unit_price * 100)
     db.add(call)
     db.flush()
     return call
@@ -167,27 +147,27 @@ def begin_platform_call(db, transcription_id, *, duration_seconds=None):
     original = db.query(PlatformProviderCall).filter_by(transcription_id=transcription_id).one_or_none()
     if original is None or original.context == "guest":
         raise HTTPException(403, UNAVAILABLE)
-    _policy()
-    budget = _budget(db, lock=True)
+    budget, policy = _policy(db, lock=True)
     ceiling = _ceiling(budget)
     call = db.query(PlatformProviderCall).filter_by(transcription_id=transcription_id).populate_existing().one_or_none()
     if not call or call.context == "guest" or call.credential_source != "platform":
         raise HTTPException(403, UNAVAILABLE)
     if call.state != "reserved" or call.released_at:
         raise HTTPException(409, UNAVAILABLE)
-    if (call.round_id != budget.round_id or call.model != settings.AAI_PLATFORM_MODEL
-        or call.price_version != settings.AAI_PLATFORM_PRICE_VERSION
-        or call.hourly_rate_cents != settings.AAI_PLATFORM_HOURLY_USD * 100):
+    price = platform_price(db, budget)
+    if (call.round_id != budget.round_id or call.model != PLATFORM_MODEL
+        or call.price_version != budget.price_version
+        or call.hourly_rate_cents != price.unit_price * 100):
         raise HTTPException(503, UNAVAILABLE)
     amount = _amount(duration_seconds or settings.AAI_MAX_AUDIO_SECONDS, call.hourly_rate_cents)
-    if amount > call.reserved_cents:
+    if amount > call.reserved_cents or (duration_seconds is not None and duration_seconds > policy.max_audio_seconds):
         raise HTTPException(429, UNAVAILABLE)
     revised_total = budget.reserved_cents - call.reserved_cents + amount
     if revised_total > ceiling:
         raise HTTPException(429, UNAVAILABLE)
     active = db.query(PlatformProviderCall).filter_by(provider="assemblyai", state="attempted",
         settled_at=None, released_at=None).count()
-    if active >= settings.AAI_PLATFORM_MAX_PROCESSING:
+    if active >= policy.max_platform_processing:
         raise HTTPException(429, UNAVAILABLE)
     budget.reserved_cents = revised_total
     call.reserved_cents = amount
@@ -195,7 +175,7 @@ def begin_platform_call(db, transcription_id, *, duration_seconds=None):
     db.flush()
     committed = sum((c.reserved_cents for c in db.query(PlatformProviderCall).filter_by(
         provider="assemblyai", state="attempted", released_at=None)), Decimal(0))
-    threshold = min(budget.alert_cents, Decimal(settings.AAI_PLATFORM_ALERT_CENTS))
+    threshold = budget.alert_cents
     if threshold > 0 and committed >= threshold and budget.alerted_at is None:
         budget.alerted_at = now_utc()
         append_audit_event(db, event="provider.budget_alert", actor_type="system",
@@ -258,8 +238,7 @@ def release_unattempted_call(db, transcription_id):
 
 def record_balance_check(db, *, available_usd, checked_at, key_reference, project_reference,
                          exclusive, actor_user_id):
-    _policy(enabled=False)
-    budget = _budget(db, create=True, lock=True)
+    budget, policy = _policy(db, enabled=False, lock=True)
     amount = Decimal(available_usd)
     if (not amount.is_finite() or amount < 0 or checked_at.tzinfo is None
         or not now_utc() - timedelta(hours=settings.AAI_BALANCE_REVIEW_HOURS)
@@ -267,8 +246,7 @@ def record_balance_check(db, *, available_usd, checked_at, key_reference, projec
         or not all(REFERENCE.fullmatch(ref) for ref in (key_reference, project_reference))):
         raise HTTPException(422, "Confira saldo, horário e referências operacionais não secretas.")
     if (key_reference != settings.AAI_PLATFORM_KEY_REFERENCE
-        or project_reference != settings.AAI_PLATFORM_PROJECT_REFERENCE
-        or budget.round_id not in {None, settings.AAI_BETA_ROUND_ID}):
+        or project_reference != settings.AAI_PLATFORM_PROJECT_REFERENCE):
         raise HTTPException(409, "As referências operacionais não correspondem à configuração.")
     pending = db.query(PlatformProviderCall).filter_by(provider="assemblyai", settled_at=None,
         released_at=None).count()
@@ -285,7 +263,6 @@ def record_balance_check(db, *, available_usd, checked_at, key_reference, projec
     budget.balance_cents = amount * 100
     # An explicit, quiescent operator check may bind an old budget to this
     # initial round. Never reset or infer the amount already authorized.
-    budget.round_id = settings.AAI_BETA_ROUND_ID
     budget.balance_baseline_cents = budget.reserved_cents
     budget.balance_checked_at = checked_at
     budget.balance_exclusive = exclusive
@@ -293,7 +270,9 @@ def record_balance_check(db, *, available_usd, checked_at, key_reference, projec
     budget.review_required = False
     # Explicit operator configuration supplies the price; no hardcoded tariff.
     # Requiring quiescence prevents a new price from repricing an in-flight call.
-    model = settings.AAI_PLATFORM_MODEL + "+speakers"
+    if settings.AAI_PLATFORM_HOURLY_USD <= 0 or not REFERENCE.fullmatch(settings.AAI_PLATFORM_PRICE_VERSION):
+        raise HTTPException(422, "Configure a tarifa e sua versão antes da conferência operacional.")
+    model = PLATFORM_MODEL + "+speakers"
     price = db.query(UsagePrice).filter_by(catalog_version=settings.AAI_PLATFORM_PRICE_VERSION,
         provider="assemblyai", model=model, metric="provider_audio_seconds", unit="second").one_or_none()
     if price and (price.currency != "USD" or price.unit_price != settings.AAI_PLATFORM_HOURLY_USD
@@ -304,6 +283,7 @@ def record_balance_check(db, *, available_usd, checked_at, key_reference, projec
             provider="assemblyai", model=model, metric="provider_audio_seconds", unit="second",
             currency="USD", unit_price=settings.AAI_PLATFORM_HOURLY_USD, unit_quantity=3600,
             effective_from=checked_at, source="https://www.assemblyai.com/pricing"))
+    budget.price_version = settings.AAI_PLATFORM_PRICE_VERSION
     append_audit_event(db, event="provider.balance_checked", actor_user_id=actor_user_id,
         resource_type="provider", resource_id="assemblyai", metadata={
             "available_usd": str(amount), "checked_at": checked_at.isoformat(), "exclusive": exclusive,

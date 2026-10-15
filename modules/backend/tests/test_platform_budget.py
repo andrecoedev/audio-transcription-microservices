@@ -53,7 +53,10 @@ def test_reservation_uses_rounded_worst_case_and_enforces_cumulative_cap(
     assert call.reserved_cents == Decimal("3.83333334")
     assert call.context == "guest"
 
-    monkeypatch.setattr(platform_budget.settings, "AAI_PLATFORM_BUDGET_CENTS", 4)
+    from src.services.beta_settings import update_policy
+    update_policy(db, section="assemblyai", changes={"assemblyai.hard_stop_usd": Decimal("0.04")},
+        version=budget.configuration_version, confirmed=True, actor_user_id=1)
+    db.commit()
     with pytest.raises(HTTPException) as error:
         reserve_platform_call(db, second.id, "local")
     assert error.value.status_code == 429

@@ -164,4 +164,4 @@ def providers_view(db, user):
                          "byok_allowed": False, "model": settings.GROQ_MODEL}
     return {"preferences": preferences_for(db, user.user_id), "providers": providers, "credentials": credentials,
             "credential_storage_available": credential_storage_available(),
-            "upload_policy": upload_policy(user)}
+            "upload_policy": upload_policy(user, db=db)}

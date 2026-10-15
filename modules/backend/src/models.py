@@ -411,7 +411,7 @@ class PlatformProviderBudget(Base):
 
     __tablename__ = "platform_provider_budgets"
     __table_args__ = (
-        CheckConstraint("limit_cents >= 0 AND reserved_cents >= 0 AND reserved_cents <= limit_cents",
+        CheckConstraint("limit_cents >= 0 AND reserved_cents >= 0",
                         name="ck_platform_provider_budget_amounts"),
     )
     provider = Column(String(32), primary_key=True)

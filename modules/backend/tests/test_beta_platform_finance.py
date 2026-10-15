@@ -22,6 +22,10 @@ def configured(monkeypatch):
 
 def checked(db, monkeypatch, amount="50"):
     configured(monkeypatch)
+    from tests.platform_helpers import confirm_test_balance
+    confirm_test_balance(db)
+    if amount == "50":
+        return
     finance.record_balance_check(db, available_usd=Decimal(amount), checked_at=finance.now_utc(),
         key_reference="beta-primary", project_reference="beta", exclusive=True, actor_user_id=1)
     db.commit()
@@ -54,7 +58,11 @@ def test_reduced_budget_rejects_already_queued_call_before_attempt(db_context, m
         row = transcription(db)
         finance.reserve_platform_call(db, row.id, "local")
         db.commit()
-        monkeypatch.setattr(settings, "AAI_PLATFORM_BUDGET_CENTS", 1)
+        from src.services.beta_settings import update_policy
+        budget = db.get(PlatformProviderBudget, "assemblyai")
+        update_policy(db, section="assemblyai", changes={"assemblyai.hard_stop_usd": Decimal("0.01"), "assemblyai.alert_usd": Decimal(0)},
+            version=budget.configuration_version, confirmed=True, actor_user_id=1)
+        db.commit()
         with pytest.raises(HTTPException):
             finance.begin_platform_call(db, row.id, duration_seconds=600)
         assert db.query(PlatformProviderCall).one().state == "reserved"
@@ -157,12 +165,13 @@ def test_recorded_balance_and_budget_changes_require_admin(db_context, auth_head
     with db_context["session_factory"]() as db:
         db.get(User, 1).is_superuser = True
         db.commit()
+    client.post("/admin/settings/initialize", headers=auth_headers(), json={"version": 0, "confirmed": True}).raise_for_status()
     assert client.post("/admin/providers/assemblyai/balance-check", headers=auth_headers(), json=payload).status_code == 200
-    change = {"hard_stop_usd": "16", "alert_usd": "12", "reason": "manual_review"}
+    change = {"hard_stop_usd": "16", "alert_usd": "12", "reason": "manual_review", "version": 1, "confirmed": True}
     assert client.patch("/admin/providers/assemblyai/budget", headers=auth_headers(), json=change).status_code == 200
     with db_context["session_factory"]() as db:
         assert db.query(AuditEvent).filter_by(event="provider.balance_checked").count() == 1
-        assert db.query(AuditEvent).filter_by(event="provider.budget_changed").count() == 1
+        assert db.query(AuditEvent).filter_by(event="admin.settings_changed").count() == 1
         assert db.get(PlatformProviderBudget, "assemblyai").limit_cents == 1600
     # Raising an environment setting alone does not update the persisted ceiling.
     monkeypatch.setattr(settings, "AAI_PLATFORM_BUDGET_CENTS", 2000)
@@ -238,6 +247,9 @@ def test_legacy_budget_requires_explicit_quiescent_check_and_preserves_amount(db
         row = transcription(db)
         db.add(PlatformProviderCall(transcription_id=row.id, provider="assemblyai", context="local",
                                    credential_source="platform", reserved_cents=17, state="attempted"))
+        db.commit()
+        from src.services.beta_settings import initialize_policy
+        initialize_policy(db, version=0, confirmed=True, actor_user_id=1)
         db.commit()
         with pytest.raises(HTTPException):
             finance.record_balance_check(db, available_usd=Decimal(40), checked_at=finance.now_utc(),

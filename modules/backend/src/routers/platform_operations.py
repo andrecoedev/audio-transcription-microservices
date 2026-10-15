@@ -39,7 +39,9 @@ def balance_check(body: BalanceInput, request: Request, db: Session = Depends(ge
 
 class BudgetInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    hard_stop_usd: Decimal = Field(gt=0, le=1000, decimal_places=8, allow_inf_nan=False)
+    version: int = Field(ge=0)
+    confirmed: bool = False
+    hard_stop_usd: Decimal = Field(ge=0, le=1000, decimal_places=8, allow_inf_nan=False)
     alert_usd: Decimal = Field(ge=0, le=1000, decimal_places=8, allow_inf_nan=False)
     reason: Literal["manual_review"]
 
@@ -62,7 +64,7 @@ def operations(db: Session = Depends(get_db), admin: TokenData = Depends(require
     attempts = [c for c in calls if c.state == "attempted" and not c.released_at]
     return {"configured": True, "round_id": budget.round_id,
         "hard_stop_usd": str(budget.limit_cents / 100),
-        "configured_cap_usd": str(Decimal(finance.settings.AAI_PLATFORM_BUDGET_CENTS) / 100),
+        "configured_cap_usd": str(budget.limit_cents / 100),
         "authorized_usd": str(budget.reserved_cents / 100),
         "attempted_estimate_usd": str(sum((c.reserved_cents for c in attempts), Decimal(0)) / 100),
         "alert_usd": str(budget.alert_cents / 100), "alerted_at": budget.alerted_at,

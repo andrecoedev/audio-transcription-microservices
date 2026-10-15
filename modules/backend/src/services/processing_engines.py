@@ -23,8 +23,9 @@ def _default_factories(providers: set[str]) -> dict[str, Callable[..., Any]]:
     if "assemblyai" in providers and settings.AAI_API_KEY:
         from .assemblyai_engine import AssemblyAIEngine
 
+        from .beta_settings import PLATFORM_MODEL
         factories["assemblyai"] = partial(AssemblyAIEngine,
-            model=settings.AAI_PLATFORM_MODEL,
+            model=PLATFORM_MODEL,
             http_timeout=settings.AAI_HTTP_TIMEOUT_SECONDS,
             timeout_seconds=settings.AAI_TIMEOUT_SECONDS,
             poll_interval=settings.AAI_POLL_INTERVAL_SECONDS)
