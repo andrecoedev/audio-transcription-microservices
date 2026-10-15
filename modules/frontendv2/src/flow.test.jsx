@@ -212,7 +212,7 @@ describe('public React flow', () => {
     })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
     await screen.findByRole('alert')
-    expect(screen.getByRole('button', { name: /AssemblyAI/ }).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Transcrição do Beta' }).disabled).toBe(true)
     expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
     await userEvent.upload(document.querySelector('input[type="file"]'), new File(['RIFFdataWAVE'], 'blocked.wav', { type: 'audio/wav' }))
     expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
