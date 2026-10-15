@@ -68,7 +68,7 @@ function Field({ definition, value, onChange, disabled }) {
   const shownValue = fieldValue(key, value)
   const label = fieldLabels[key] || key
   return <label className="block min-w-0 space-y-1.5">
-    <span className="flex flex-wrap items-center gap-2 text-sm font-medium capitalize text-gray-800">
+    <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-800">
       {label}
       {!editable && <span className="badge badge-info">Somente leitura</span>}
     </span>
@@ -119,7 +119,7 @@ function ConfirmDialog({ confirmation, onCancel, onConfirm, busy }) {
     }
   }, [isOpen])
   if (!confirmation) return null
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4" role="presentation">
+  return <div className="fixed inset-0 z-50 !mt-0 flex items-center justify-center bg-gray-950/40 p-4" role="presentation">
     <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="admin-confirm-title" tabIndex={-1} className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
       <h2 id="admin-confirm-title" className="text-lg font-semibold text-gray-900">Confirme a alteração</h2>
       <p className="mt-2 text-sm text-gray-600">{confirmation.text}</p>
