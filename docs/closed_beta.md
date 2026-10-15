@@ -99,6 +99,10 @@ Não imprima Compose expandido, pois ele pode incluir credenciais.
    conferido, `checked_at` com timezone, os mesmos rótulos configurados e
    `exclusive: true`. O valor vem do painel e não deve ser inventado ou copiado
    para documentação.
+   Em orçamento legado ainda sem rodada, esta confirmação explícita vincula a
+   rodada inicial sem apagar autorizações antigas. Resolva antes as pendências
+   históricas; preços antigos desconhecidos continuam desconhecidos. Ajuste
+   teto e alerta pela rota administrativa, sem reescrever o acumulado.
 6. Uma futura ativação requer revisão do hard stop/alerta e saldo conferido,
    configuração, migration e homologação operacional pelo processo de release.
    Este runbook não ativa o serviço nem autoriza tráfego pago.

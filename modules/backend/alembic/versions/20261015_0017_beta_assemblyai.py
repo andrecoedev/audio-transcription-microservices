@@ -55,7 +55,7 @@ def downgrade():
         "SELECT 1 FROM beta_access_grants WHERE round_id IS NOT NULL LIMIT 1",
         "SELECT 1 FROM transcription_reservations WHERE round_id IS NOT NULL LIMIT 1",
         "SELECT 1 FROM platform_provider_budgets WHERE balance_checked_at IS NOT NULL OR round_id IS NOT NULL OR reserved_cents <> trunc(reserved_cents) OR limit_cents <> trunc(limit_cents) LIMIT 1",
-        "SELECT 1 FROM platform_provider_calls WHERE model IS NOT NULL OR remote_transcript_id IS NOT NULL OR reserved_cents <> trunc(reserved_cents) LIMIT 1",
+        "SELECT 1 FROM platform_provider_calls WHERE model IS NOT NULL OR remote_transcript_id IS NOT NULL OR provider_status IS NOT NULL OR settled_at IS NOT NULL OR released_at IS NOT NULL OR hourly_rate_cents IS NOT NULL OR reserved_cents <> trunc(reserved_cents) LIMIT 1",
     ):
         if db.execute(sa.text(query)).first():
             raise RuntimeError("Beta financial evidence exists; preserve it before downgrade")

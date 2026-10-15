@@ -229,3 +229,28 @@ def test_manual_balance_recheck_never_resets_accumulated_authorization(db_contex
         db.commit()
         budget = db.get(PlatformProviderBudget, "assemblyai")
         assert budget.reserved_cents == budget.balance_baseline_cents == Decimal("0.38333334")
+
+
+def test_legacy_budget_requires_explicit_quiescent_check_and_preserves_amount(db_context, monkeypatch):
+    configured(monkeypatch)
+    with db_context["session_factory"]() as db:
+        db.add(PlatformProviderBudget(provider="assemblyai", limit_cents=200, reserved_cents=17))
+        row = transcription(db)
+        db.add(PlatformProviderCall(transcription_id=row.id, provider="assemblyai", context="local",
+                                   credential_source="platform", reserved_cents=17, state="attempted"))
+        db.commit()
+        with pytest.raises(HTTPException):
+            finance.record_balance_check(db, available_usd=Decimal(40), checked_at=finance.now_utc(),
+                key_reference="beta-primary", project_reference="beta", exclusive=True, actor_user_id=1)
+        # Old calls retain their conservative authorization; no retroactive price.
+        finance.observe_platform_call(db, row.id, {"provider_id": "synthetic-historical",
+            "status": "completed", "audio_duration_seconds": 60})
+        db.commit()
+        assert db.query(PlatformProviderCall).one().estimated_cost_cents is None
+        finance.record_balance_check(db, available_usd=Decimal(40), checked_at=finance.now_utc(),
+            key_reference="beta-primary", project_reference="beta", exclusive=True, actor_user_id=1)
+        db.commit()
+        budget = db.get(PlatformProviderBudget, "assemblyai")
+        assert budget.round_id == "round-one"
+        assert budget.reserved_cents == budget.balance_baseline_cents == 17
+        assert budget.limit_cents == 200

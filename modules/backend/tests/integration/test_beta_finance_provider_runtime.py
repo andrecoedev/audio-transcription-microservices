@@ -30,10 +30,16 @@ from tests.platform_helpers import configure_platform, confirm_test_balance
 pytestmark = pytest.mark.postgres
 
 
+@pytest.fixture(autouse=True)
+def _explicit_test_limits(monkeypatch):
+    from tests.entitlement_helpers import enable_test_policy
+    enable_test_policy(monkeypatch)
+
+
 def _seed_platform_job(factory, input_path, *, label):
     with factory() as db:
         user = User(
-            username=f"beta-finance-{label}-{uuid4().hex}",
+            username=f"beta-{label}-{uuid4().hex}",
             email=f"beta-finance-{uuid4().hex}@example.invalid",
             hashed_password="synthetic-fixture",
         )

@@ -75,6 +75,26 @@ def _ceiling(budget):
                budget.balance_baseline_cents + budget.balance_cents)
 
 
+def change_platform_budget(db, *, hard_stop_usd, alert_usd, reason, actor_user_id):
+    """Manual, audited change; configuration remains a second independent cap."""
+    _policy(enabled=False)
+    budget = _budget(db, create=True, lock=True)
+    new_limit, alert = hard_stop_usd * 100, alert_usd * 100
+    if alert > new_limit or new_limit < budget.reserved_cents:
+        raise HTTPException(409, "O teto não pode ficar abaixo das reservas existentes ou do alerta.")
+    if new_limit > budget.limit_cents:
+        _valid_balance(budget)
+        if new_limit > budget.balance_baseline_cents + budget.balance_cents:
+            raise HTTPException(409, "O teto exige uma conferência de saldo suficiente.")
+    before = str(budget.limit_cents)
+    budget.limit_cents, budget.alert_cents = new_limit, alert
+    append_audit_event(db, event="provider.budget_changed", actor_user_id=actor_user_id,
+        resource_type="provider", resource_id="assemblyai", metadata={
+            "previous_limit_cents": before, "limit_cents": str(new_limit),
+            "alert_cents": str(alert), "reason": reason})
+    db.flush()
+
+
 def _amount(seconds, hourly_rate_cents):
     seconds = Decimal(str(seconds))
     if not seconds.is_finite() or seconds <= 0 or seconds > settings.AAI_MAX_AUDIO_SECONDS:
@@ -211,7 +231,7 @@ def observe_platform_call(db, transcription_id, event, *, call_id=None):
         if not number.is_finite() or number < 0 or number > Decimal("1e12"):
             raise RuntimeError("Invalid provider duration")
         call.provider_audio_seconds = number
-        if status == "completed":
+        if status == "completed" and call.hourly_rate_cents is not None:
             call.estimated_cost_cents = (number * call.hourly_rate_cents / 3600).quantize(PRECISION, rounding=ROUND_CEILING)
             if call.estimated_cost_cents > call.reserved_cents:
                 budget.review_required = True
@@ -244,7 +264,7 @@ def record_balance_check(db, *, available_usd, checked_at, key_reference, projec
         raise HTTPException(422, "Confira saldo, horário e referências operacionais não secretas.")
     if (key_reference != settings.AAI_PLATFORM_KEY_REFERENCE
         or project_reference != settings.AAI_PLATFORM_PROJECT_REFERENCE
-        or budget.round_id != settings.AAI_BETA_ROUND_ID):
+        or budget.round_id not in {None, settings.AAI_BETA_ROUND_ID}):
         raise HTTPException(409, "As referências operacionais não correspondem à configuração.")
     pending = db.query(PlatformProviderCall).filter_by(provider="assemblyai", settled_at=None,
         released_at=None).count()
@@ -259,6 +279,9 @@ def record_balance_check(db, *, available_usd, checked_at, key_reference, projec
         db.flush()
         return budget
     budget.balance_cents = amount * 100
+    # An explicit, quiescent operator check may bind an old budget to this
+    # initial round. Never reset or infer the amount already authorized.
+    budget.round_id = settings.AAI_BETA_ROUND_ID
     budget.balance_baseline_cents = budget.reserved_cents
     budget.balance_checked_at = checked_at
     budget.balance_exclusive = exclusive

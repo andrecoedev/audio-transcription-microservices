@@ -48,21 +48,7 @@ class BudgetInput(BaseModel):
 def budget_change(body: BudgetInput, request: Request, db: Session = Depends(get_db),
                   admin: TokenData = Depends(require_admin)):
     enforce_rate_limit(request, "provider-settings-user", str(admin.user_id))
-    finance._policy(enabled=False)
-    budget = finance._budget(db, create=True, lock=True)
-    new_limit, alert = body.hard_stop_usd * 100, body.alert_usd * 100
-    if alert > new_limit or new_limit < budget.reserved_cents:
-        raise HTTPException(409, "O teto não pode ficar abaixo das reservas existentes ou do alerta.")
-    if new_limit > budget.limit_cents:
-        finance._valid_balance(budget)
-        if new_limit > budget.balance_baseline_cents + budget.balance_cents:
-            raise HTTPException(409, "O teto exige uma conferência de saldo suficiente.")
-    before = str(budget.limit_cents)
-    budget.limit_cents, budget.alert_cents = new_limit, alert
-    append_audit_event(db, event="provider.budget_changed", actor_user_id=admin.user_id,
-        resource_type="provider", resource_id="assemblyai", metadata={
-            "previous_limit_cents": before, "limit_cents": str(new_limit),
-            "alert_cents": str(alert), "reason": body.reason})
+    finance.change_platform_budget(db, **body.model_dump(), actor_user_id=admin.user_id)
     db.commit()
     return {"updated": True}
 

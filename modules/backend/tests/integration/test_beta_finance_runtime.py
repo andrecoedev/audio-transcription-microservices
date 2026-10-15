@@ -1,6 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from decimal import Decimal
+from pathlib import Path
+
+import pytest
+from alembic.config import Config
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
+from alembic.script import ScriptDirectory
 
 from fastapi import HTTPException
 
@@ -40,3 +47,29 @@ def test_concurrent_workers_respect_single_external_slot(postgres_session_factor
     with postgres_session_factory() as db:
         assert db.query(PlatformProviderCall).filter_by(state="attempted").count() == 1
         assert db.get(PlatformProviderBudget, "assemblyai").reserved_cents == Decimal("4.21666668")
+
+
+def test_new_migration_cannot_drop_manual_reconciliation_of_legacy_call(
+    postgres_engine, postgres_session_factory, monkeypatch
+):
+    from datetime import datetime, timezone
+    with postgres_session_factory() as db:
+        db.add(PlatformProviderBudget(provider="assemblyai", limit_cents=200, reserved_cents=0))
+        db.flush()
+        db.add(PlatformProviderCall(provider="assemblyai", context="local", credential_source="platform",
+            reserved_cents=17, state="attempted", provider_status="not_submitted",
+            settled_at=datetime.now(timezone.utc), released_at=datetime.now(timezone.utc)))
+        db.commit()
+    config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
+    migration = ScriptDirectory.from_config(config).get_revision("20261015_0017").module
+    with postgres_engine.begin() as connection:
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        with pytest.raises(RuntimeError, match="Beta financial evidence"):
+            migration.downgrade()
+
+
+def test_initial_round_cannot_configure_more_than_five_invited_users(monkeypatch):
+    from pydantic import ValidationError
+    from src.config import Settings
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, AAI_BETA_MAX_USERS=6)

@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     AAI_BALANCE_REVIEW_HOURS: int = Field(default=24, ge=1, le=168)
     AAI_BETA_ROUND_ID: str = Field(default="", max_length=64)
     AAI_BETA_ROUND_SECONDS: int = Field(default=36000, ge=1)
-    AAI_BETA_MAX_USERS: int = Field(default=5, ge=1, le=100)
+    AAI_BETA_MAX_USERS: int = Field(default=5, ge=1, le=5)
     AAI_PLATFORM_MAX_PROCESSING: int = Field(default=1, ge=1, le=10)
     AAI_PLATFORM_MAX_QUEUED: int = Field(default=10, ge=1, le=100)
     AAI_MAX_AUDIO_SECONDS: int = Field(default=600, ge=1, le=600)
