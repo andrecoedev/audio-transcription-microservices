@@ -1,12 +1,13 @@
 """Strictly administrative operational configuration, never an ENV editor."""
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Query
 from pydantic import BaseModel, ConfigDict, Field
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..security import TokenData, require_admin
-from ..services.beta_settings import settings_view, initialize_policy, update_policy
+from ..services.beta_settings import (settings_view, initialize_policy, update_policy,
+                                     overview, participants_view, settings_history)
 from ..services.rate_limit import enforce_rate_limit
 from ..utils.http_limits import BodyLimitedRoute
 
@@ -16,6 +17,40 @@ router = APIRouter(prefix="/admin/settings", tags=["admin settings"], route_clas
 @router.get("")
 def get_settings(db: Session = Depends(get_db), admin: TokenData = Depends(require_admin)):
     return settings_view(db)
+
+
+@router.get("/overview")
+def get_overview(db: Session = Depends(get_db), admin: TokenData = Depends(require_admin)):
+    from .health import _processing_status
+    result = overview(db)
+    result["system"].update(_processing_status())
+    return result
+
+
+@router.get("/participants")
+def get_participants(db: Session = Depends(get_db), admin: TokenData = Depends(require_admin)):
+    return participants_view(db)
+
+
+@router.get("/accounts")
+def search_accounts(q: str = Query(min_length=2, max_length=100), db: Session = Depends(get_db),
+                    admin: TokenData = Depends(require_admin)):
+    from sqlalchemy import or_
+    from ..models import User
+    term = q.strip()
+    if len(term) < 2:
+        from fastapi import HTTPException
+        raise HTTPException(422, "Digite pelo menos dois caracteres para buscar uma conta.")
+    # Escape LIKE metacharacters; this is bounded account lookup, not content search.
+    pattern = "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    users = db.query(User).filter(User.is_active.is_(True), or_(
+        User.username.ilike(pattern, escape="\\"), User.email.ilike(pattern, escape="\\"))).order_by(User.id).limit(10).all()
+    return {"items": [{"user_id": user.id, "username": user.username, "email": user.email} for user in users]}
+
+
+@router.get("/history")
+def get_history(db: Session = Depends(get_db), admin: TokenData = Depends(require_admin)):
+    return settings_history(db)
 
 
 class RevisionInput(BaseModel):

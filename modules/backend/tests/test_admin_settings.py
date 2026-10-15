@@ -62,3 +62,76 @@ def test_updates_are_allowlisted_confirmed_versioned_and_audited(db_context, aut
         assert event.actor_user_id == 1
         assert event.event_metadata["before"]["beta.quota_minutes_per_participant"] == 600
         assert event.event_metadata["after"]["beta.quota_minutes_per_participant"] == 360
+
+
+def test_reduced_budget_preserves_committed_use_and_blocks_new_calls(db_context, auth_headers, monkeypatch):
+    from decimal import Decimal
+    import pytest
+    from fastapi import HTTPException
+    from src.models import PlatformProviderBudget, Transcription
+    from src.services.platform_budget import reserve_platform_call
+    from .platform_helpers import configure_platform, confirm_test_balance
+    configure_platform(monkeypatch)
+    headers = admin_headers(db_context, auth_headers)
+    client = db_context["client"]
+    client.post("/admin/settings/initialize", headers=headers, json={"version": 0, "confirmed": True}).raise_for_status()
+    with db_context["session_factory"]() as db:
+        confirm_test_balance(db)
+        budget = db.get(PlatformProviderBudget, "assemblyai")
+        budget.limit_cents = Decimal(1500)
+        budget.reserved_cents = Decimal(800)
+        budget.operational_policy = {**budget.operational_policy, "beta_enabled": True, "platform_enabled": True}
+        db.commit()
+    response = client.patch("/admin/settings/assemblyai", headers=headers,
+        json={"version": 1, "confirmed": True, "hard_stop_usd": "6", "alert_usd": "5"})
+    assert response.status_code == 200
+    with db_context["session_factory"]() as db:
+        assert db.get(PlatformProviderBudget, "assemblyai").reserved_cents == Decimal(800)
+        row = Transcription(filename="synthetic.wav", original_filename="synthetic.wav", file_size_mb=0.1, duration_seconds=60, transcription_model="assemblyai", status="queued")
+        db.add(row)
+        db.flush()
+        with pytest.raises(HTTPException) as denied:
+            reserve_platform_call(db, row.id, "local", duration_seconds=60)
+        assert denied.value.status_code == 429
+
+
+def test_paused_beta_blocks_admission_even_with_stale_enabled_environment(db_context, auth_headers, monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    from src.models import Transcription
+    from src.services.platform_budget import reserve_platform_call
+    from .platform_helpers import configure_platform, confirm_test_balance
+    configure_platform(monkeypatch)
+    headers = admin_headers(db_context, auth_headers)
+    db_context["client"].post("/admin/settings/initialize", headers=headers,
+        json={"version": 0, "confirmed": True}).raise_for_status()
+    with db_context["session_factory"]() as db:
+        confirm_test_balance(db)
+        row = Transcription(filename="synthetic.wav", original_filename="synthetic.wav", file_size_mb=0.1, duration_seconds=60, transcription_model="assemblyai", status="queued")
+        db.add(row)
+        db.flush()
+        with pytest.raises(HTTPException) as denied:
+            reserve_platform_call(db, row.id, "local", duration_seconds=60)
+        assert denied.value.status_code == 503
+
+
+def test_operational_views_are_admin_only_and_exclude_external_balance_and_secrets(db_context, auth_headers, monkeypatch):
+    from src.routers import health
+    monkeypatch.setattr(health, "_processing_status", lambda: {"redis": "connected", "worker_available": False,
+        "worker_count": 0, "queue": "transcriptions"})
+    headers = admin_headers(db_context, auth_headers)
+    client = db_context["client"]
+    client.post("/admin/settings/initialize", headers=headers, json={"version": 0, "confirmed": True}).raise_for_status()
+    for path in ("overview", "participants", "history", "accounts?q=alice"):
+        assert client.get(f"/admin/settings/{path}", headers=auth_headers("bob")).status_code == 403
+        response = client.get(f"/admin/settings/{path}", headers=headers)
+        assert response.status_code == 200
+        assert not any(key in response.text for key in ("external_balance_snapshot_usd", "key_reference", "project_reference", "ciphertext", "hashed_password"))
+    overview = client.get("/admin/settings/overview", headers=headers).json()
+    assert overview["financial"]["available_usd"] == "0"
+    assert overview["system"]["worker_available"] is False
+    accounts = client.get("/admin/settings/accounts?q=alice", headers=headers).json()
+    assert [a["user_id"] for a in accounts["items"]] == [1]
+    assert client.get("/admin/settings/accounts?q=%25%25", headers=headers).json()["items"] == []
+    history = client.get("/admin/settings/history", headers=headers).json()
+    assert history["items"][0]["event"] == "admin.settings_initialized"

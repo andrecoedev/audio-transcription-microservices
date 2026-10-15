@@ -12,7 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.exc import IntegrityError
 
 from ..config import settings
-from ..models import PlatformProviderBudget, PlatformProviderCall, BetaAccessGrant
+from ..models import (PlatformProviderBudget, PlatformProviderCall, BetaAccessGrant,
+                      TranscriptionReservation, User, AuditEvent)
 from .audit import append_audit_event
 
 PLATFORM_MODEL = "universal-3-5-pro"
@@ -50,6 +51,18 @@ def read_policy(db, *, required=False, lock=False):
     if required and policy is None:
         raise HTTPException(503, "A configuração do Beta ainda não foi preparada pelo administrador.")
     return row, policy
+
+
+def round_policy_for_user(db, user_id):
+    """Quota presentation remains readable while the round is paused."""
+    row, policy = read_policy(db)
+    if policy and row.round_id:
+        grants = db.query(BetaAccessGrant).filter(BetaAccessGrant.user_id == user_id,
+            BetaAccessGrant.round_id == row.round_id, BetaAccessGrant.revoked_at.is_(None),
+            BetaAccessGrant.expires_at > datetime.now(timezone.utc)).all()
+        if any("transcription.platform" in g.capabilities for g in grants):
+            return policy
+    return None
 
 
 def initialize_policy(db, *, version, confirmed, actor_user_id):
@@ -125,6 +138,8 @@ def update_policy(db, *, section, changes, version, confirmed, actor_user_id):
     for key, value in changed.items():
         if key in POLICY_FIELDS:
             data[POLICY_FIELDS[key]] = value
+    if data["max_audio_seconds"] > min(600, settings.AAI_MAX_AUDIO_SECONDS) or data["max_upload_mb"] > settings.MAX_UPLOAD_SIZE_MB:
+        raise HTTPException(422, "O limite solicitado excede a capacidade técnica configurada neste ambiente.")
     try:
         updated = BetaPolicy.model_validate(data)
     except ValidationError:
@@ -195,6 +210,11 @@ def settings_view(db):
         "assemblyai.alert_usd": format((row.alert_cents / 100).normalize(), "f") if row else "0",
         "assemblyai.model": PLATFORM_MODEL, "assemblyai.speaker_detection": True,
         "assemblyai.price_version": row.price_version if row else None})
+    saved_values = dict(values)
+    values["limits.max_audio_seconds"] = min(effective.max_audio_seconds, settings.AAI_MAX_AUDIO_SECONDS)
+    values["limits.max_upload_mb"] = min(effective.max_upload_mb, settings.MAX_UPLOAD_SIZE_MB)
+    overrides = {key: "Limitado pela capacidade técnica do ambiente; exceções individuais continuam preservadas."
+        for key in values if values[key] != saved_values[key]}
     definitions = []
     descriptions = {"beta_enabled": "Autoriza novas operações da rodada.", "platform_enabled": "Autoriza uso da credencial da USAGI.",
         "round_name": "Nome de apresentação da rodada.", "quota_minutes": "Minutos por conta na rodada, sem renovação.",
@@ -209,12 +229,89 @@ def settings_view(db):
         definitions.append(_definition(key, schema["type"], descriptions[field], f.default,
             minimum=schema.get("minimum"), maximum=schema.get("maximum"),
             confirmation=field in {"beta_enabled", "platform_enabled", "quota_minutes"}))
+        if key in {"limits.max_audio_seconds", "limits.max_upload_mb"}:
+            definitions[-1]["maximum"] = min(definitions[-1]["maximum"],
+                settings.AAI_MAX_AUDIO_SECONDS if key == "limits.max_audio_seconds" else settings.MAX_UPLOAD_SIZE_MB)
     definitions += [_definition("beta.round_id", "string", "Identificador imutável após o primeiro convite ou uso.", ""),
         _definition("assemblyai.hard_stop_usd", "decimal", "Teto interno cumulativo; não é saldo externo.", "0", minimum="0", maximum="1000", confirmation=True),
         _definition("assemblyai.alert_usd", "decimal", "Alerta de revisão operacional, abaixo do teto.", "0", minimum="0", maximum="1000"),
         _definition("assemblyai.model", "enum", "Configuração fixa para esta rodada Beta.", PLATFORM_MODEL, editable=False, options=[PLATFORM_MODEL]),
         _definition("assemblyai.speaker_detection", "boolean", "Configuração fixa para esta rodada Beta.", True, editable=False),
         _definition("assemblyai.price_version", "string", "Versão de tarifa conferida pelo operador.", None, editable=False)]
+    definitions[len(POLICY_FIELDS)]["editable"] = not (row and (row.invited_count or
+        db.query(PlatformProviderCall).count() or db.query(BetaAccessGrant).filter(BetaAccessGrant.round_id.is_not(None)).count()))
+    definitions[len(POLICY_FIELDS)]["requires_confirmation"] = True
     return {"configured": policy is not None, "version": row.configuration_version if row else 0,
-        "values": values, "definitions": definitions,
+        "values": values, "saved_values": saved_values, "overrides": overrides, "definitions": definitions,
         "updated_at": row.configuration_updated_at if row else None}
+
+
+def participants_view(db):
+    row, policy = read_policy(db)
+    if not policy or not row.round_id:
+        return {"items": [], "used_slots": row.invited_count if row else 0, "maximum": (policy or BetaPolicy()).max_participants}
+    from .transcription_entitlements import HELD, _aware
+    grants = db.query(BetaAccessGrant).filter_by(round_id=row.round_id).order_by(BetaAccessGrant.expires_at.desc()).all()
+    platform_grants = [g for g in grants if "transcription.platform" in g.capabilities]
+    user_ids = {g.user_id for g in platform_grants}
+    users = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+    holds = db.query(TranscriptionReservation).filter_by(round_id=row.round_id, source="usagi").all()
+    items = []
+    for user_id in sorted(user_ids):
+        user = users.get(user_id)
+        if user is None:
+            continue  # Erasure retains the anonymous durable invitation count.
+        own = [g for g in platform_grants if g.user_id == user_id]
+        active = next((g for g in own if g.revoked_at is None and _aware(g.expires_at) > datetime.now(timezone.utc)), None)
+        grant = active or own[0]
+        used = sum((r.reserved_seconds for r in holds if r.user_id == user_id and r.state == "consumed"), Decimal(0))
+        pending = sum((r.reserved_seconds for r in holds if r.user_id == user_id and r.state in HELD), Decimal(0))
+        limit = policy.quota_minutes * 60
+        items.append({"user_id": user_id, "username": user.username, "email": user.email,
+            "grant_id": grant.id, "active": active is not None, "expires_at": grant.expires_at,
+            "revoked_at": grant.revoked_at, "capabilities": grant.capabilities,
+            "quota_seconds": limit, "consumed_seconds": str(used), "reserved_seconds": str(pending),
+            "available_seconds": str(max(Decimal(0), limit - used - pending)),
+            "committed_above_limit": used + pending > limit})
+    return {"items": items, "used_slots": max(row.invited_count, len(user_ids)), "maximum": policy.max_participants}
+
+
+def overview(db):
+    """Explicit projection: no provider balance, references or credential values."""
+    row, policy = read_policy(db)
+    participants = participants_view(db)
+    calls = db.query(PlatformProviderCall).filter_by(provider="assemblyai").all()
+    committed = row.reserved_cents if row else Decimal(0)
+    cap = row.limit_cents if row else Decimal(0)
+    holds = db.query(TranscriptionReservation).filter_by(round_id=row.round_id, source="usagi").all() if row and row.round_id else []
+    from .transcription_entitlements import HELD
+    from .platform_budget import _valid_balance
+    balance_review_valid = price_review_valid = False
+    if row:
+        try:
+            _valid_balance(row)
+            balance_review_valid = True
+        except HTTPException:
+            pass
+        try:
+            platform_price(db, row)
+            price_review_valid = True
+        except HTTPException:
+            pass
+    return {"participants_used": participants["used_slots"], "participants_maximum": participants["maximum"],
+        "consumed_seconds": str(sum((r.reserved_seconds for r in holds if r.state == "consumed"), Decimal(0))),
+        "reserved_seconds": str(sum((r.reserved_seconds for r in holds if r.state in HELD), Decimal(0))),
+        "financial": {"authorized_usd": str(committed / 100), "available_usd": str(max(Decimal(0), cap - committed) / 100),
+            "committed_above_limit": committed > cap, "alert_reached": bool(row and row.alert_cents > 0 and committed >= row.alert_cents),
+            "review_required": bool(row and row.review_required), "balance_review_valid": balance_review_valid,
+            "price_review_valid": price_review_valid,
+            "unresolved_calls": sum(c.state == "attempted" and c.settled_at is None and c.released_at is None for c in calls),
+            "queued_calls": sum(c.state == "reserved" and c.released_at is None for c in calls)},
+        "system": {"database": "connected", "assemblyai_credential_configured": bool(settings.AAI_API_KEY_CONFIGURED or settings.AAI_API_KEY),
+            "firebase_configured": bool(settings.FIREBASE_AUTH_ENABLED and settings.FIREBASE_PROJECT_ID)}}
+
+
+def settings_history(db):
+    rows = db.query(AuditEvent).filter(AuditEvent.event.in_(["admin.settings_initialized", "admin.settings_changed"])).order_by(AuditEvent.id.desc()).limit(20).all()
+    return {"items": [{"id": row.id, "event": row.event, "actor_user_id": row.actor_user_id,
+        "created_at": row.timestamp, "changes": row.event_metadata} for row in rows]}
