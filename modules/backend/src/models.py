@@ -439,6 +439,7 @@ class PlatformProviderCall(Base):
         CheckConstraint("state IN ('reserved', 'attempted')", name="ck_platform_provider_call_state"),
     )
     id = Column(Integer, primary_key=True)
+    operation_key = Column(String(100), nullable=True, unique=True)
     transcription_id = Column(Integer, ForeignKey("transcriptions.id", ondelete="SET NULL"), unique=True)
     provider = Column(String(32), ForeignKey("platform_provider_budgets.provider", ondelete="RESTRICT"), nullable=False)
     context = Column(String(16), nullable=False)

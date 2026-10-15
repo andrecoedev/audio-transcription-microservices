@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from .config import sanitize_settings_snapshot, settings
 from .logging_config import configure_logging
 from .routers import api_keys, auth, guests, health, meeting_actions, meeting_intelligence, meeting_minutes, meetings, provider_preferences, reviewed_meeting_minutes, transcriptions
-from .routers import usage, account_plans, privacy
+from .routers import usage, account_plans, privacy, platform_operations
 
 
 configure_logging()
@@ -54,6 +54,7 @@ app.include_router(auth.router)
 app.include_router(provider_preferences.router)
 app.include_router(usage.router)
 app.include_router(account_plans.router)
+app.include_router(platform_operations.router)
 app.include_router(privacy.router)
 app.include_router(guests.router)
 app.include_router(transcriptions.router)

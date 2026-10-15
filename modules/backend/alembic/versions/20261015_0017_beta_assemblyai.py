@@ -30,6 +30,7 @@ def upgrade():
         sa.Column("review_required", sa.Boolean(), nullable=False, server_default=sa.false()),
     ]
     call_columns = [
+        sa.Column("operation_key", sa.String(100)),
         sa.Column("round_id", sa.String(64)), sa.Column("model", sa.String(64)),
         sa.Column("use_diarization", sa.Boolean()), sa.Column("price_version", sa.String(64)),
         sa.Column("hourly_rate_cents", sa.Numeric(24, 8)),
@@ -43,6 +44,8 @@ def upgrade():
         op.add_column("platform_provider_budgets", column)
     for column in call_columns:
         op.add_column("platform_provider_calls", column)
+    op.execute("UPDATE platform_provider_calls SET operation_key = 'transcription:' || transcription_id::text WHERE transcription_id IS NOT NULL")
+    op.create_unique_constraint("uq_platform_provider_calls_operation_key", "platform_provider_calls", ["operation_key"])
 
 
 def downgrade():
@@ -60,6 +63,8 @@ def downgrade():
                    "provider_status", "remote_transcript_id", "hourly_rate_cents", "price_version",
                    "use_diarization", "model", "round_id"):
         op.drop_column("platform_provider_calls", column)
+    op.drop_constraint("uq_platform_provider_calls_operation_key", "platform_provider_calls", type_="unique")
+    op.drop_column("platform_provider_calls", "operation_key")
     for column in ("review_required", "project_reference", "key_reference", "balance_exclusive",
                    "balance_checked_at", "balance_baseline_cents", "balance_cents", "round_id",
                    "alerted_at", "alert_cents"):
