@@ -129,6 +129,7 @@ def test_operational_views_are_admin_only_and_exclude_external_balance_and_secre
         assert not any(key in response.text for key in ("external_balance_snapshot_usd", "key_reference", "project_reference", "ciphertext", "hashed_password"))
     overview = client.get("/admin/settings/overview", headers=headers).json()
     assert overview["financial"]["available_usd"] == "0"
+    assert overview["financial"]["authorized_usd"] == "0"
     assert overview["system"]["worker_available"] is False
     accounts = client.get("/admin/settings/accounts?q=alice", headers=headers).json()
     assert [a["user_id"] for a in accounts["items"]] == [1]
