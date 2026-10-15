@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
+from decimal import Decimal
 
 import pytest
 from alembic.config import Config
@@ -13,6 +14,7 @@ from sqlalchemy import inspect, text
 from src.models import PlatformProviderBudget, PlatformProviderCall, Transcription
 from src.services import platform_budget
 from src.services.platform_budget import reserve_platform_call
+from tests.platform_helpers import configure_platform, confirm_test_balance
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -39,8 +41,9 @@ def _seed_transcription(factory, filename):
 def test_concurrent_platform_reservations_cannot_exceed_budget(
     postgres_engine, postgres_session_factory, monkeypatch
 ):
-    monkeypatch.setattr(platform_budget.settings, "AAI_PLATFORM_ENABLED", True)
-    monkeypatch.setattr(platform_budget.settings, "AAI_PLATFORM_BUDGET_CENTS", 17)
+    configure_platform(monkeypatch, limit=4)
+    with postgres_session_factory() as db:
+        confirm_test_balance(db)
     monkeypatch.setattr(platform_budget.settings, "AAI_MAX_AUDIO_SECONDS", 600)
     transcription_ids = [
         _seed_transcription(postgres_session_factory, f"parallel-{index}.wav")
@@ -69,9 +72,9 @@ def test_concurrent_platform_reservations_cannot_exceed_budget(
     try:
         budget = db.get(PlatformProviderBudget, "assemblyai")
         calls = db.query(PlatformProviderCall).all()
-        assert budget.reserved_cents == 17
+        assert budget.reserved_cents == Decimal("3.83333334")
         assert len(calls) == 1
-        assert calls[0].reserved_cents == 17
+        assert calls[0].reserved_cents == Decimal("3.83333334")
         assert calls[0].transcription_id in transcription_ids
     finally:
         db.close()

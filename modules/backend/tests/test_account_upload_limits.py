@@ -65,12 +65,16 @@ def test_authenticated_policy_is_account_scoped(db_context, monkeypatch):
 
 
 def test_development_upload_policy_is_explicit_and_technically_capped(db_context, monkeypatch):
-    from src.models import AuditEvent
+    from src.models import AuditEvent, BetaAccessGrant
     monkeypatch.setattr(settings, "APP_ENV", "dev")
     monkeypatch.setattr(settings, "DEV_LOCAL_ACCESS_ENABLED", True)
     monkeypatch.setattr(settings, "LOCAL_TRANSCRIPTION_ENABLED", True)
     monkeypatch.setattr(settings, "MAX_UPLOAD_SIZE_MB", 2)
     with db_context["session_factory"]() as db:
+        # This regression exercises local-only development, not the separate
+        # finite platform round granted by the shared positive test fixture.
+        for grant in db.query(BetaAccessGrant).filter_by(user_id=1):
+            grant.capabilities = [cap for cap in grant.capabilities if cap != "transcription.platform"]
         user = db.get(User, 1)
         user.registration_source = "public"
         user.is_superuser = True

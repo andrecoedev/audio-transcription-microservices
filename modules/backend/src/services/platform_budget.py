@@ -181,10 +181,12 @@ def begin_platform_call(db, transcription_id, *, duration_seconds=None):
     return call.context
 
 
-def observe_platform_call(db, transcription_id, event):
+def observe_platform_call(db, transcription_id, event, *, call_id=None):
     """Critical persistence; exceptions abort polling, never authorize a retry."""
     budget = _budget(db, lock=True)
-    call = db.query(PlatformProviderCall).filter_by(transcription_id=transcription_id).one_or_none()
+    query = db.query(PlatformProviderCall)
+    call = (query.filter_by(id=call_id) if call_id is not None else
+            query.filter_by(transcription_id=transcription_id)).one_or_none()
     if not call or call.state != "attempted":
         raise RuntimeError("Provider observation has no live authorization")
     remote_id = event.get("provider_id")

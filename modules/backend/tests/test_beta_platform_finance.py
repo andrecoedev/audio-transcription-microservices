@@ -145,3 +145,26 @@ def test_external_snapshot_lower_than_internal_budget_blocks_before_call(db_cont
             finance.reserve_platform_call(db, transcription(db).id, "local")
         assert denied.value.status_code == 429
         assert db.query(PlatformProviderCall).count() == 0
+
+
+def test_recorded_balance_and_budget_changes_require_admin(db_context, auth_headers, monkeypatch):
+    from src.models import AuditEvent, User
+    configured(monkeypatch)
+    payload = {"available_usd": "50", "checked_at": finance.now_utc().isoformat(),
+        "key_reference": "beta-primary", "project_reference": "beta", "exclusive": True}
+    client = db_context["client"]
+    assert client.post("/admin/providers/assemblyai/balance-check", headers=auth_headers(), json=payload).status_code == 403
+    with db_context["session_factory"]() as db:
+        db.get(User, 1).is_superuser = True
+        db.commit()
+    assert client.post("/admin/providers/assemblyai/balance-check", headers=auth_headers(), json=payload).status_code == 200
+    change = {"hard_stop_usd": "16", "alert_usd": "12", "reason": "manual_review"}
+    assert client.patch("/admin/providers/assemblyai/budget", headers=auth_headers(), json=change).status_code == 200
+    with db_context["session_factory"]() as db:
+        assert db.query(AuditEvent).filter_by(event="provider.balance_checked").count() == 1
+        assert db.query(AuditEvent).filter_by(event="provider.budget_changed").count() == 1
+        assert db.get(PlatformProviderBudget, "assemblyai").limit_cents == 1600
+    # Raising an environment setting alone does not update the persisted ceiling.
+    monkeypatch.setattr(settings, "AAI_PLATFORM_BUDGET_CENTS", 2000)
+    with db_context["session_factory"]() as db:
+        assert finance._ceiling(db.get(PlatformProviderBudget, "assemblyai")) == 1600

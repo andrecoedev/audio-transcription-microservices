@@ -298,6 +298,8 @@ def test_platform_access_is_separate_from_byok_and_storage_capability(
     db_context, auth_headers, credential_cipher, monkeypatch, beta_provider_accounts
 ):
     from src.services.platform_budget import platform_reservation_amount_cents
+    from .platform_helpers import configure_platform, confirm_test_balance
+    configure_platform(monkeypatch, limit=100)
 
     client = db_context["client"]
     headers = auth_headers()
@@ -313,6 +315,7 @@ def test_platform_access_is_separate_from_byok_and_storage_capability(
     # explicit beta grant permits configured platform access.
     db = db_context["session_factory"]()
     try:
+        confirm_test_balance(db)
         db.get(User, 1).registration_source = "public"
         db.commit()
     finally:
@@ -353,10 +356,7 @@ def test_platform_access_is_separate_from_byok_and_storage_capability(
     # Exhausted cumulative budget removes platform access without disclosing amounts.
     exhausted = db_context["session_factory"]()
     try:
-        exhausted.add(PlatformProviderBudget(
-            provider="assemblyai", limit_cents=100,
-            reserved_cents=100 - platform_reservation_amount_cents() + 1,
-        ))
+        exhausted.get(PlatformProviderBudget, "assemblyai").reserved_cents = 100 - platform_reservation_amount_cents() + 1
         exhausted.commit()
     finally:
         exhausted.close()

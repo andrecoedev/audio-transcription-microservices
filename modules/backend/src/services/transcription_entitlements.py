@@ -315,7 +315,10 @@ def finish_reservation(db, transcription_id, *, success=False):
             raise RuntimeError("Result has no authorized inference")
         row.state = "consumed"
     else:
-        row.state = "unknown" if row.state == "started" else "released"
+        from ..models import PlatformProviderCall
+        call = db.query(PlatformProviderCall).filter_by(transcription_id=transcription_id).one_or_none()
+        remote_error = bool(call and call.provider_status == "error" and call.settled_at)
+        row.state = "unknown" if row.state == "started" and not remote_error else "released"
 
 
 def recover_reservation(db, transcription_id):

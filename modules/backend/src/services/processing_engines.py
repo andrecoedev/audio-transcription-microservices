@@ -24,6 +24,7 @@ def _default_factories(providers: set[str]) -> dict[str, Callable[..., Any]]:
         from .assemblyai_engine import AssemblyAIEngine
 
         factories["assemblyai"] = partial(AssemblyAIEngine,
+            model=settings.AAI_PLATFORM_MODEL,
             http_timeout=settings.AAI_HTTP_TIMEOUT_SECONDS,
             timeout_seconds=settings.AAI_TIMEOUT_SECONDS,
             poll_interval=settings.AAI_POLL_INTERVAL_SECONDS)

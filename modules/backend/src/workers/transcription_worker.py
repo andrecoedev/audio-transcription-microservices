@@ -1,6 +1,7 @@
 """Jobs RQ de transcrição executados fora do processo FastAPI."""
 
 import logging
+import secrets
 import time
 from contextlib import ExitStack
 from datetime import datetime, timezone
@@ -12,10 +13,10 @@ from rq.job import Job
 
 from ..config import settings
 from ..database import SessionLocal
-from ..models import Meeting, MeetingSpeaker, Transcription, TranscriptionJob, TranscriptionOwnership
+from ..models import Meeting, MeetingSpeaker, Transcription, TranscriptionJob, TranscriptionOwnership, PlatformProviderCall
 from ..services.processing_engines import initialize_processing_engines
 from ..services.audit import append_audit_event
-from ..services.platform_budget import begin_platform_call
+from ..services.platform_budget import begin_platform_call, observe_platform_call, release_unattempted_call
 from ..services.transcription_entitlements import (
     claim_reservation,
     authorize_inference,
@@ -123,12 +124,14 @@ def recover_pending_jobs(queue) -> int:
             ).first()
             interrupted_usage = None
             if db_job.status == "processing" and db_job.usage_attempt_id:
+                platform_call = db.query(PlatformProviderCall).filter_by(transcription_id=db_job.transcription_id).one_or_none()
                 interrupted_usage = UsageRecorder(operation_id=db_job.usage_attempt_id,
                     user_id=owner.user_id if owner else None, guest_session_id=owner.guest_session_id if owner else None,
                     resource_type="transcription", resource_id=db_job.transcription_id, operation="transcription",
                     provider=db_job.transcription_model,
                     credential_source="local" if db_job.transcription_model == "whisper" else db_job.credential_source,
-                    model="universal-2" if db_job.transcription_model == "assemblyai" else settings.WHISPER_MODEL,
+                    model=(platform_call.model if platform_call and platform_call.model else "universal-2")
+                        if db_job.transcription_model == "assemblyai" else settings.WHISPER_MODEL,
                     session_factory=SessionLocal)
             # A missing reservation is not grandfathered, and Guest jobs are
             # never recovered into a provider call.
@@ -256,6 +259,7 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
         )
         db.commit()
         owner = db.query(TranscriptionOwnership).filter_by(transcription_id=transcription_id).first()
+        platform_call = db.query(PlatformProviderCall).filter_by(transcription_id=transcription_id).one_or_none()
         return {
             "claim_status": "claimed",
             "usage_attempt_id": attempt_id,
@@ -270,6 +274,7 @@ def _claim_transcription_job(transcription_id: int) -> dict | None:
             "credential_id": job.credential_id,
             "credential_user_id": job.credential_user_id,
             "guest_context": guest_context,
+            "assemblyai_model": platform_call.model if platform_call else "universal-2",
         }
     except Exception:
         db.rollback()
@@ -361,6 +366,7 @@ def _persist_failed_job(transcription_id: int, public_error: str) -> None:
             job.failed_at = datetime.now(timezone.utc)
             job.completed_at = None
             finish_reservation(db, transcription_id, success=False)
+            release_unattempted_call(db, transcription_id)
             schedule_audio_cleanup(db, input_reference(job))
         append_audit_event(
             db,
@@ -410,7 +416,7 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             resource_type="transcription", resource_id=transcription_id, operation="transcription",
             provider=claim["transcription_model"],
             credential_source="local" if claim["transcription_model"] == "whisper" else claim["credential_source"],
-            model="universal-2" if claim["transcription_model"] == "assemblyai" else settings.WHISPER_MODEL,
+            model=claim["assemblyai_model"] if claim["transcription_model"] == "assemblyai" else settings.WHISPER_MODEL,
             use_diarization=claim["use_diarization"], session_factory=SessionLocal)
         usage.record("attempt", "attempt", 1, phase="started", status="started")
         reference = ("object:" + claim["input_object_key"]) if claim.get("input_object_key") else claim["input_path"]
@@ -427,6 +433,8 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
             try:
                 byok_secret = decrypt_credential(credential_db, claim["credential_id"],
                                                  claim["credential_user_id"], "assemblyai")
+                if settings.AAI_API_KEY and secrets.compare_digest(byok_secret, settings.AAI_API_KEY):
+                    raise TranscriptionProcessingError("Platform credential cannot be used as BYOK")
             finally:
                 credential_db.close()
         elif claim["transcription_model"] == "assemblyai" and claim["credential_source"] != "platform":
@@ -445,10 +453,24 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
         if hasattr(service, "set_usage_observer"):
             service.set_usage_observer(lambda metric, quantity: usage.record(metric, "second", quantity,
                                         measurement_source="ffmpeg"))
+        if (claim["transcription_model"] == "assemblyai" and claim["credential_source"] == "platform"
+            and not hasattr(service, "_get_engine")):
+            raise TranscriptionProcessingError("Platform execution observer is unavailable")
         if claim["transcription_model"] == "assemblyai" and hasattr(service, "_get_engine"):
             observed_engine = service._get_engine("assemblyai")
             if hasattr(observed_engine, "set_usage_observer"):
                 observed_engine.set_usage_observer(usage.provider_response)
+            if claim["credential_source"] == "platform":
+                if (not hasattr(observed_engine, "set_execution_observer")
+                    or getattr(observed_engine, "model", None) != claim["assemblyai_model"]):
+                    raise TranscriptionProcessingError("Platform execution observer/model is unavailable")
+
+                def observe_execution(event):
+                    with SessionLocal() as observation_db:
+                        observe_platform_call(observation_db, transcription_id, event)
+                        observation_db.commit()
+
+                observed_engine.set_execution_observer(observe_execution)
         if claim["transcription_model"] == "assemblyai":
             claim["max_duration_seconds"] = min(claim["max_duration_seconds"] or settings.AAI_MAX_AUDIO_SECONDS,
                                                 settings.AAI_MAX_AUDIO_SECONDS)
@@ -473,7 +495,7 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
                     else:
                         # This also commits the reservation authorization and
                         # provider attempt marker before AssemblyAI is called.
-                        begin_platform_call(authorization_db, transcription_id)
+                        begin_platform_call(authorization_db, transcription_id, duration_seconds=duration_seconds)
                 # BYOK/local authorization and the no-repeat marker must be
                 # durable before inference just like the platform marker.
                 authorization_db.commit()
@@ -549,6 +571,8 @@ def process_transcription_job_sync(transcription_id: int) -> dict:
     finally:
         if observed_engine is not None and hasattr(observed_engine, "set_usage_observer"):
             observed_engine.set_usage_observer(None)
+        if observed_engine is not None and hasattr(observed_engine, "set_execution_observer"):
+            observed_engine.set_execution_observer(None)
         if service is not None and hasattr(service, "set_usage_observer"):
             service.set_usage_observer(None)
         if usage is not None:
