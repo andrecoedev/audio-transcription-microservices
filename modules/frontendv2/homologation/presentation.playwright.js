@@ -14,7 +14,6 @@ async (page) => {
   await page.getByText('Decidimos publicar o guia de integração em português.', { exact: true }).first().waitFor()
   const longId = new URL(page.url()).pathname.split('/').pop()
   await page.goto(`${base}/meetings/${longId}`)
-  const region = page.getByRole('region', { name: 'Trechos da transcrição' })
   // UI currently uses aria-label on a generic scroll container, not region role.
   const transcript = page.locator('[aria-label="Trechos da transcrição"]')
   await transcript.locator('article').last().waitFor()
@@ -46,5 +45,5 @@ async (page) => {
   if (!googleWithoutBeta) throw new Error('Google account received implicit Beta')
   return { longSegments: 200, silenceShowsEmptyMessage: /nenhum trecho|nenhuma fala|não foi detectada fala/i.test(silenceText),
     safeFailure: failure, expiredSessionBlocked: true, reauthenticationWorked: true,
-    googleMockWithoutBeta: googleWithoutBeta, regionRoleAvailable: await region.count() }
+    googleMockWithoutBeta: googleWithoutBeta }
 }
