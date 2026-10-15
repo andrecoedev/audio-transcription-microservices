@@ -179,6 +179,124 @@ def test_starter_byok_is_separate_and_does_not_inherit_platform(account, monkeyp
         policy.require_execution(account, 1, "assemblyai", "platform")
 
 
+def test_platform_round_spans_months_and_regrant_without_refill(account, monkeypatch):
+    from . import entitlement_helpers
+    december = datetime(2026, 12, 31, 23, 59, tzinfo=timezone.utc)
+    monkeypatch.setattr(policy, "now_utc", lambda: december)
+    monkeypatch.setattr(entitlement_helpers, "now_utc", lambda: december)
+    from .entitlement_helpers import grant_test_beta
+    grant_test_beta(account, 1)
+    limits(monkeypatch, max_audio_seconds=10)
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_SECONDS", 10)
+    first = job(account, provider="assemblyai", source="platform")
+    hold = reserve(account, first, provider="assemblyai", source="platform", now=december)
+    assert hold.round_id == "test-round"
+    account.commit()
+    policy.claim_reservation(account, first.id)
+    account.commit()
+    policy.authorize_inference(account, first.id, 6)
+    account.commit()
+    policy.finish_reservation(account, first.id, success=True)
+    account.commit()
+
+    grant = account.query(BetaAccessGrant).filter_by(user_id=1).first()
+    grant.revoked_at = policy.now_utc()
+    account.commit()
+    account.add(BetaAccessGrant(id="regrant", user_id=1, capabilities=["transcription.platform"],
+        round_id="test-round", expires_at=policy.now_utc() + timedelta(hours=1)))
+    account.commit()
+    second = job(account, provider="assemblyai", source="platform")
+    next_month = december + timedelta(minutes=2)
+    second_hold = reserve(account, second, provider="assemblyai", source="platform", now=next_month)
+    assert second_hold.reserved_seconds == Decimal("4.000")
+    account.commit()
+    view = policy.plan_view(account, 1, now=next_month)
+    assert view["period_kind"] == "beta_round"
+    assert view["renews_at"] is None
+    assert view["beta_round"]["id"] == "test-round"
+    assert Decimal(view["beta_round"]["consumed_seconds"]) == 6
+    assert Decimal(view["beta_round"]["reserved_seconds"]) == 4
+    assert Decimal(view["quota"]["available_seconds"]) == 0
+
+
+@pytest.mark.parametrize("grant_round,expires,revoke", [
+    (None, True, False), ("wrong-round", False, False), ("test-round", True, True),
+])
+def test_platform_round_requires_current_matching_active_grant(account, monkeypatch, grant_round, expires, revoke):
+    limits(monkeypatch)
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
+    grant = BetaAccessGrant(id="bad-round", user_id=1, capabilities=["transcription.platform"],
+        round_id=grant_round,
+        expires_at=policy.now_utc() + timedelta(hours=1) if expires else policy.now_utc() - timedelta(seconds=1),
+        revoked_at=policy.now_utc() if revoke else None)
+    account.add(grant)
+    account.commit()
+    with pytest.raises(HTTPException):
+        policy.require_execution(account, 1, "assemblyai", "platform")
+
+
+def test_historical_or_mismatched_platform_reservation_cannot_be_claimed(account, monkeypatch):
+    from .entitlement_helpers import grant_test_beta
+    grant_test_beta(account, 1)
+    limits(monkeypatch)
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
+    row = job(account, provider="assemblyai", source="platform")
+    hold = reserve(account, row, provider="assemblyai", source="platform")
+    account.commit()
+    hold.round_id = None  # Simulate a historical reservation from before enrollment.
+    account.commit()
+    with pytest.raises(HTTPException) as denied:
+        policy.claim_reservation(account, row.id)
+    assert denied.value.status_code == 403
+
+
+def test_platform_inference_rechecks_round_limit_after_configuration_reduction(account, monkeypatch):
+    from .entitlement_helpers import grant_test_beta
+    grant_test_beta(account, 1)
+    limits(monkeypatch, max_audio_seconds=10)
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_SECONDS", 10)
+    first = job(account, provider="assemblyai", source="platform")
+    reserve(account, first, provider="assemblyai", source="platform")
+    account.commit()
+    policy.claim_reservation(account, first.id)
+    account.commit()
+    policy.authorize_inference(account, first.id, 4)
+    account.commit()
+    policy.finish_reservation(account, first.id, success=True)
+    account.commit()
+
+    second = job(account, provider="assemblyai", source="platform")
+    hold = reserve(account, second, provider="assemblyai", source="platform")
+    assert hold.reserved_seconds == Decimal("6.000")
+    account.commit()
+    policy.claim_reservation(account, second.id)
+    account.commit()
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_SECONDS", 8)
+    with pytest.raises(HTTPException) as denied:
+        policy.authorize_inference(account, second.id, 5)
+    assert denied.value.status_code == 429
+    assert hold.state == "processing"
+
+
+def test_round_reservations_do_not_change_byok_monthly_quota_or_dev_local(account, monkeypatch):
+    from .entitlement_helpers import grant_test_beta
+    grant_test_beta(account, 1)
+    limits(monkeypatch, monthly_usagi_seconds=60, max_audio_seconds=10)
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_SECONDS", 10)
+    round_job = job(account, provider="assemblyai", source="platform")
+    reserve(account, round_job, provider="assemblyai", source="platform")
+    byok_job = job(account, provider="assemblyai", source="user")
+    byok_hold = reserve(account, byok_job, provider="assemblyai", source="user")
+    assert byok_hold.round_id is None
+    account.commit()
+    view = policy.plan_view(account, 1)
+    assert Decimal(view["quota"]["reserved_seconds"]) == 10
+    assert Decimal(view["beta_round"]["reserved_seconds"]) == 10
+
+
 @pytest.mark.parametrize("enabled,homologated", [(False, False), (True, False), (False, True)])
 def test_beta_cannot_enable_unhomologated_local(account, monkeypatch, enabled, homologated):
     from .entitlement_helpers import grant_test_beta
@@ -388,6 +506,28 @@ def test_admin_plan_assignment_is_explicit_and_bad_beta_input_is_rejected(accoun
         {"capabilities": ["transcription.byok"], "expires_at": "2099-01-01T00:00:00"},
     ):
         assert client.post("/admin/accounts/2/beta", headers=headers, json=payload).status_code == 422
+
+
+def test_admin_platform_grant_requires_round_and_locks_global_enrollment(account, db_context, auth_headers, monkeypatch):
+    from src.services import platform_budget
+    account.get(User, 1).is_superuser = True
+    account.query(BetaAccessGrant).filter_by(user_id=2).delete()
+    account.commit()
+    monkeypatch.setattr(settings, "AAI_BETA_ROUND_ID", "test-round")
+    calls = []
+    monkeypatch.setattr(platform_budget, "lock_beta_enrollment",
+        lambda db, round_id, user_id: calls.append((round_id, user_id)))
+    client, headers = db_context["client"], auth_headers()
+    expiry = (policy.now_utc() + timedelta(hours=1)).isoformat()
+    base = {"capabilities": ["transcription.platform"], "expires_at": expiry}
+    assert client.post("/admin/accounts/2/beta", headers=headers, json=base).status_code == 422
+    nonplatform = {"capabilities": ["transcription.byok"], "expires_at": expiry, "round_id": "test-round"}
+    assert client.post("/admin/accounts/2/beta", headers=headers, json=nonplatform).status_code == 422
+    response = client.post("/admin/accounts/2/beta", headers=headers,
+        json={**base, "round_id": "test-round"})
+    assert response.status_code == 201
+    assert response.json()["round_id"] == "test-round"
+    assert calls == [("test-round", 2)]
 
 
 def test_revoked_beta_is_rechecked_before_byok_inference(account, monkeypatch):
