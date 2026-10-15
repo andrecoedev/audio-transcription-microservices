@@ -70,6 +70,31 @@ it('shows account plan values, renewal, beta access, and BYOK separately from US
   expect(screen.getByText(`Período: ${formatTimestamp('2026-01-01T00:00:00Z')} · Renovação: ${formatTimestamp('2026-02-01T00:00:00Z')}`)).toBeTruthy()
 })
 
+it('shows beta round allowance as finite and without a monthly renewal date', async () => {
+  usageService.getPlan.mockResolvedValue(plan({
+    period_kind: 'beta_round',
+    renews_at: null,
+    development_access: true,
+    beta_round: {
+      id: 'round-1', limit_seconds: 36000, consumed_seconds: 3600, reserved_seconds: 600,
+      available_seconds: 31800, expires_at: '2026-12-01T00:00:00Z',
+    },
+    quota: { limit_seconds: null, consumed_seconds: '3600', reserved_seconds: '600', available_seconds: null },
+  }))
+  usageService.getOverview.mockResolvedValue({ metrics: [] })
+
+  render(<UsageOverview />)
+
+  expect(await screen.findByText(/Franquia desta rodada · expira em/)).toBeTruthy()
+  expect(screen.getByText('Sem renovação automática')).toBeTruthy()
+  expect(screen.getByText('Franquia desta rodada', { selector: 'dt' }).parentElement.textContent).toContain('10 horas de áudio')
+  expect(screen.getByText('Consumido nesta rodada', { selector: 'dt' }).parentElement.textContent).toContain('1 hora de áudio')
+  expect(screen.getByText('Reservado nesta rodada', { selector: 'dt' }).parentElement.textContent).toContain('10 min de áudio')
+  expect(screen.getByText('Disponível nesta rodada', { selector: 'dt' }).parentElement.textContent).toContain('8 horas e 50 minutos de áudio')
+  expect(screen.queryByText(/Renovação:/)).toBeNull()
+  expect(screen.queryByText(/Sem limite comercial de áudio/)).toBeNull()
+})
+
 it('identifies the real Free plan as unavailable when the account has no quota', async () => {
   usageService.getPlan.mockResolvedValue(plan({ plan: 'free', quota: {
     limit_seconds: 0, consumed_seconds: '0', reserved_seconds: '0', available_seconds: '0',

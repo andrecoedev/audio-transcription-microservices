@@ -1,7 +1,7 @@
 """The public example is synthetic, read-only and cannot authorize inference."""
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from src.config import settings
@@ -92,8 +92,9 @@ def test_claimed_legacy_guest_reservation_cannot_start_paid_call(db_context, mon
         json={"guest_token": guest["Authorization"][7:]}).json()["transferred"] == 1
     monkeypatch.setattr(settings, "AAI_GUEST_ENABLED", True)
     monkeypatch.setattr(settings, "AAI_PLATFORM_ENABLED", True)
-    with pytest.raises(RuntimeError, match="demonstration only"):
+    with pytest.raises(HTTPException) as denied:
         begin_platform_call(db, tid)
+    assert denied.value.status_code == 403
     db.expire_all()
     assert db.query(PlatformProviderCall).one().state == "reserved"
     db.close()

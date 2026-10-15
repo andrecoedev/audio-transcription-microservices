@@ -12,6 +12,10 @@ from ..models import AuditEvent
 
 
 ALLOWED_EVENTS = {
+    "provider.balance_checked",
+    "provider.budget_changed",
+    "provider.budget_alert",
+    "provider.call_reconciled",
     "account.plan_changed",
     "account.beta_granted",
     "account.beta_revoked",

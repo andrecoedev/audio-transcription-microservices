@@ -36,7 +36,7 @@ from sqlalchemy.pool import StaticPool
 from src.database import get_db
 from src.models import Base, User
 from src.routers import auth, guests, meeting_actions, meeting_intelligence, meeting_minutes, meetings, provider_preferences, reviewed_meeting_minutes, transcriptions
-from src.routers import account_plans, privacy
+from src.routers import account_plans, privacy, platform_operations
 from src.security import create_access_token
 
 
@@ -117,6 +117,7 @@ def db_context(tmp_path, monkeypatch):
     app = FastAPI()
     app.include_router(auth.router)
     app.include_router(account_plans.router)
+    app.include_router(platform_operations.router)
     app.include_router(privacy.router)
     app.include_router(provider_preferences.router)
     app.include_router(guests.router)

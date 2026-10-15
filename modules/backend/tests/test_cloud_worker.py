@@ -6,17 +6,18 @@ from src.services.assemblyai_engine import AssemblyAIProcessingError
 from src.services.platform_budget import reserve_platform_call
 from src.services.transcription_processing_service import ProcessingResult
 from src.workers import transcription_worker
+from .platform_helpers import configure_platform, confirm_test_balance
 
 
 @pytest.mark.parametrize("failure", [None, "quota", "timeout"])
 def test_cloud_worker_preserves_native_result_and_never_repeats_attempt(db_context, monkeypatch, tmp_path, failure):
     factory = db_context["session_factory"]
-    monkeypatch.setattr(settings, "AAI_PLATFORM_ENABLED", True)
-    monkeypatch.setattr(settings, "AAI_PLATFORM_BUDGET_CENTS", 200)
+    configure_platform(monkeypatch, limit=200)
     monkeypatch.setattr(transcription_worker, "SessionLocal", factory)
     source = tmp_path / "cloud.wav"
     source.write_bytes(b"synthetic audio")
     db = factory()
+    confirm_test_balance(db)
     row = Transcription(filename="cloud.wav", original_filename="cloud.wav", file_size_mb=1,
         duration_seconds=0, transcription_model="assemblyai", use_diarization=True, segments=[], status="queued")
     db.add(row)
@@ -33,11 +34,18 @@ def test_cloud_worker_preserves_native_result_and_never_repeats_attempt(db_conte
     calls = []
 
     class CloudService:
+        model = "universal-3-5-pro"
+        def _get_engine(self, _provider):
+            return self
+        def set_execution_observer(self, callback):
+            self.callback = callback
+
         def process_transcription(self, **kwargs):
             calls.append(kwargs)
             kwargs["before_inference"](2)
             if failure:
                 raise AssemblyAIProcessingError(failure)
+            self.callback({"provider_id": "synthetic-remote-id", "status": "completed", "audio_duration_seconds": 2})
             return ProcessingResult(segments=[
                 {"start": 0, "end": 1, "speaker": "SPEAKER_00", "text": "Olá"},
                 {"start": 1, "end": 2, "speaker": "SPEAKER_01", "text": "Bom dia"},

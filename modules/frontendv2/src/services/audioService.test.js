@@ -72,3 +72,17 @@ it('uses only the official upload, status and result contract', async () => {
   await audioService.deleteTranscription(42)
   expect(api.delete).toHaveBeenCalledWith('/transcriptions/42')
 })
+
+it('sends credential source only for an explicit AssemblyAI route', async () => {
+  api.post.mockResolvedValue({ data: { id: 43 } })
+  const file = new File(['audio'], 'sample.wav', { type: 'audio/wav' })
+
+  await audioService.createTranscriptionJob(file, { transcriptionModel: 'assemblyai', credentialSource: 'platform' })
+  expect(api.post.mock.calls[0][1].get('credential_source')).toBe('platform')
+
+  await audioService.createTranscriptionJob(file, { transcriptionModel: 'assemblyai', credentialSource: 'user' })
+  expect(api.post.mock.calls[1][1].get('credential_source')).toBe('user')
+
+  await audioService.createTranscriptionJob(file, { transcriptionModel: 'automatic', credentialSource: 'platform' })
+  expect(api.post.mock.calls[2][1].get('credential_source')).toBeNull()
+})

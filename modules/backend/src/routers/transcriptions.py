@@ -169,6 +169,7 @@ async def create_transcription_job(
     file: UploadFile = File(...),
     use_diarization: bool | None = Form(None),
     transcription_model: str | None = Form(None),
+    credential_source: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user: Optional[TokenData] = Depends(
         require_scope_when("transcribe", settings.AUTH_PROTECT_PROCESSING)
@@ -177,11 +178,12 @@ async def create_transcription_job(
     """Valida o upload, persiste o job e o enfileira no RQ."""
     if use_diarization is None:
         use_diarization = preferences_for(db, current_user.user_id)["use_diarization"]
-    return await enqueue_transcription(request, file, use_diarization, transcription_model, db, current_user)
+    return await enqueue_transcription(request, file, use_diarization, transcription_model, db, current_user,
+                                      credential_source=credential_source)
 
 
 async def enqueue_transcription(request, file, use_diarization, transcription_model, db, current_user,
-                                *, guest_session: GuestSession | None = None):
+                                *, guest_session: GuestSession | None = None, credential_source=None):
     """One durable upload/queue path, with ownership supplied by verified context."""
     public = guest_session is not None or current_user.registration_source == "public"
     enforce_rate_limit(request, "job-user", str(current_user.user_id if current_user else "anonymous"))
@@ -194,8 +196,10 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
         require_guest_processing()
         selection = {"credential_source": "platform", "credential_id": None, "credential_user_id": None}
     else:
-        selection = resolve_transcription(db, current_user, transcription_model)
+        selection = resolve_transcription(db, current_user, transcription_model, credential_source)
         transcription_model = selection["provider"]
+        if transcription_model == "assemblyai" and selection["credential_source"] == "platform":
+            use_diarization = True
     dev_local = (guest_session is None and transcription_model == "whisper"
                  and selection["credential_source"] == "none"
                  and development_local_access(db, current_user.user_id))
@@ -271,8 +275,6 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
         if transcription_model == "assemblyai":
             job.max_duration_seconds = min(job.max_duration_seconds or settings.AAI_MAX_AUDIO_SECONDS,
                                            settings.AAI_MAX_AUDIO_SECONDS)
-            if selection["credential_source"] == "platform":
-                reserve_platform_call(db, transcription.id, "guest" if guest_session else "local")
         if guest_session is not None:
             db.add(TranscriptionOwnership(transcription_id=transcription.id,
                    owner_sub=f"guest:{guest_session.id}", guest_session_id=guest_session.id))
@@ -289,6 +291,8 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
                 saved_upload.size_bytes, "object:" + saved_upload.key)
             job.max_duration_seconds = min(job.max_duration_seconds or int(reservation.reserved_seconds),
                                            int(reservation.reserved_seconds))
+            if transcription_model == "assemblyai" and selection["credential_source"] == "platform":
+                reserve_platform_call(db, transcription.id, "local", duration_seconds=job.max_duration_seconds)
         append_audit_event(
             db,
             event="transcription.created",

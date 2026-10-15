@@ -85,6 +85,7 @@ export default function UsageOverview() {
   const planError = Boolean(currentPlanRequest?.error)
   const plan = currentPlanRequest?.plan
   const developmentAccess = plan?.development_access === true
+  const betaRound = plan?.period_kind === 'beta_round' ? plan.beta_round : null
   const metrics = Array.isArray(overview?.metrics) ? overview.metrics : []
   const hasRecordedData = metrics.some((metric) => (numberValue(metric.observations) ?? 0) > 0)
   const audio = aggregate(metrics, 'audio_seconds', 'second')
@@ -117,15 +118,26 @@ export default function UsageOverview() {
         {plan.plan === 'free' && !plan.local_processing_available && !plan.beta?.capabilities?.includes('transcription.platform') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
           A transcrição fornecida pela USAGI ainda não está disponível neste ambiente. Sua franquia não habilita esse serviço por si só.
         </p>}
-        <p className="text-xs text-gray-600">
-          Período: {formatTimestamp(plan.period_start)} · Renovação: {formatTimestamp(plan.renews_at)}
-        </p>
-        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <PlanValue label="Cota USAGI" value={`${formatCommercialLimit(plan.quota?.limit_seconds, developmentAccess)} de áudio`} />
-          <PlanValue label="Consumido pela USAGI" value={`${formatPlanDuration(plan.quota?.consumed_seconds)} de áudio`} />
-          <PlanValue label="Reservado pela USAGI" value={`${formatPlanDuration(plan.quota?.reserved_seconds)} de áudio`} />
-          <PlanValue label="Disponível na USAGI" value={`${formatCommercialLimit(plan.quota?.available_seconds, developmentAccess)} de áudio`} />
-        </dl>
+        {betaRound ? <>
+          <p className="text-xs text-gray-600">Franquia desta rodada · expira em {formatTimestamp(betaRound.expires_at)}</p>
+          <p className="text-xs text-gray-600">Sem renovação automática</p>
+          <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <PlanValue label="Franquia desta rodada" value={`${formatTechnicalDuration(betaRound.limit_seconds)} de áudio`} />
+            <PlanValue label="Consumido nesta rodada" value={`${formatTechnicalDuration(betaRound.consumed_seconds)} de áudio`} />
+            <PlanValue label="Reservado nesta rodada" value={`${formatTechnicalDuration(betaRound.reserved_seconds)} de áudio`} />
+            <PlanValue label="Disponível nesta rodada" value={`${formatTechnicalDuration(betaRound.available_seconds)} de áudio`} />
+          </dl>
+        </> : <>
+          <p className="text-xs text-gray-600">
+            Período: {formatTimestamp(plan.period_start)} · Renovação: {formatTimestamp(plan.renews_at)}
+          </p>
+          <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <PlanValue label="Cota USAGI" value={`${formatCommercialLimit(plan.quota?.limit_seconds, developmentAccess)} de áudio`} />
+            <PlanValue label="Consumido pela USAGI" value={`${formatPlanDuration(plan.quota?.consumed_seconds)} de áudio`} />
+            <PlanValue label="Reservado pela USAGI" value={`${formatPlanDuration(plan.quota?.reserved_seconds)} de áudio`} />
+            <PlanValue label="Disponível na USAGI" value={`${formatCommercialLimit(plan.quota?.available_seconds, developmentAccess)} de áudio`} />
+          </dl>
+        </>}
         <div className="rounded-lg bg-gray-50 p-3 text-sm">
           <p className="font-medium text-gray-900">Uso com credenciais próprias (BYOK)</p>
           <p className="mt-1 text-gray-700">Medido: {formatPlanDuration(plan.byok?.measured_seconds)} · Pendente: {formatPlanDuration(plan.byok?.pending_seconds)}</p>

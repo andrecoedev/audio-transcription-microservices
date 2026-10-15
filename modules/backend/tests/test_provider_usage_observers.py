@@ -23,11 +23,16 @@ class _Response:
 
 
 class _HttpClient:
-    def __init__(self, payload):
+    def __init__(self, payload, events=None):
         self.payload = payload
         self.http_client = self
+        self.events = events
+        self.calls = 0
 
     def get(self, _path, *, timeout):
+        self.calls += 1
+        if self.events is not None:
+            self.events.append("poll")
         if isinstance(self.payload, Exception):
             raise self.payload
         return _Response(self.payload)
@@ -43,16 +48,16 @@ class _Transcriber:
 
 
 def _assembly_engine(monkeypatch, payload, events):
-    client = _HttpClient(payload)
+    client = _HttpClient(payload, events)
     transcriber = _Transcriber(events)
     monkeypatch.setattr(aai_module.aai, "Client", lambda **_kwargs: client)
     monkeypatch.setattr(aai_module.aai, "Transcriber", lambda **_kwargs: transcriber)
-    return AssemblyAIEngine("test-key", poll_interval=0.001)
+    return AssemblyAIEngine("test-key", poll_interval=0.001), client
 
 
 def test_assemblyai_observes_submission_and_provider_usage_before_mapping(monkeypatch):
     events = []
-    engine = _assembly_engine(monkeypatch, {
+    engine, _client = _assembly_engine(monkeypatch, {
         "id": "transcript-1", "status": "completed", "audio_duration": 8.5,
         "text": "hello", "words": [{"start": 0, "end": 100}],
     }, events)
@@ -70,7 +75,8 @@ def test_assemblyai_observes_submission_and_provider_usage_before_mapping(monkey
         "use_diarization": False,
     }
     assert events[1] == "submit"
-    assert events[2] == {
+    assert events[2] == "poll"
+    assert events[3] == {
         "phase": "polled", "status": "completed", "model": "universal-2",
         "use_diarization": False, "provider_id": "transcript-1",
         "audio_duration_seconds": 8.5,
@@ -80,7 +86,7 @@ def test_assemblyai_observes_submission_and_provider_usage_before_mapping(monkey
 @pytest.mark.parametrize("duration", [None, -1, float("nan"), float("inf"), True, "8"])
 def test_assemblyai_omits_invalid_audio_duration_and_observer_errors_are_nonfatal(monkeypatch, duration):
     events = []
-    engine = _assembly_engine(monkeypatch, {
+    engine, _client = _assembly_engine(monkeypatch, {
         "status": "completed", "audio_duration": duration,
         "text": "hello", "words": [{"start": 0, "end": 100}],
     }, events)
@@ -90,7 +96,7 @@ def test_assemblyai_omits_invalid_audio_duration_and_observer_errors_are_nonfata
 
 
 def test_assemblyai_observer_failure_does_not_break_delivery(monkeypatch):
-    engine = _assembly_engine(monkeypatch, {
+    engine, _client = _assembly_engine(monkeypatch, {
         "status": "completed", "text": "hello", "words": [{"start": 0, "end": 100}],
     }, [])
     engine.set_usage_observer(lambda _event: (_ for _ in ()).throw(RuntimeError("secret")))
@@ -99,7 +105,7 @@ def test_assemblyai_observer_failure_does_not_break_delivery(monkeypatch):
 
 def test_assemblyai_poll_failure_emits_unknown_without_provider_error(monkeypatch):
     events = []
-    engine = _assembly_engine(monkeypatch, RuntimeError("private provider response"), events)
+    engine, _client = _assembly_engine(monkeypatch, RuntimeError("private provider response"), events)
     engine.set_usage_observer(events.append)
     with pytest.raises(AssemblyAIProcessingError):
         engine.transcribe_file("audio.wav", 1, False)
@@ -107,6 +113,66 @@ def test_assemblyai_poll_failure_emits_unknown_without_provider_error(monkeypatc
         "phase": "polled", "status": "unknown", "model": "universal-2",
         "use_diarization": False, "provider_id": "transcript-1",
     }
+
+
+def test_mandatory_execution_observer_records_acceptance_before_poll(monkeypatch):
+    events = []
+    engine, _client = _assembly_engine(monkeypatch, {
+        "status": "completed", "text": "hello", "words": [{"start": 0, "end": 100}],
+    }, events)
+    engine.set_execution_observer(events.append)
+
+    engine.transcribe_file("audio.wav", 1, False)
+
+    assert events[0] == "submit"
+    assert events[1] == {
+        "phase": "accepted", "status": "queued", "model": "universal-2",
+        "use_diarization": False, "provider_id": "transcript-1",
+    }
+    assert events[2] == "poll"
+    assert events[3]["phase"] == "polled"
+    assert events[3]["status"] == "completed"
+    assert events[3]["provider_id"] == "transcript-1"
+
+
+def test_execution_observer_preserves_accepted_id_when_poll_times_out(monkeypatch):
+    events = []
+    engine, _client = _assembly_engine(monkeypatch, {"status": "queued"}, events)
+    engine.set_execution_observer(events.append)
+    engine.timeout_seconds = 0.5
+    ticks = iter([1.0, 2.0])
+    monkeypatch.setattr(aai_module.time, "monotonic", lambda: next(ticks))
+
+    with pytest.raises(AssemblyAIProcessingError) as error:
+        engine.transcribe_file("audio.wav", 1, False)
+
+    assert error.value.code == "timeout"
+    assert events[1]["phase"] == "accepted"
+    assert events[1]["provider_id"] == "transcript-1"
+    assert events[-1] == {
+        "phase": "polled", "status": "unknown", "model": "universal-2",
+        "use_diarization": False, "provider_id": "transcript-1",
+    }
+    assert "private" not in str(events)
+
+
+def test_execution_observer_persistence_failure_aborts_without_poll_or_resubmit(monkeypatch):
+    events = []
+    engine, client = _assembly_engine(monkeypatch, {
+        "status": "completed", "text": "hello", "words": [{"start": 0, "end": 100}],
+    }, events)
+
+    def fail(_event):
+        raise RuntimeError("database password must not leak")
+
+    engine.set_execution_observer(fail)
+    with pytest.raises(AssemblyAIProcessingError) as error:
+        engine.transcribe_file("audio.wav", 1, False)
+
+    assert error.value.code == "observer"
+    assert "password" not in str(error.value)
+    assert client.calls == 0
+    assert events.count("submit") == 1
 
 
 class _GeminiModel:

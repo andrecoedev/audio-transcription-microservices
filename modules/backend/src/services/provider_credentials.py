@@ -66,7 +66,7 @@ def preferences_for(db, user_id):
     return {name: getattr(row, name) for name in DEFAULT_PREFERENCES} if row else dict(DEFAULT_PREFERENCES)
 
 
-def select_provider(db, user, provider):
+def select_provider(db, user, provider, *, credential_source=None):
     """Return immutable execution provenance, never the secret, to HTTP code."""
     if provider == "whisper":
         require_execution(db, user.user_id, provider, "none")
@@ -80,7 +80,9 @@ def select_provider(db, user, provider):
     if provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(422, "Unsupported provider")
     own = credential_for(db, user.user_id, provider)
-    if own:
+    if credential_source == "user" and own is None:
+        raise HTTPException(503, "Conecte sua chave em Configurações para usar sua própria conta.")
+    if own and credential_source != "platform":
         require_execution(db, user.user_id, provider, "user")
         if not credential_storage_available():
             raise HTTPException(503, "User provider credential is unavailable")
@@ -88,19 +90,23 @@ def select_provider(db, user, provider):
     # Platform credentials require an explicit account capability and infrastructure policy.
     require_execution(db, user.user_id, provider, "platform")
     require_provider_credential(user, provider)
+    if provider == "assemblyai" and not platform_budget_has_headroom(db):
+        raise HTTPException(503, "Este recurso está temporariamente indisponível no Beta.")
     if provider == "gemini" and not (settings.GEMINI_API_KEY_CONFIGURED or settings.GEMINI_API_KEY):
         raise HTTPException(503, "Meeting intelligence is not configured")
     return {"provider": provider, "credential_source": "platform", "credential_id": None, "credential_user_id": None}
 
 
-def resolve_transcription(db, user, requested):
+def resolve_transcription(db, user, requested, credential_source=None):
     provider = requested or preferences_for(db, user.user_id)["transcription_provider"]
     if provider == "automatic":
         # Choice is made before upload/queue, not a retry/fallback on failure.
         provider = "assemblyai" if credential_for(db, user.user_id, "assemblyai") else "whisper"
     if provider not in {"whisper", "assemblyai"}:
         raise HTTPException(400, "Invalid transcription model")
-    return select_provider(db, user, provider)
+    if credential_source is not None and (provider != "assemblyai" or credential_source not in {"user", "platform"}):
+        raise HTTPException(422, "Escolha uma origem de processamento válida.")
+    return select_provider(db, user, provider, credential_source=credential_source)
 
 
 def resolve_intelligence(db, user):
@@ -143,6 +149,8 @@ def providers_view(db, user):
                 allowed = platform_access
         except HTTPException:
             allowed, source = False, "user" if own else None
+        if provider == "assemblyai":
+            allowed = allowed or platform_access
         providers[provider] = {"available": True, "allowed": allowed, "configured": allowed,
                                "credential_source": source, "platform_access": platform_access,
                                "byok_allowed": byok_allowed}
