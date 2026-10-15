@@ -34,6 +34,13 @@ def test_security_headers_and_no_store_are_set():
     assert response.headers["cache-control"] == "no-store"
 
 
+def test_admin_settings_responses_are_never_cached_even_when_authentication_fails():
+    with TestClient(app) as client:
+        response = client.get("/admin/settings")
+    assert response.status_code == 401
+    assert response.headers["cache-control"] == "no-store"
+
+
 def test_validation_errors_never_echo_rejected_passwords_or_guest_proof():
     with TestClient(app) as client:
         for route, body, forbidden in [

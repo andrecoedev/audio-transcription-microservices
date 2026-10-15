@@ -83,7 +83,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    if request.url.path.startswith(("/account", "/usage", "/auth", "/guest", "/settings", "/transcriptions", "/meetings", "/meeting-minutes")):
+    if request.url.path.startswith(("/admin", "/account", "/usage", "/auth", "/guest", "/settings", "/transcriptions", "/meetings", "/meeting-minutes")):
         response.headers["Cache-Control"] = "no-store"
     return response
 
