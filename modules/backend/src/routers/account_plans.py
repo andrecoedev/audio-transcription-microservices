@@ -10,6 +10,7 @@ from rq.exceptions import NoSuchJobError
 from rq.job import Job
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..database import get_db
 from ..models import BetaAccessGrant, TranscriptionJob, TranscriptionReservation, User
 from ..security import TokenData, get_authenticated_user, require_admin
@@ -53,6 +54,12 @@ class BetaInput(BaseModel):
         return value.astimezone(timezone.utc)
 
 
+class DevelopmentLocalAccessInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool
+    reason: Literal["operational_access"]
+
+
 def locked_user(db, user_id):
     row = db.query(User).filter_by(id=user_id).with_for_update(key_share=True).one_or_none()
     if row is None:
@@ -71,6 +78,22 @@ def assign_plan(user_id: int, body: PlanInput, request: Request, db: Session = D
         resource_type="user", resource_id=user_id, metadata={"previous": previous, "plan": body.plan, "reason": body.reason})
     db.commit()
     return {"user_id": user_id, "plan": row.plan}
+
+
+@router.patch("/admin/accounts/{user_id}/development-local-access")
+def set_development_local_access(user_id: int, body: DevelopmentLocalAccessInput, request: Request,
+                                 db: Session = Depends(get_db), admin: TokenData = Depends(require_admin)):
+    if body.enabled and not (settings.APP_ENV == "dev" and settings.DEV_LOCAL_ACCESS_ENABLED):
+        raise HTTPException(403, "A concessão de acesso local está desabilitada neste ambiente.")
+    enforce_rate_limit(request, "provider-settings-user", str(admin.user_id))
+    row = locked_user(db, user_id)
+    previous = bool(row.development_local_access)
+    row.development_local_access = body.enabled
+    append_audit_event(db, event="account.development_local_access_changed", actor_user_id=admin.user_id,
+        resource_type="user", resource_id=user_id,
+        metadata={"previous": previous, "new": body.enabled, "reason": body.reason})
+    db.commit()
+    return {"user_id": user_id, "development_local_access": row.development_local_access}
 
 
 @router.post("/admin/accounts/{user_id}/beta", status_code=201)

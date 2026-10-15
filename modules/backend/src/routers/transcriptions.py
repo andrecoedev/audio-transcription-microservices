@@ -19,7 +19,7 @@ from ..services.rate_limit import enforce_rate_limit
 from ..services.provider_policy import require_guest_processing
 from ..services.platform_budget import reserve_platform_call
 from ..services.provider_credentials import preferences_for, resolve_transcription
-from ..services.transcription_entitlements import reserve_transcription
+from ..services.transcription_entitlements import development_local_access, reserve_transcription
 from ..services.storage_lifecycle import upload_directory
 from ..services.audio_storage import get_audio_storage, schedule_audio_cleanup, cleanup_after_commit
 from ..services.object_storage import StorageError
@@ -185,8 +185,6 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
     """One durable upload/queue path, with ownership supplied by verified context."""
     public = guest_session is not None or current_user.registration_source == "public"
     enforce_rate_limit(request, "job-user", str(current_user.user_id if current_user else "anonymous"))
-    if public and guest_session is None:
-        enforce_rate_limit(request, "public-job")
     if transcription_model not in {None, "automatic", "whisper", "assemblyai"}:
         await file.close()
         raise HTTPException(status_code=400, detail="Invalid transcription model")
@@ -198,6 +196,11 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
     else:
         selection = resolve_transcription(db, current_user, transcription_model)
         transcription_model = selection["provider"]
+    dev_local = (guest_session is None and transcription_model == "whisper"
+                 and selection["credential_source"] == "none"
+                 and development_local_access(db, current_user.user_id))
+    if public and guest_session is None and not dev_local:
+        enforce_rate_limit(request, "public-job")
 
     try:
         queue = get_transcription_queue()
@@ -227,6 +230,7 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
             max_size_bytes=upload_limit_mb(
                 current_user.user_id if current_user else None,
                 "public" if guest_session else current_user.registration_source,
+                dev_local,
             ) * 1024 * 1024,
         )
         if guest_session is None:
@@ -259,9 +263,11 @@ async def enqueue_transcription(request, file, use_diarization, transcription_mo
         db.add(job)
         for name in ("credential_source", "credential_id", "credential_user_id"):
             setattr(job, name, selection[name])
-        if public:
+        if public and not dev_local:
             job.max_duration_seconds = settings.PUBLIC_MAX_AUDIO_SECONDS
             job.timeout_seconds = settings.PUBLIC_JOB_TIMEOUT_SECONDS
+        elif dev_local:
+            job.max_duration_seconds = settings.DEV_LOCAL_MAX_AUDIO_SECONDS
         if transcription_model == "assemblyai":
             job.max_duration_seconds = min(job.max_duration_seconds or settings.AAI_MAX_AUDIO_SECONDS,
                                            settings.AAI_MAX_AUDIO_SECONDS)

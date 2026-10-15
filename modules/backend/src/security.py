@@ -40,6 +40,7 @@ class TokenData(BaseModel):
     firebase_sign_in_provider: Optional[str] = None
     firebase_email: Optional[str] = None
     google_connected: bool = False
+    development_local_access: bool = False
 
 
 def verify_password(plain_password: str, hashed_password: str | None) -> bool:
@@ -156,6 +157,7 @@ async def get_optional_user(
     token_data.username = user.username
     token_data.email = user.email
     token_data.registration_source = user.registration_source
+    token_data.development_local_access = bool(user.development_local_access)
     token_data.roles = ["admin"] if user.is_superuser else ["user"]
     if token_data.auth_provider == 'firebase':
         from .services.identity import principal_for_user
