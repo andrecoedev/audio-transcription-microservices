@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import Layout from './Layout'
 import { useAuthStore } from '../stores/authStore'
@@ -9,6 +9,7 @@ afterEach(cleanup)
 
 const open = () => render(<MemoryRouter><Routes><Route element={<Layout />}>
   <Route path="/" element={<h1>Conteúdo útil</h1>} />
+  <Route path="/tasks" element={<h1>Tarefas da conta</h1>} />
 </Route></Routes></MemoryRouter>)
 
 describe('USAGI application shell', () => {
@@ -16,7 +17,7 @@ describe('USAGI application shell', () => {
     open()
     expect(screen.getByRole('main').textContent).toContain('Conteúdo útil')
     expect(screen.getByRole('link', { name: 'Tarefas' }).getAttribute('href')).toBe('/tasks')
-    expect(screen.getByRole('link', { name: 'Histórico' }).getAttribute('href')).toBe('/transcriptions')
+    expect(screen.getByRole('link', { name: 'Minhas transcrições' }).getAttribute('href')).toBe('/transcriptions')
     expect(screen.queryByRole('heading', { name: 'Administração' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Administração' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Área da conta' }).getAttribute('aria-expanded')).toBe('false')
@@ -43,8 +44,37 @@ describe('USAGI application shell', () => {
     const toggle = screen.getByRole('button', { name: 'Abrir navegação' })
     fireEvent.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  })
+  it('moves focus into the drawer, traps both Tab directions, and returns focus when closed', async () => {
+    useAuthStore.setState({ user: { name: 'Fixture', roles: ['user'] }, token: 'synthetic-session', isAuthenticated: true })
+    open()
+    const toggle = screen.getByRole('button', { name: 'Abrir navegação' })
+    fireEvent.click(toggle)
+    const dialog = screen.getByRole('dialog', { name: 'Navegação principal' })
+    const accountButton = within(dialog).getByRole('button', { name: 'Área da conta' })
+    const focusableItems = () => Array.from(dialog.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+    await waitFor(() => expect(document.activeElement).toBe(focusableItems()[0]))
+    fireEvent.click(accountButton)
+    expect(within(dialog).getByRole('button', { name: 'Sair' })).toBeTruthy()
+    expect(focusableItems().at(-1)).toBe(accountButton)
+    accountButton.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(focusableItems()[0])
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(accountButton)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(document.activeElement).toBe(toggle))
+    expect(document.body.style.overflow).toBe('')
+  })
+  it('closes on backdrop click and restores focus', async () => {
+    open()
+    const toggle = screen.getByRole('button', { name: 'Abrir navegação' })
+    fireEvent.click(toggle)
+    fireEvent.click(screen.getByLabelText('Fechar navegação pelo fundo'))
+    await waitFor(() => expect(document.activeElement).toBe(toggle))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
   it('closes mobile navigation when an admin opens the separated admin destination', () => {
     useAuthStore.setState({ user: { name: 'Fixture', roles: ['admin'] }, token: 'synthetic-session', isAuthenticated: true })
@@ -52,9 +82,17 @@ describe('USAGI application shell', () => {
     const toggle = screen.getByRole('button', { name: 'Abrir navegação' })
     fireEvent.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    const adminLinks = screen.getAllByRole('link', { name: 'Administração' })
-    fireEvent.click(adminLinks[1])
+    const drawer = screen.getByRole('dialog', { name: 'Navegação principal' })
+    fireEvent.click(within(drawer).getByRole('link', { name: 'Administração' }))
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  })
+  it('moves focus to the destination content after choosing a drawer link', async () => {
+    open()
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir navegação' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Tarefas' }))
+    expect(screen.getByRole('heading', { name: 'Tarefas da conta' })).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('main')))
   })
   it('keeps admin section heading IDs unique when desktop and mobile sidebars are mounted', () => {
     useAuthStore.setState({ user: { name: 'Fixture', roles: ['admin'] }, token: 'synthetic-session', isAuthenticated: true })

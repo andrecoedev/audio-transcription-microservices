@@ -1,8 +1,8 @@
 const statuses = {
   queued: ['Na fila', 'bg-gray-100 text-gray-700'],
-  processing: ['Processando', 'bg-amber-50 text-amber-800'],
-  completed: ['Concluída', 'bg-primary-50 text-primary-800'],
-  failed: ['Falhou', 'bg-red-50 text-red-800'],
+  processing: ['Processando', 'bg-[var(--usagi-warning-soft)] text-warning'],
+  completed: ['Concluída', 'bg-[var(--usagi-success-soft)] text-success'],
+  failed: ['Falhou', 'bg-[var(--usagi-danger-soft)] text-danger'],
 }
 
 export default function StatusBadge({ status }) {
