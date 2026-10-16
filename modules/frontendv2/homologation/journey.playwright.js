@@ -4,6 +4,10 @@
 async (page) => {
   const base = 'http://127.0.0.1:4180'
   const api = 'http://127.0.0.1:2029'
+  const mobile = page.viewportSize()?.width < 768
+  const persona = mobile ? 'mobile' : 'member'
+  const email = `${persona}@example.invalid`
+  const filename = mobile ? 'Reunião sintética – mobile.wav' : 'Reunião sintética – integração.wav'
   const events = [], errors = [], stages = []
   const started = Date.now()
   let clicks = 0
@@ -22,7 +26,7 @@ async (page) => {
   const waitText = async (text) => page.locator('p:visible, h1:visible, h2:visible, h3:visible')
     .filter({ hasText: text }).first().waitFor({ timeout: 25000 })
   const record = label => stages.push({ label, elapsed_seconds: Math.round((Date.now() - started) / 1000), clicks, path: new URL(page.url()).pathname })
-  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.setViewportSize(mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 })
   await page.goto(base)
   await page.evaluate(() => { localStorage.clear(); sessionStorage.clear() })
   await page.goto(`${base}/new-transcription`)
@@ -30,7 +34,7 @@ async (page) => {
   check(await page.getByRole('link', { name: 'Administração', exact: true }).count() === 0, 'Guest must not see admin')
   record('Guest demonstrativo')
   await page.goto(`${base}/signup?returnTo=%2Fnew-transcription`)
-  await page.getByLabel('E-mail', { exact: true }).fill('member@example.invalid')
+  await page.getByLabel('E-mail', { exact: true }).fill(email)
   await page.getByLabel('Senha', { exact: true }).fill('Synthetic-passphrase!')
   await page.getByLabel('Confirmar senha', { exact: true }).fill('Synthetic-passphrase!')
   await click(page.getByRole('button', { name: 'Criar conta', exact: true }))
@@ -43,10 +47,10 @@ async (page) => {
   check(adminLogin.ok(), 'Synthetic admin login failed')
   const admin = await adminLogin.json()
   const adminHeaders = { Authorization: `Bearer ${admin.access_token}` }
-  const accounts = await page.request.get(`${api}/admin/settings/accounts?q=member`, { headers: adminHeaders })
+  const accounts = await page.request.get(`${api}/admin/settings/accounts?q=${persona}`, { headers: adminHeaders })
   const accountData = await accounts.json()
   const accountsList = accountData.items
-  const member = accountsList.find(item => item.email === 'member@example.invalid')
+  const member = accountsList.find(item => item.email === email)
   check(member, 'Admin search must find the newly created internal account')
   const granted = await page.request.post(`${api}/admin/accounts/${member.user_id}/beta`, { headers: adminHeaders,
     data: { capabilities: ['transcription.platform', 'intelligence.platform'], round_id: 'test-round', expires_at: new Date(Date.now() + 3600000).toISOString() } })
@@ -59,7 +63,7 @@ async (page) => {
   wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22)
   wav.writeUInt32LE(8000, 24); wav.writeUInt32LE(16000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34)
   wav.write('data', 36); wav.writeUInt32LE(wav.length - 44, 40)
-  await page.locator('input[type=file]').setInputFiles({ name: 'Reunião sintética – integração.wav', mimeType: 'audio/wav', buffer: wav })
+  await page.locator('input[type=file]').setInputFiles({ name: filename, mimeType: 'audio/wav', buffer: wav })
   const submit = page.getByRole('button', { name: /Iniciar Transcrição/i }).last()
   await click(submit)
   await page.waitForURL(/\/transcriptions\/\d+$/, { timeout: 20000 })
@@ -67,7 +71,7 @@ async (page) => {
   record('Upload e processamento')
   await page.reload()
   await waitText('Decidimos publicar o guia')
-  check(await page.getByText('Reunião sintética – integração.wav', { exact: true }).count() > 0, 'Original filename lost')
+  check(await page.getByText(filename, { exact: true }).count() > 0, 'Original filename lost')
   record('Resultado após refresh')
   await page.goto(`${base}/meetings/${id}`)
   await click(page.getByRole('button', { name: 'Gerar resumo', exact: true }))
@@ -82,7 +86,7 @@ async (page) => {
   await click(page.getByRole('button', { name: 'Aceitar', exact: true }).first())
   await page.getByRole('button', { name: 'Concluir', exact: true }).first().waitFor()
   record('Decisão e tarefa aceita')
-  await page.screenshot({ path: '.local-artifacts/beta-e2e-desktop.png', fullPage: true })
+  await page.screenshot({ path: `.local-artifacts/beta-e2e-${mobile ? 'mobile-flow' : 'desktop'}.png`, fullPage: true })
   await page.setViewportSize({ width: 390, height: 844 })
   await page.screenshot({ path: '.local-artifacts/beta-e2e-mobile.png', fullPage: true })
   check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Horizontal overflow on mobile')
@@ -91,7 +95,7 @@ async (page) => {
   await click(page.getByRole('button', { name: 'Área da conta', exact: true }).last())
   await click(page.getByRole('button', { name: 'Sair', exact: true }).last())
   await page.goto(`${base}/login?returnTo=${encodeURIComponent(`/meetings/${id}`)}`)
-  await page.getByLabel('E-mail', { exact: true }).fill('member@example.invalid')
+  await page.getByLabel('E-mail', { exact: true }).fill(email)
   await page.getByLabel('Senha', { exact: true }).fill('Synthetic-passphrase!')
   await click(page.getByRole('button', { name: 'Entrar', exact: true }))
   await page.waitForURL(`**/meetings/${id}`)
@@ -107,5 +111,5 @@ async (page) => {
   check(events.filter(item => item.path === '/transcriptions/jobs' && item.status === 202).length === 1,
     'Exactly one upload submission must be authorized')
   check(errors.length === 0, 'Unexpected JavaScript error')
-  return { id, clicks, stages, javascriptErrors: errors, networkErrors: events.filter(item => item.status >= 400) }
+  return { id, viewport: mobile ? 'mobile-full' : 'desktop', clicks, stages, javascriptErrors: errors, networkErrors: events.filter(item => item.status >= 400) }
 }

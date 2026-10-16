@@ -7,7 +7,7 @@ import wave
 from fastapi import HTTPException
 
 PROJECT = "usagi-beta-e2e"
-PERSONAS = {name: f"{name}@example.invalid" for name in ("member", "other", "admin", "google")}
+PERSONAS = {name: f"{name}@example.invalid" for name in ("member", "mobile", "other", "admin", "google")}
 SEGMENTS = [
     {"start": 0.0, "end": 10.0, "speaker": "SPEAKER_00",
      "text": "Decidimos publicar o guia de integração em português."},

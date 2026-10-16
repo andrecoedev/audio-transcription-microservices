@@ -2,7 +2,7 @@
 const key = 'beta-e2e-synthetic-identity'
 const read = () => JSON.parse(localStorage.getItem(key) || 'null')
 const signed = (name) => {
-  if (!['member', 'other', 'google'].includes(name)) throw new Error('Unknown synthetic persona')
+  if (!['member', 'mobile', 'other', 'google'].includes(name)) throw new Error('Unknown synthetic persona')
   localStorage.setItem(key, JSON.stringify({ uid: name, token: `beta-e2e-${name}` }))
   return { verified: true, token: `beta-e2e-${name}` }
 }
