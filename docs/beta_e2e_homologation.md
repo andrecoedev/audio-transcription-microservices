@@ -14,13 +14,15 @@ pessoas reais, orçamento real e bancos persistentes não foram utilizados.
 ## Ambiente e persona
 
 - React/Vite real, FastAPI real, PostgreSQL 16 e Redis 7 descartáveis, RQ real.
-- Worker do walkthrough: `rq.Worker`, com execução em processo filho; nenhum
-  modelo ML carregado. Integrações pytest usam `SimpleWorker` para preservar os
-  doubles em processo, sem alegar teste CUDA.
+- Worker do walkthrough: `RecoveringWorker` existente, baseado em `rq.Worker`,
+  com execução em processo filho e manutenção; nenhum modelo ML carregado.
+  Integrações pytest comuns usam `SimpleWorker` para preservar os doubles em
+  processo; o drill de crash usa o `RecoveringWorker` real com fork/SIGKILL.
+  Nenhum desses testes alega validar CUDA.
 - Banco exclusivo `usagi_beta_e2e_test`; projetos Compose sintéticos separados.
   A suíte pytest roda em outro banco descartável, pois suas fixtures truncam
   tabelas. Nunca executar contra `transcription_db` ou volume de desenvolvimento.
-- Identidades `member`, `other`, `google` e admin sintético, somente
+- Identidades `member`, `mobile`, `other`, `google` e admin sintético, somente
   `example.invalid`. Firebase SDK no navegador e verificação Admin SDK no
   servidor são fronteiras simuladas; resolução de User/FirebaseIdentity,
   ownership, grants e autorização do domínio continuam reais.
@@ -81,14 +83,33 @@ para **9 h 59 min**, sem renovação automática. Nenhum Starter automático.
 | Dupla execução | Uma submissão 202 no roteiro; geração repetida reutiliza revisão ativa; aceite de tarefa idempotente; uma Meeting/reserva/tentativa na jornada integrada |
 | Timeout/ambiguidade | Provider fake recebe uma chamada; remote ID persistido; erro mantém hold e reentrada não repete submissão |
 | Redis indisponível | Redis do walkthrough parado deliberadamente: resultado GET 200, nova submissão 503; restaurado depois |
-| Restart/RQ efêmero | Registros RQ concluídos apagados; API/Worker recriados; resumo/tarefa/resultado continuam no banco e navegador |
+| Restart/RQ efêmero | Registros RQ concluídos apagados; API/Worker recriados; resumo/tarefa/resultado continuam no banco e navegador. SIGKILL durante chamada aceita e reinício imediato também exercitados; detalhes abaixo |
 | Resposta incompleta e retry | Testes existentes rejeitam JSON/schema/referência inválida, preservam revisão e verificam retry/recovery sem duplicar trabalho ativo |
 | Longos | Fixture de apresentação com 200 segmentos/33 min 20 s; todos renderizados, scroll limitado; não é medição de processamento |
 | Silêncio/vazio | Resultado sem segmentos é acessível e exportação textual fica desabilitada; falta mensagem de vazio mais explícita (P2) |
 | Decisões | Persistem na revisão de inteligência; não existe editor independente de decisões |
 | Tarefa | Aceite, responsável, prazo revisável, status, origem e exportação exercitados por HTTP/integração; aceite e retorno também no navegador |
 | Ownership | A/B/admin: detalhe, ações, resumo e exportação privada negados com 404; listagem/privacidade cobertas pela suíte |
-| Desktop/mobile | 1440×1000 / 390×844, sem overflow horizontal; sidebar/menu e retorno exercitados |
+| Desktop/mobile | Jornada completa repetida com contas distintas em 1440×1000 e 390×844, incluindo upload, processamento, resumo, tarefa e retorno; sem overflow horizontal |
+
+### Interrupção durante processamento
+
+O teste `test_worker_killed_after_submission_and_restarted_never_duplicates_call`
+executa HTTP, PostgreSQL e Redis reais, com `RecoveringWorker`/workhorse em
+processos Linux. A resposta simulada fica deliberadamente bloqueada depois de
+persistir o ID remoto. Nesse ponto, job RQ está `started`, heartbeat existe e o
+PostgreSQL está `processing`. SIGKILL encerra somente o grupo de processos do
+Worker descartável; um novo Worker inicia imediatamente e respeita o lease RQ
+anterior, sem segunda chamada.
+
+A expiração do lease é **acelerada explicitamente** pelo argumento `timestamp`
+do cleanup real do RQ. Não medimos o tempo natural de detecção de abandono.
+Após cleanup, RQ marca `failed`; o hook de manutenção de produção reconcilia o
+PostgreSQL como `failed`, mantém reserva `unknown`/hold financeiro e ID remoto,
+não cria Meeting e não enfileira outra chamada. Duas reconciliações posteriores
+são idempotentes. Um recibo compartilhado entre processos comprova uma única
+invocação do double. Isso não homologa crash CUDA nem recuperação de provider
+real; trabalho ambíguo continua exigindo reconciliação operacional.
 
 ## Evidência/origem
 
@@ -123,6 +144,11 @@ Valores cumulativos aproximados:
 | Resumo persistido | 16 s | 4 |
 | Decisão/tarefa aceita | 16 s | 7 |
 | Logout/login/lista/retorno mobile | 17 s | 13 |
+
+A repetição **inteiramente mobile**, desde Guest/cadastro até o retorno, também
+levou 17 s/13 cliques, com resultado em 8 s e resumo em 16 s, zero erros JS e
+zero respostas HTTP de erro. São duas execuções distintas, não uma projeção do
+desktop sobre tela menor.
 
 O contador não inclui digitação, seleção de arquivo, navegação direta por URL,
 ações administrativas HTTP ou leitura humana. Doubles aguardam quatro segundos;
@@ -179,6 +205,10 @@ vazio; o roteiro principal requer essa execução limpa. Para repetir sem apagar
 dados, parar API/Worker anteriores e usar outro nome de projeto Compose
 descartável em **todos** os comandos (`-p <nome>`).
 
+Antes de executar o roteiro, definir o viewport Playwright em 1440×1000 para
+desktop; repetir em 390×844 para a jornada mobile. O script escolhe personas
+sintéticas distintas (`member`/`mobile`), cada uma inicialmente sem grant.
+
 Na raiz, com o mesmo projeto isolado:
 
 ```powershell
@@ -194,6 +224,28 @@ sintéticos da conta de teste. Não executar a suíte pytest no banco que deseja
 preservar para o walkthrough: iniciar **outro projeto descartável**, aplicar
 Alembic e executar o service `tests` (profile `test`).
 
+Drill Redis reproduzível no mesmo runtime isolado, após a jornada desktop:
+
+1. `docker compose -f modules/backend/tests/homologation/compose.yaml stop redis`
+2. Executar via Playwright MCP o filename
+   `modules/frontendv2/homologation/redis-outage.playwright.js`.
+3. Restaurar Redis mesmo se a verificação falhar:
+   `docker compose -f modules/backend/tests/homologation/compose.yaml start redis`.
+
+Resultado observado: GET persistido **200**, nova submissão **503**, contagem
+inalterada de transcrições. Não desabilitamos rate limit: sua falha segura é
+uma das barreiras que impedem a criação do job nessa indisponibilidade.
+
+Drill de crash e demais jornadas HTTP, em **outro projeto/banco descartável**:
+
+```powershell
+docker compose -p usagi-beta-e2e-tests -f modules/backend/tests/homologation/compose.yaml run --rm migrate
+docker compose -p usagi-beta-e2e-tests -f modules/backend/tests/homologation/compose.yaml --profile test run --rm tests python -m pytest -q tests/integration/test_beta_journey_runtime.py
+```
+
+Não executar `seed` nesse projeto de pytest. O teste de crash exige Linux/fork;
+no Windows nativo é explicitamente ignorado. A execução Docker Linux passou.
+
 Os scripts Playwright registram somente paths/status/métricas qualitativas;
 não registram headers ou payloads de autenticação. Tokens/secret do harness são
 fixtures explícitas, não credenciais válidas fora desse runtime. A configuração
@@ -202,7 +254,7 @@ os marcadores de homologação.
 
 ## Testes e validações
 
-- Backend: **643 passaram**, incluindo PostgreSQL/Redis/RQ, formatos FFmpeg,
+- Backend: **644 passaram**, incluindo PostgreSQL/Redis/RQ, formatos FFmpeg,
   ownership, segurança, quotas, falhas, recovery e novos testes verticais.
 - Frontend: **327 passaram**, lint/build passaram.
 - Alembic upgrade/check, compilação Python, pip check, Compose oficial + overlay
@@ -214,6 +266,14 @@ os marcadores de homologação.
   adicionais produzem 401/503 esperados, não erros inesperados da aplicação.
 - CI, revisões independentes, Security Gate e Gitleaks: resultados finais no PR
   e Trello, não presumidos pela execução local.
+
+As duas revisões independentes iniciais não encontraram P0/P1: Standards não
+apontou violação; Spec identificou lacunas de cobertura mobile e reprodução de
+falhas, fechadas pelos drills acima. O verificador funcional independente
+confirmou apresentação/retorno, 200 segmentos, ownership A/B/admin, sidebar e
+idempotência sobre resultado persistido, mas não repetiu cadastro, grant,
+upload ou crash. A cobertura restante provém da execução do responsável e dos
+testes, não é atribuída indevidamente ao verificador.
 
 ## Próxima ação
 
