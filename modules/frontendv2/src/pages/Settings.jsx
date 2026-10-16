@@ -106,8 +106,8 @@ function SettingsPage() {
       setErrorMessage(error.status === 422
         ? 'Formato da chave inválido. Copie a chave de API do serviço, sem espaços, e tente novamente.'
         : error.status === 429 ? 'Muitas alterações em pouco tempo. Aguarde antes de tentar novamente.'
-          : 'Não foi possível salvar a credencial. Tente novamente; se continuar, procure o suporte da USAGI.')
-      toast.error('Não foi possível salvar a credencial')
+          : 'Não foi possível salvar a chave. Tente novamente; se continuar, procure o suporte da USAGI.')
+      toast.error('Não foi possível salvar a chave')
       return false
     } finally {
       setCredentials((current) => ({ ...current, [provider]: '' }))
@@ -125,8 +125,8 @@ function SettingsPage() {
       toast.success('Credencial removida')
       return true
     } catch {
-      setErrorMessage('Não foi possível remover a credencial. Tente novamente.')
-      toast.error('Não foi possível remover a credencial')
+      setErrorMessage('Não foi possível remover a chave. Tente novamente.')
+      toast.error('Não foi possível remover a chave')
       return false
     } finally {
       setCredentials((current) => ({ ...current, [provider]: '' }))

@@ -27,14 +27,14 @@ it('shows a compact provider heading and opens the key form only after an explic
   setup()
 
   expect(screen.getByRole('heading', { name: 'AssemblyAI' })).toBeTruthy()
-  expect(screen.getByText('Sua própria chave não está conectada')).toBeTruthy()
+  expect(screen.getByText('Não conectada')).toBeTruthy()
   expect(screen.getByText(/O uso da sua própria chave é cobrado pelo serviço AssemblyAI/)).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'Conectar sua própria chave' })).toBeTruthy()
-  expect(screen.queryByLabelText('Credencial AssemblyAI')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Conectar chave AssemblyAI' })).toBeTruthy()
+  expect(screen.queryByLabelText('Chave AssemblyAI')).toBeNull()
   expect(screen.getByLabelText('Disponibilidade AssemblyAI').textContent).toBe('USAGI: habilitado')
 
-  fireEvent.click(screen.getByRole('button', { name: 'Conectar sua própria chave' }))
-  expect(screen.getByLabelText('Credencial AssemblyAI').type).toBe('password')
+  fireEvent.click(screen.getByRole('button', { name: 'Conectar chave AssemblyAI' }))
+  expect(screen.getByLabelText('Chave AssemblyAI').type).toBe('password')
   expect(screen.getByRole('button', { name: 'Salvar chave' }).disabled).toBe(true)
 })
 
@@ -42,15 +42,15 @@ it('keeps platform entitlement separate from key storage and still offers own-ke
   setup({ details: { available: true, allowed: false, configured: false, credential_source: null, platform_access: false, byok_allowed: true } })
 
   expect(screen.getByLabelText('Disponibilidade AssemblyAI').textContent).toBe('USAGI: não habilitado para esta conta')
-  expect(screen.getByRole('button', { name: 'Conectar sua própria chave' }).disabled).toBe(false)
-  fireEvent.click(screen.getByRole('button', { name: 'Conectar sua própria chave' }))
-  expect(screen.getByLabelText('Credencial AssemblyAI')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Conectar chave AssemblyAI' }).disabled).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'Conectar chave AssemblyAI' }))
+  expect(screen.getByLabelText('Chave AssemblyAI')).toBeTruthy()
 })
 
 it('disables own-key setup when secure storage is unavailable and gives a short actionable message', () => {
   setup({ storageAvailable: false })
 
-  expect(screen.getByRole('button', { name: 'Conectar sua própria chave' }).disabled).toBe(true)
+  expect(screen.getByRole('button', { name: 'Conectar chave AssemblyAI' }).disabled).toBe(true)
   expect(screen.getByRole('status').textContent).toMatch(/procure o suporte da USAGI/i)
   expect(screen.queryByText(/credential_storage_available|credential_storage/)).toBeNull()
 })
@@ -58,7 +58,7 @@ it('disables own-key setup when secure storage is unavailable and gives a short 
 it('does not treat missing platform entitlement as an unsupported integration', () => {
   setup({ details: { available: true, allowed: false, configured: false, credential_source: null, platform_access: false, byok_allowed: true } })
 
-  expect(screen.getByRole('button', { name: 'Conectar sua própria chave' }).disabled).toBe(false)
+  expect(screen.getByRole('button', { name: 'Conectar chave AssemblyAI' }).disabled).toBe(false)
   expect(screen.queryByText('Esta integração não está disponível nesta versão.')).toBeNull()
 })
 
@@ -66,18 +66,18 @@ it('disables credential setup when the integration is unsupported', () => {
   setup({ details: { available: false, allowed: false, configured: false, credential_source: null, platform_access: false } })
 
   expect(screen.getByText('Esta integração não está disponível nesta versão.')).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'Conectar sua própria chave' }).disabled).toBe(true)
-  expect(screen.queryByLabelText('Credencial AssemblyAI')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Conectar chave AssemblyAI' }).disabled).toBe(true)
+  expect(screen.queryByLabelText('Chave AssemblyAI')).toBeNull()
 })
 
 it('clears the draft when a disconnected form is cancelled', () => {
   const { onChange } = setup()
-  fireEvent.click(screen.getByRole('button', { name: 'Conectar sua própria chave' }))
-  fireEvent.change(screen.getByLabelText('Credencial AssemblyAI'), { target: { value: 'temporary-secret' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Conectar chave AssemblyAI' }))
+  fireEvent.change(screen.getByLabelText('Chave AssemblyAI'), { target: { value: 'temporary-secret' } })
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
 
   expect(onChange).toHaveBeenLastCalledWith('')
-  expect(screen.queryByLabelText('Credencial AssemblyAI')).toBeNull()
+  expect(screen.queryByLabelText('Chave AssemblyAI')).toBeNull()
 })
 
 it('allows connected credentials to be replaced, cancelled, saved write-only, or removed after confirmation', async () => {
@@ -101,24 +101,24 @@ it('allows connected credentials to be replaced, cancelled, saved write-only, or
   fireEvent.click(screen.getByRole('button', { name: 'Ajuda: Gemini' }))
   expect(screen.getByRole('button', { name: 'Substituir chave Gemini' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Substituir chave Gemini' }))
-  fireEvent.change(screen.getByLabelText('Credencial Gemini'), { target: { value: 'replacement-secret' } })
+  fireEvent.change(screen.getByLabelText('Chave Gemini'), { target: { value: 'replacement-secret' } })
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
   expect(onChange).toHaveBeenLastCalledWith('')
-  expect(screen.queryByLabelText('Credencial Gemini')).toBeNull()
+  expect(screen.queryByLabelText('Chave Gemini')).toBeNull()
 
   fireEvent.click(screen.getByRole('button', { name: 'Substituir chave Gemini' }))
-  fireEvent.change(screen.getByLabelText('Credencial Gemini'), { target: { value: 'replacement-secret' } })
+  fireEvent.change(screen.getByLabelText('Chave Gemini'), { target: { value: 'replacement-secret' } })
   fireEvent.click(screen.getByRole('button', { name: 'Salvar nova chave' }))
   await screen.findByRole('button', { name: 'Substituir chave Gemini' })
   expect(onSave).toHaveBeenCalledTimes(1)
   expect(screen.queryByText('replacement-secret')).toBeNull()
-  expect(screen.queryByLabelText('Credencial Gemini')).toBeNull()
+  expect(screen.queryByLabelText('Chave Gemini')).toBeNull()
 
-  fireEvent.click(screen.getByRole('button', { name: 'Remover credencial Gemini' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Remover chave Gemini' }))
   expect(screen.getByRole('group', { name: 'Confirmar remoção Gemini' }).textContent).toMatch(/não revoga a chave no serviço externo/)
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar remoção' }))
   expect(onRemove).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: 'Remover credencial Gemini' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Remover chave Gemini' }))
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar remoção Gemini' }))
   await waitFor(() => expect(screen.queryByRole('group', { name: 'Confirmar remoção Gemini' })).toBeNull())
   expect(onRemove).toHaveBeenCalledTimes(1)
@@ -128,9 +128,9 @@ it('keeps deletion available when secure storage is unavailable because deleting
   const onRemove = vi.fn(async () => true)
   setup({ credential: { configured: true }, storageAvailable: false, onRemove })
 
-  expect(screen.getByRole('button', { name: 'Remover credencial AssemblyAI' }).disabled).toBe(false)
+  expect(screen.getByRole('button', { name: 'Remover chave AssemblyAI' }).disabled).toBe(false)
   expect(screen.getByRole('button', { name: 'Substituir chave AssemblyAI' }).disabled).toBe(true)
-  fireEvent.click(screen.getByRole('button', { name: 'Remover credencial AssemblyAI' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Remover chave AssemblyAI' }))
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar remoção AssemblyAI' }))
 
   await waitFor(() => expect(onRemove).toHaveBeenCalledTimes(1))
@@ -145,16 +145,16 @@ it('fails closed for Free when BYOK permission is false or missing but keeps rem
 
   expect(screen.getByRole('status').textContent).toBe('Chave própria exige plano autorizado ou acesso beta.')
   expect(screen.getByRole('button', { name: 'Substituir chave AssemblyAI' }).disabled).toBe(true)
-  expect(screen.getByRole('button', { name: 'Remover credencial AssemblyAI' }).disabled).toBe(false)
+  expect(screen.getByRole('button', { name: 'Remover chave AssemblyAI' }).disabled).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'Substituir chave AssemblyAI' }))
-  expect(screen.queryByLabelText('Credencial AssemblyAI')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: 'Remover credencial AssemblyAI' }))
+  expect(screen.queryByLabelText('Chave AssemblyAI')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Remover chave AssemblyAI' }))
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar remoção AssemblyAI' }))
   await waitFor(() => expect(onRemove).toHaveBeenCalledOnce())
   expect(onSave).not.toHaveBeenCalled()
 
   cleanup()
   setup({ details: { available: true, allowed: true, configured: true, credential_source: 'platform' } })
-  expect(screen.getByRole('button', { name: 'Conectar sua própria chave' }).disabled).toBe(true)
+  expect(screen.getByRole('button', { name: 'Conectar chave AssemblyAI' }).disabled).toBe(true)
   expect(screen.getByText('Chave própria exige plano autorizado ou acesso beta.')).toBeTruthy()
 })

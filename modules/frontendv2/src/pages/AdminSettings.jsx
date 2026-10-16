@@ -298,7 +298,7 @@ export default function AdminSettings() {
 }
 
 function Metric({ icon: Icon, label, value, detail }) { return <div className="min-w-0 rounded-lg bg-gray-50 p-4"><p className="flex items-center gap-2 text-xs text-gray-500">{Icon && <Icon className="h-4 w-4" aria-hidden="true" />}{label}</p><p className="mt-2 break-words text-xl font-semibold text-gray-900">{value}</p>{detail && <p className="mt-1 break-words text-xs text-gray-500">{detail}</p>}</div> }
-function Status({ label, value }) { const translated = value === 'connected' ? 'Conectado' : display(value); return <div className="flex min-w-0 justify-between gap-3 rounded-lg border p-3"><span className="text-gray-600">{label}</span><span className="break-words text-right font-medium">{translated}</span></div> }
+function Status({ label, value }) { const translated = value === 'connected' ? 'Conectado' : display(value); return <div className="flex min-w-0 justify-between gap-3 border-b border-gray-100 py-2 last:border-0"><span className="text-gray-600">{label}</span><span className="break-words text-right font-medium">{translated}</span></div> }
 function formatSeconds(value) { const seconds = Number(value || 0); return Number.isFinite(seconds) ? (seconds / 60).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—' }
 
 function ParticipantsCard({ participants, maximum, search, setSearch, accounts, searchError, busy, findAccounts, grantAccount, revokeAccount, expiresAt, setExpiresAt }) {

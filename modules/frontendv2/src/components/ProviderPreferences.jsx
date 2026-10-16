@@ -45,7 +45,7 @@ function serviceDescription(provider, settings) {
   const source = details.credential_source
   if (provider === 'groq') return 'Acesso à Groq disponibilizado pela USAGI.'
   if (source === 'platform') return 'Usa a franquia da USAGI.'
-  if (source === 'user') return `Cobrança na sua conta ${providerNames[provider]}.`
+  if (source === 'user') return `O serviço ${providerNames[provider]} cobra o uso da sua própria chave.`
   return null
 }
 
