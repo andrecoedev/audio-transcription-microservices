@@ -44,6 +44,16 @@ export default {
         },
       },
       boxShadow: { popover: 'var(--usagi-shadow-popover)' },
+      borderRadius: {
+        md: 'var(--usagi-radius-badge)', lg: 'var(--usagi-radius-control)',
+        xl: 'var(--usagi-radius-modal)',
+      },
+      spacing: {
+        1: 'var(--usagi-space-1)', 2: 'var(--usagi-space-2)',
+        3: 'var(--usagi-space-3)', 4: 'var(--usagi-space-4)',
+        6: 'var(--usagi-space-6)', 8: 'var(--usagi-space-8)',
+        12: 'var(--usagi-space-12)',
+      },
       fontSize: { xs: ['0.8125rem', { lineHeight: '1.25rem' }] },
       transitionDuration: { DEFAULT: 'var(--usagi-duration)' },
       animation: {
