@@ -42,7 +42,7 @@ export default function Layout() {
     background.forEach((node) => { if (node) node.inert = true })
     document.body.style.overflow = 'hidden'
     const focusables = () => Array.from(drawerRef.current?.querySelectorAll(focusableSelector) || [])
-    requestAnimationFrame(() => focusables()[0]?.focus())
+    const focusFrame = requestAnimationFrame(() => focusables()[0]?.focus())
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -64,6 +64,7 @@ export default function Layout() {
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => {
+      cancelAnimationFrame(focusFrame)
       document.removeEventListener('keydown', handleKeyDown)
       background.forEach((node, index) => { if (node) node.inert = previousInert[index] })
       document.body.style.overflow = previousOverflow
@@ -72,7 +73,7 @@ export default function Layout() {
 
   return <div className="flex min-h-screen flex-col bg-canvas md:h-screen md:flex-row md:overflow-hidden">
     <a ref={skipLinkRef} href="#main-content" className="sr-only z-50 rounded-lg bg-white p-3 focus:not-sr-only focus:absolute">Ir para o conteúdo</a>
-    <div ref={desktopSidebarRef} className="hidden md:block"><Sidebar /></div>
+    <div ref={desktopSidebarRef} className="hidden overflow-y-auto md:block"><Sidebar /></div>
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <Navbar ref={menuButtonRef} backgroundRef={navbarRef} expanded={menuOpen} onMenu={() => setMenuOpen(true)} />
       <main ref={mainRef} id="main-content" className="min-w-0 flex-1 p-5 sm:p-8 md:overflow-y-auto lg:px-10 lg:py-10">

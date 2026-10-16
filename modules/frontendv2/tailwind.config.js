@@ -12,7 +12,7 @@ export default {
         shell: 'var(--usagi-shell)',
         surface: 'var(--usagi-surface)',
         'surface-secondary': 'var(--usagi-surface-secondary)',
-        ink: 'var(--usagi-ink)',
+        ink: 'rgb(var(--usagi-ink-rgb) / <alpha-value>)',
         muted: 'var(--usagi-muted)',
         success: 'var(--usagi-success)',
         warning: 'var(--usagi-warning)',

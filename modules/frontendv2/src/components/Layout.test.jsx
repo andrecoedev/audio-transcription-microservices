@@ -71,7 +71,7 @@ describe('USAGI application shell', () => {
     open()
     const toggle = screen.getByRole('button', { name: 'Abrir navegação' })
     fireEvent.click(toggle)
-    fireEvent.click(screen.getByRole('button', { name: 'Fechar navegação pelo fundo', hidden: true }))
+    fireEvent.click(screen.getByLabelText('Fechar navegação pelo fundo'))
     await waitFor(() => expect(document.activeElement).toBe(toggle))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
