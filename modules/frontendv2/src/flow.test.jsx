@@ -108,7 +108,7 @@ describe('public React flow', () => {
     authService.me.mockRejectedValue(Object.assign(new Error('expired'), { status: 401 }))
     window.history.pushState({}, '', '/transcriptions')
     render(<App />)
-    expect(await screen.findByText('Salve e acompanhe suas reuniões')).toBeTruthy()
+    expect(await screen.findByText('Entre para continuar')).toBeTruthy()
     expect(audioService.listTranscriptions).not.toHaveBeenCalled()
     expect(localStorage.getItem('token')).toBeNull()
     expect(useAuthStore.getState().isAuthenticated).toBe(false)

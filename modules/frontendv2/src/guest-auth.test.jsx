@@ -140,7 +140,7 @@ describe('Guest and account boundaries', () => {
   it('App keeps protected history behind login', async () => {
     window.history.replaceState({}, '', '/meetings')
     render(<App />)
-    expect(await screen.findByText('Salve e acompanhe suas reuniões')).toBeTruthy()
+    expect(await screen.findByText('Entre para continuar')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Reuniões' })).toBeNull()
   })
   it('opens the public demo without upload, policy lookup, or creating an identity', async () => {

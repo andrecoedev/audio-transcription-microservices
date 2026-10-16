@@ -25,9 +25,9 @@ function AccountRequired({ children }) {
   const location = useLocation()
   const context = `?returnTo=${encodeURIComponent(location.pathname + location.search)}`
   if (authenticated) return children
-  return <Card><CardHeader><CardTitle>Salve e acompanhe suas reuniões</CardTitle></CardHeader>
-    <CardContent><p className="text-gray-600 mb-4">Entre ou crie uma conta para usar este recurso. Sua transcrição temporária continua disponível nesta aba.</p>
-      <div className="flex gap-4 text-primary-700"><Link to={`/login${context}`}>Entrar</Link><Link to={`/signup${context}`}>Criar conta</Link><Link to="/new-transcription">Transcrever um arquivo</Link></div>
+  return <Card><CardHeader><CardTitle>Entre para continuar</CardTitle></CardHeader>
+    <CardContent><p className="text-gray-600 mb-4">Entre ou crie uma conta para acessar suas transcrições, reuniões e tarefas. Você também pode explorar os dados de exemplo sem entrar.</p>
+      <div className="flex flex-wrap gap-4 text-primary-700"><Link to={`/login${context}`}>Entrar</Link><Link to={`/signup${context}`}>Criar conta</Link><Link to="/new-transcription">Ver demonstração</Link></div>
     </CardContent></Card>
 }
 
