@@ -20,6 +20,11 @@ export default function Layout() {
     if (returnFocus) requestAnimationFrame(() => menuButtonRef.current?.focus())
   }, [])
 
+  const navigateFromMenu = () => {
+    closeMenu(false)
+    requestAnimationFrame(() => mainRef.current?.focus())
+  }
+
   useEffect(() => { closeMenu(false) }, [pathname, closeMenu])
 
   useEffect(() => {
@@ -76,13 +81,13 @@ export default function Layout() {
     <div ref={desktopSidebarRef} className="hidden overflow-y-auto md:block"><Sidebar /></div>
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <Navbar ref={menuButtonRef} backgroundRef={navbarRef} expanded={menuOpen} onMenu={() => setMenuOpen(true)} />
-      <main ref={mainRef} id="main-content" className="min-w-0 flex-1 p-5 sm:p-8 md:overflow-y-auto lg:px-10 lg:py-10">
+      <main ref={mainRef} id="main-content" tabIndex={-1} className="min-w-0 flex-1 p-5 sm:p-8 md:overflow-y-auto lg:px-10 lg:py-10">
         <div className="mx-auto max-w-7xl"><Outlet /></div>
       </main>
     </div>
     {menuOpen && <div className="fixed inset-0 z-40 flex md:hidden">
       <div id="mobile-navigation" ref={drawerRef} role="dialog" aria-modal="true" aria-label="Navegação principal" tabIndex={-1} className="relative z-10 h-full max-h-[100dvh] overflow-y-auto overscroll-contain shadow-xl">
-        <Sidebar compact onNavigate={() => closeMenu(false)} onClose={() => closeMenu()} />
+        <Sidebar compact onNavigate={navigateFromMenu} onClose={() => closeMenu()} />
       </div>
       <button type="button" aria-label="Fechar navegação pelo fundo" aria-hidden="true" tabIndex={-1} onClick={() => closeMenu()} className="flex-1 bg-ink/40" />
     </div>}

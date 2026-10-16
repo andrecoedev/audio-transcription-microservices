@@ -9,6 +9,7 @@ afterEach(cleanup)
 
 const open = () => render(<MemoryRouter><Routes><Route element={<Layout />}>
   <Route path="/" element={<h1>Conteúdo útil</h1>} />
+  <Route path="/tasks" element={<h1>Tarefas da conta</h1>} />
 </Route></Routes></MemoryRouter>)
 
 describe('USAGI application shell', () => {
@@ -84,6 +85,14 @@ describe('USAGI application shell', () => {
     const drawer = screen.getByRole('dialog', { name: 'Navegação principal' })
     fireEvent.click(within(drawer).getByRole('link', { name: 'Administração' }))
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  })
+  it('moves focus to the destination content after choosing a drawer link', async () => {
+    open()
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir navegação' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Tarefas' }))
+    expect(screen.getByRole('heading', { name: 'Tarefas da conta' })).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('main')))
   })
   it('keeps admin section heading IDs unique when desktop and mobile sidebars are mounted', () => {
     useAuthStore.setState({ user: { name: 'Fixture', roles: ['admin'] }, token: 'synthetic-session', isAuthenticated: true })
