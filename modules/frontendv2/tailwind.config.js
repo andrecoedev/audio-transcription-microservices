@@ -44,6 +44,7 @@ export default {
         },
       },
       boxShadow: { popover: 'var(--usagi-shadow-popover)' },
+      fontSize: { xs: ['0.8125rem', { lineHeight: '1.25rem' }] },
       transitionDuration: { DEFAULT: 'var(--usagi-duration)' },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
