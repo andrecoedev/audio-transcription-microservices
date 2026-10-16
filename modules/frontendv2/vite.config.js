@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { firebaseWebEnv } from './config/firebaseWebEnv.js'
+import { browserTitle } from './src/brand.js'
 
 const frontendRoot = path.dirname(fileURLToPath(import.meta.url))
 
@@ -19,7 +20,12 @@ export default defineConfig(({ mode }) => {
   return {
     define: Object.fromEntries(Object.entries(web).map(([key, value]) =>
       [`import.meta.env.${key}`, JSON.stringify(value)])),
-    plugins: [react()],
+    plugins: [react(), {
+      name: 'brand-browser-title',
+      transformIndexHtml(html) {
+        return html.replace(/<title>[\s\S]*?<\/title>/, `<title>${browserTitle}</title>`)
+      },
+    }],
     resolve: {
       alias: {
         '@': path.resolve(frontendRoot, './src'),
