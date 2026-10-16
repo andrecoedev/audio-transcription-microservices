@@ -1,5 +1,12 @@
 // Translate known API failures without changing contracts or exposing diagnostics.
 const messages = {
+  'A franquia da rodada beta está esgotada; não há renovação automática.': 'Você atingiu a franquia desta rodada do Beta. Não há renovação automática.',
+  'Este recurso está temporariamente indisponível no Beta.': 'Novas transcrições do Beta estão temporariamente indisponíveis. Tente novamente mais tarde.',
+  'A franquia da rodada beta foi reduzida e não comporta este áudio.': 'O áudio ultrapassa o tempo disponível na sua franquia desta rodada do Beta. Envie um áudio mais curto ou consulte seu acesso.',
+  'Sua franquia mensal está esgotada. Aguarde a renovação.': 'Você atingiu sua franquia mensal. Aguarde a renovação para enviar outro áudio.',
+  'O áudio excede o tempo disponível para esta transcrição.': 'O áudio ultrapassa o tempo disponível para esta transcrição. Confira sua franquia e envie um áudio mais curto.',
+  'O limite de transcrições simultâneas foi atingido.': 'Você já tem o máximo de transcrições em processamento. Aguarde uma terminar antes de enviar outra.',
+  'O limite de armazenamento foi atingido. Exclua arquivos que não precisa manter.': 'Seu armazenamento está cheio. Exclua arquivos que não precisa manter antes de enviar outro áudio.',
   'O máximo não pode ficar abaixo das vagas já utilizadas nesta rodada.': 'O limite de participantes não pode ficar abaixo das vagas já utilizadas nesta rodada.',
   'A identificação da rodada não pode mudar após convites ou uso.': 'A rodada já tem convites ou uso registrado; seu identificador não pode ser alterado.',
   'O teto exige conferência operacional suficiente.': 'Confira a autorização financeira com o operador antes de aumentar o teto.',
@@ -15,7 +22,7 @@ const messages = {
   'AssemblyAI is temporarily unavailable': 'O AssemblyAI está temporariamente indisponível. Tente novamente mais tarde.',
   'Transcription processing failed': 'Não foi possível concluir a transcrição. Tente enviar o áudio novamente.',
   'Audio could not be decoded': 'Não foi possível ler o áudio deste arquivo. Confira se ele contém som e exporte novamente como WAV ou MP3. Se o problema continuar, procure o suporte da USAGI.',
-  'Platform transcription budget exhausted': 'A franquia de transcrição da USAGI está esgotada no momento. Tente novamente mais tarde ou consulte as opções da sua conta.',
+  'Platform transcription budget exhausted': 'Novas transcrições do Beta estão temporariamente indisponíveis. Tente novamente mais tarde.',
   'Visitor transcription is unavailable': 'A transcrição para visitantes está indisponível no momento. Tente novamente mais tarde.',
   'Platform transcription is unavailable': 'A transcrição fornecida pela USAGI está indisponível no momento. Confira outras opções em Configurações.',
   'Provider credential storage is unavailable': 'Não foi possível guardar sua chave agora. Tente novamente mais tarde; se continuar, procure o suporte da USAGI.',
