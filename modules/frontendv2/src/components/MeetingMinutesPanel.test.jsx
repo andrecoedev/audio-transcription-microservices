@@ -74,7 +74,7 @@ it('supports manual actions when there is no Intelligence and reloads changed da
   audioService.getMeetingMinutes.mockResolvedValue(manualOnly)
   const view = render(<MeetingMinutesPanel meetingId="42" version={0} />)
   expect(await screen.findByText('Prepare room')).toBeTruthy()
-  expect(screen.getByText('Nenhum resumo disponível.')).toBeTruthy()
+  expect(screen.getByText('Esta reunião ainda não tem resumo.')).toBeTruthy()
   expect(screen.queryByText(/gerados por IA/)).toBeNull()
   view.rerender(<MeetingMinutesPanel meetingId="42" version={1} />)
   await waitFor(() => expect(audioService.getMeetingMinutes).toHaveBeenCalledTimes(2))

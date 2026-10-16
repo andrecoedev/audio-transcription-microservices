@@ -126,7 +126,7 @@ it('shows new revision suggestions without replacing previously reviewed work', 
 it('creates manual work without intelligence and retains it after reload', async () => {
   audioService.getMeetingIntelligenceStatus.mockResolvedValue({ completed_revision: null })
   const view = render(<MeetingActionsPanel meetingId="42" />)
-  await screen.findByText('Ainda não há análise da reunião.')
+  await screen.findByText('Esta reunião ainda não tem resumo. Gere um resumo para revisar sugestões de tarefas.')
   fireEvent.change(screen.getByLabelText('Nova tarefa descrição'), { target: { value: '  Enviar slides  ' } })
   fireEvent.click(screen.getByRole('button', { name: 'Criar tarefa' }))
   expect(await screen.findByText('Enviar slides')).toBeTruthy()
@@ -167,7 +167,15 @@ it('completes and reopens tasks, then honors explicit deletion', async () => {
   expect(await within(row).findByText(/Aberta/)).toBeTruthy()
   vi.spyOn(window, 'confirm').mockReturnValue(true)
   fireEvent.click(within(row).getByRole('button', { name: 'Excluir tarefa' }))
-  expect(await screen.findByText('Nenhuma tarefa criada.')).toBeTruthy()
+  expect(await screen.findByText('Nenhuma tarefa aceita ou criada manualmente nesta reunião.')).toBeTruthy()
+})
+
+it('labels a persisted dismissed task and names the action precisely', async () => {
+  actions = [{ id: 8, description: 'Não enviar o rascunho', assignee: null, due_date: null, status: 'dismissed' }]
+  render(<MeetingActionsPanel meetingId="42" />)
+  const row = (await screen.findByText('Não enviar o rascunho')).closest('li')
+  expect(within(row).getByText(/Descartada/)).toBeTruthy()
+  expect(within(row).queryByRole('button', { name: 'Marcar como descartada' })).toBeNull()
 })
 
 it('shows loading and a sanitized error, then retries', async () => {

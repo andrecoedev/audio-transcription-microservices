@@ -69,7 +69,7 @@ function ActionRow({ item, busy, change, remove, onViewOrigin, evidenceBaseUrl }
         <Button size="sm" variant="outline" disabled={busy} onClick={edit}>Editar tarefa</Button>
         {item.status !== 'dismissed' && <Button size="sm" disabled={busy} onClick={() => change(item.id, { status: item.status === 'open' ? 'done' : 'open' })}>
           {item.status === 'open' ? 'Concluir' : 'Reabrir'}</Button>}
-        {item.status === 'open' && <Button size="sm" variant="outline" disabled={busy} onClick={() => change(item.id, { status: 'dismissed' })}>Descartar</Button>}
+        {item.status === 'open' && <Button size="sm" variant="outline" disabled={busy} onClick={() => change(item.id, { status: 'dismissed' })}>Marcar como descartada</Button>}
         <Button size="sm" variant="ghost" disabled={busy} onClick={() => remove(item.id)}>Excluir tarefa</Button>
       </div>
     </>}
@@ -194,7 +194,7 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
       <Button variant="outline" disabled={loading || busy} onClick={() => setRefresh(value => value + 1)}>Atualizar tarefas</Button>
       {!loading && !error && <section aria-labelledby="suggested-actions-heading" className="space-y-3">
         <h3 id="suggested-actions-heading" className="font-semibold">Sugeridas pela IA</h3>
-        {!suggestionResult && <p className="text-sm text-gray-500">Ainda não há análise da reunião.</p>}
+        {!suggestionResult && <p className="text-sm text-gray-500">Esta reunião ainda não tem resumo. Gere um resumo para revisar sugestões de tarefas.</p>}
         {suggestionResult && suggestions.length === 0 && <p className="text-sm text-gray-500">Nenhuma sugestão pendente nesta revisão.</p>}
         <ul className="space-y-3">{suggestions.map(item => <Suggestion key={`${suggestionResult.revision}-${item.source_index}`} item={item}
           revision={suggestionResult.revision} references={suggestionResult.references || []} busy={busy} accept={accept} dismiss={dismiss} evidenceBaseUrl={evidenceBaseUrl} />)}</ul>
@@ -208,7 +208,7 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
       </section>}
       <section aria-labelledby="operational-actions-heading" className="space-y-3">
         <h3 id="operational-actions-heading" className="font-semibold">Tarefas</h3>
-        {!loading && !error && items.length === 0 && <p>Nenhuma tarefa criada.</p>}
+        {!loading && !error && items.length === 0 && <p className="text-sm text-gray-500">Nenhuma tarefa aceita ou criada manualmente nesta reunião.</p>}
         <ul className="space-y-3">{items.map(item => <ActionRow key={item.id} item={item} busy={busy || loading} change={change} remove={remove} onViewOrigin={viewOrigin} evidenceBaseUrl={evidenceBaseUrl} />)}</ul>
       </section>
       <form onSubmit={create} className="space-y-3">

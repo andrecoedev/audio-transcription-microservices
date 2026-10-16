@@ -68,7 +68,7 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange, in
     {error && <p role="alert" className="text-red-700">{error}</p>}
     {error && <Button variant="outline" onClick={() => setRefresh(value => value + 1)}>Consultar novamente</Button>}
     {!status && !error && <p role="status" className="text-sm text-gray-500">Consultando análise...</p>}
-    {status && !status.generation && !result && <p className="text-sm text-gray-600">Ainda não há análise desta reunião.</p>}
+    {status && !status.generation && !result && <div className="space-y-2"><p className="font-medium text-gray-900">Esta reunião ainda não tem resumo.</p><p className="text-sm text-gray-600">Veja os principais pontos da reunião.</p></div>}
     {status && !status.configured && <p className="text-sm text-gray-600">A análise com IA está indisponível no momento.</p>}
     {busy && <p role="status" className="text-sm text-gray-600">{result ? 'Gerando novamente; a versão anterior continua disponível.' : 'Gerando resumo...'}</p>}
     {state === 'failed' && <p role="alert" className="text-sm text-red-700">A geração falhou. Você pode tentar novamente.</p>}
@@ -77,15 +77,15 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange, in
     </Button>}
     {status && <p className="text-sm text-gray-600">Ao gerar um resumo, a transcrição e o contexto da reunião são enviados ao serviço escolhido, inclusive com sua própria chave. Excluir na USAGI não remove automaticamente cópias desse serviço.</p>}
     {content && <div className="space-y-5">
-      <p className="text-xs text-gray-500">Versão {result.revision} · {result.provider} · {result.model}</p>
+      <p className="text-xs text-gray-500">Conteúdo gerado por IA; revise antes de utilizar.</p>
       {visibleSections.includes('summary') && <section><h3 className="font-semibold text-gray-900">Resumo</h3><p className="mt-2 whitespace-pre-wrap leading-7">{content.summary}</p></section>}
       {sections.filter(([key]) => visibleSections.includes(key)).map(([key, heading, items]) => <section key={key} className="space-y-2">
         <h3 className="font-semibold text-gray-900">{heading}</h3>
-        {items?.length ? <ul className="space-y-3">{items.map((item, index) => <li key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <p>{item.description}</p>
+        {items?.length ? <ul className="divide-y divide-gray-200">{items.map((item, index) => <li key={index} className="py-3 first:pt-0 last:pb-0">
+          <p>{item.description || item.decision || item.question || item.topic}</p>
           {key === 'actions' && <p className="mt-1 text-sm text-gray-600">Responsável: {item.assignee || 'Não identificado'} · Prazo: {item.due_date || 'Sem prazo explícito'}</p>}
           <EvidenceLinks evidence={item.evidence} references={result.references} />
-        </li>)}</ul> : <p className="text-sm text-gray-500">Nenhum item identificado.</p>}
+        </li>)}</ul> : <p className="text-sm text-gray-500">{key === 'decisions' ? 'Nenhuma decisão identificada nesta versão.' : key === 'questions' ? 'Nenhuma pergunta em aberto identificada.' : key === 'topics' ? 'Nenhum tópico identificado nesta versão.' : 'Nenhuma tarefa sugerida nesta versão.'}</p>}
       </section>)}
     </div>}
   </section>
