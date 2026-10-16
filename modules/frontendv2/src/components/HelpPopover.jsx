@@ -40,7 +40,7 @@ export default function HelpPopover({ label, children }) {
   return <span ref={container} className="relative inline-flex align-middle" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
     <button type="button" aria-label={`Ajuda: ${label}`} aria-expanded={open} aria-describedby={open ? id : undefined}
       onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onClick={() => setPinned(value => !value)}
-      className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">?</button>
-    {open && <span ref={tooltip} id={id} role="tooltip" style={position} className="fixed z-30 rounded-lg border border-gray-200 bg-white p-3 text-left text-sm font-normal leading-relaxed text-gray-700 shadow-lg">{children}</span>}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">?</button>
+    {open && <span ref={tooltip} id={id} role="tooltip" style={position} className="fixed z-30 rounded-lg border border-gray-200 bg-white p-3 text-left text-sm font-normal leading-relaxed text-gray-700 shadow-popover">{children}</span>}
   </span>
 }
