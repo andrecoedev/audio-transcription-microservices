@@ -1,0 +1,54 @@
+/* Light-only product foundation. Keep color values here, not in components. */
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/geist/Geist-variable.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --usagi-canvas: #f7faf8;
+  --usagi-shell: #eff4f1;
+  --usagi-surface: #ffffff;
+  --usagi-surface-secondary: #f4f8f6;
+  --usagi-hover: #e9eeec;
+  --usagi-primary: #1f4939;
+  --usagi-primary-hover: #13382a;
+  --usagi-primary-soft-rgb: 226 243 233;
+  --usagi-primary-soft: rgb(var(--usagi-primary-soft-rgb));
+  --usagi-primary-tint: #cfe5d8;
+  --usagi-primary-mid: #9dbdaa;
+  --usagi-ink-rgb: 24 32 28;
+  --usagi-ink: rgb(var(--usagi-ink-rgb));
+  --usagi-text-secondary: #414a46;
+  --usagi-muted: #626a66;
+  --usagi-border: #dfe4e2;
+  --usagi-control-border: #849189;
+  --usagi-success: #1e5a3c;
+  --usagi-success-soft: #e5f3eb;
+  --usagi-warning: #7c5019;
+  --usagi-warning-soft: #fbf3df;
+  --usagi-danger: #ac312c;
+  --usagi-danger-hover: #8d2824;
+  --usagi-danger-soft: #fcece9;
+  --usagi-info: #225984;
+  --usagi-info-soft: #eaf3fa;
+  --usagi-on-primary: #ffffff;
+
+  --usagi-font-ui: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --usagi-font-ja: 'Yu Gothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  --usagi-space-1: 0.25rem;
+  --usagi-space-2: 0.5rem;
+  --usagi-space-3: 0.75rem;
+  --usagi-space-4: 1rem;
+  --usagi-space-6: 1.5rem;
+  --usagi-space-8: 2rem;
+  --usagi-space-12: 3rem;
+  --usagi-radius-control: 0.5rem;
+  --usagi-radius: 0.625rem;
+  --usagi-radius-modal: 0.75rem;
+  --usagi-shadow-popover: 0 2px 4px rgb(24 32 28 / 6%), 0 12px 28px -8px rgb(24 32 28 / 18%);
+  --usagi-duration: 160ms;
+}
