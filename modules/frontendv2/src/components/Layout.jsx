@@ -80,10 +80,10 @@ export default function Layout() {
       </main>
     </div>
     {menuOpen && <div className="fixed inset-0 z-40 flex md:hidden">
-      <div id="mobile-navigation" ref={drawerRef} role="dialog" aria-modal="true" aria-label="Navegação principal" tabIndex={-1} className="relative z-10 h-full shadow-xl">
-        <Sidebar compact onNavigate={() => closeMenu(false)} />
+      <div id="mobile-navigation" ref={drawerRef} role="dialog" aria-modal="true" aria-label="Navegação principal" tabIndex={-1} className="relative z-10 h-full max-h-[100dvh] overflow-y-auto overscroll-contain shadow-xl">
+        <Sidebar compact onNavigate={() => closeMenu(false)} onClose={() => closeMenu()} />
       </div>
-      <button type="button" aria-label="Fechar navegação" onClick={() => closeMenu()} className="flex-1 bg-ink/40" />
+      <button type="button" aria-label="Fechar navegação pelo fundo" aria-hidden="true" tabIndex={-1} onClick={() => closeMenu()} className="flex-1 bg-ink/40" />
     </div>}
   </div>
 }

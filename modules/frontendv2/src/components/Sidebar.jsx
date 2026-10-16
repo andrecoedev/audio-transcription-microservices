@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Home, FileAudio, Plus, Settings, Users, ListChecks, ChevronUp, LogOut, Shield } from 'lucide-react'
-import { brand } from '../brand'
+import { Home, FileAudio, Plus, Settings, Users, ListChecks, ChevronUp, LogOut, Shield, X } from 'lucide-react'
+import Brand from './Brand'
 import { useAuthStore } from '../stores/authStore'
 import { endSession } from '../services/sessionService'
 import toast from 'react-hot-toast'
@@ -17,16 +17,18 @@ const navigation = [
 
 const linkClass = ({ isActive }) => `flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${isActive ? 'bg-primary-50 font-medium text-primary-800' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`
 
-export default function Sidebar({ onNavigate, compact = false }) {
+export default function Sidebar({ onNavigate, onClose, compact = false }) {
   const { user, isAuthenticated } = useAuthStore()
   const isAdmin = isAuthenticated && user?.roles?.includes('admin')
   const [accountOpen, setAccountOpen] = useState(false)
   const adminHeadingId = useId()
   return <aside className={`flex h-full shrink-0 flex-col border-r border-gray-200 bg-shell px-3 ${compact ? 'w-[220px] py-5' : 'w-[236px] py-7'}`}>
-    <Link to="/" onClick={onNavigate} aria-label={`${brand.company} ${brand.jp}, ${brand.product}`} className={`mb-8 px-3 ${compact ? 'py-1' : 'py-2'}`}>
-      <span className="flex items-baseline gap-2"><span className={`${compact ? 'text-lg' : 'text-xl'} font-semibold tracking-[0.12em] text-primary-700`}>{brand.company}</span><span lang="ja" className="text-xs text-muted">{brand.jp}</span></span>
-      {!compact && <span className="mt-1 block text-sm text-gray-600">{brand.product}</span>}
-    </Link>
+    <div className={`mb-8 flex items-start justify-between ${compact ? 'px-3 py-1' : 'px-3 py-2'}`}>
+      <Link to="/" onClick={onNavigate}>
+        <Brand compact={compact} className={compact ? 'text-lg' : 'text-xl'} />
+      </Link>
+      {compact && <button type="button" aria-label="Fechar navegação" onClick={onClose} className="-mr-1 -mt-1 rounded-lg p-2 text-ink hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"><X className="h-4 w-4" aria-hidden="true" /></button>}
+    </div>
     <nav aria-label="Navegação principal" className="space-y-1">
       {navigation.map(({ name, href, icon: Icon }) => <NavLink key={href} to={href} end={href === '/'} onClick={onNavigate} className={linkClass}>
         <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />{name}
