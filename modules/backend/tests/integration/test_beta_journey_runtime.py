@@ -1,5 +1,8 @@
 """Public HTTP → PG → Redis/RQ → FFmpeg → synthetic providers → durable review."""
 import os
+import secrets
+import signal
+import time
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -25,8 +28,12 @@ def journey(postgres_session_factory, monkeypatch, tmp_path):
     from src.main import app
     from src.routers import transcriptions, meeting_intelligence
     from src.utils import http_limits
+    from src.services import rate_limit
     from src.workers import transcription_worker, meeting_intelligence_worker
     connection = Redis.from_url(redis_url)
+    # Keep real rate limiting, but don't share one IP/account counter across tests.
+    monkeypatch.setattr(settings, "SECRET_KEY", secrets.token_urlsafe(32))
+    monkeypatch.setattr(rate_limit, "get_redis_connection", lambda: connection)
     queue = Queue("beta-journey-" + uuid4().hex, connection=connection)
     assembly, intelligence = install(monkeypatch)
     for module in (transcription_worker, meeting_intelligence_worker, http_limits):
@@ -183,3 +190,107 @@ def test_invalid_upload_and_ambiguous_provider_failure_never_retry_paid_submissi
         call = db.query(PlatformProviderCall).one()
         assert call.remote_transcript_id == "synthetic-e2e-remote"
         assert call.released_at is None
+
+
+@pytest.mark.skipif(not hasattr(os, "fork"), reason="Standard RQ workhorse requires Linux/fork")
+def test_worker_killed_after_submission_and_restarted_never_duplicates_call(journey, postgres_session_factory, tmp_path, monkeypatch):
+    """Real SIGKILL and immediate restart; lease expiry is explicitly accelerated."""
+    import run_worker
+    from src.services import usage_metering
+    from src.workers.transcription_worker import recover_pending_jobs
+
+    client, queue, assembly, _ = journey
+    monkeypatch.setattr(run_worker, "engine", postgres_session_factory.kw["bind"])
+    monkeypatch.setattr(usage_metering, "SessionLocal", postgres_session_factory)
+    owner_id = login(client, "member")
+    admin_id = login(client, "admin")
+    with postgres_session_factory() as db:
+        db.get(User, admin_id).is_superuser = True
+        db.commit()
+    grant(client, owner_id)
+    assembly.delay = 60
+    receipt = tmp_path / "synthetic-submissions.txt"
+    original = assembly.transcribe_file
+
+    def observed_submission(*args, **kwargs):
+        with receipt.open("a") as trace:
+            trace.write("synthetic-submit\n")
+        return original(*args, **kwargs)
+
+    assembly.transcribe_file = observed_submission
+    submitted = upload(client)
+    assert submitted.status_code == 202
+    tid = submitted.json()["transcription_id"]
+    active_pids = set()
+
+    def spawn_worker():
+        pid = os.fork()
+        if pid == 0:
+            os.setsid()  # Only this disposable worker and its horse receive SIGKILL.
+            try:
+                postgres_session_factory.kw["bind"].dispose(close=False)
+                recover_pending_jobs(queue)
+                run_worker.RecoveringWorker([queue], connection=queue.connection).work(burst=True, logging_level="WARNING")
+            except BaseException:
+                os._exit(1)
+            os._exit(0)
+        active_pids.add(pid)
+        return pid
+
+    def wait_until(condition):
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            if condition():
+                return
+            time.sleep(0.05)
+        pytest.fail("Disposable worker did not reach the expected state")
+
+    def accepted():
+        with postgres_session_factory() as db:
+            call = db.query(PlatformProviderCall).filter_by(transcription_id=tid).one_or_none()
+            return bool(call and call.remote_transcript_id)
+
+    try:
+        first = spawn_worker()
+        wait_until(accepted)
+        rq_job = queue.fetch_job(f"transcription_{tid}")
+        assert rq_job.get_status() == "started"
+        assert rq_job.last_heartbeat is not None
+        assert os.getpgid(first) == first
+        os.killpg(first, signal.SIGKILL)
+        os.waitpid(first, 0)
+        active_pids.remove(first)
+        second = spawn_worker()
+
+        def restarted_and_exited():
+            result, status = os.waitpid(second, os.WNOHANG)
+            if result:
+                active_pids.remove(second)
+                assert os.waitstatus_to_exitcode(status) == 0
+            return bool(result)
+
+        wait_until(restarted_and_exited)
+        # A fresh restart must respect the previous live RQ lease, not replay it.
+        assert queue.fetch_job(f"transcription_{tid}").get_status() == "started"
+        with postgres_session_factory() as db:
+            assert db.get(Transcription, tid).status == "processing"
+        # Exercise RQ's real abandoned-job cleanup without waiting its production TTL.
+        queue.started_job_registry.cleanup(timestamp=time.time() + 3600)
+        assert queue.fetch_job(f"transcription_{tid}").get_status() == "failed"
+        # Exercise the production maintenance hook, not a synthetic recovery loop.
+        run_worker.RecoveringWorker([queue], connection=queue.connection).run_maintenance_tasks()
+        assert recover_pending_jobs(queue) == 0
+        assert recover_pending_jobs(queue) == 0
+        with postgres_session_factory() as db:
+            row = db.get(Transcription, tid)
+            assert row.status == row.job.status == "failed"
+            assert db.query(Meeting).count() == 0
+            assert db.query(PlatformProviderCall).count() == 1
+            assert db.query(TranscriptionReservation).one().state == "unknown"
+            call = db.query(PlatformProviderCall).one()
+            assert call.remote_transcript_id and call.released_at is None
+        assert receipt.read_text().splitlines() == ["synthetic-submit"]
+    finally:
+        for pid in active_pids:
+            os.killpg(pid, signal.SIGKILL)
+            os.waitpid(pid, 0)

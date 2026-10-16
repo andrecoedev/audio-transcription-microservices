@@ -39,11 +39,13 @@ def main():
         from src.workers.config import get_transcription_queue
         from src.workers.transcription_worker import recover_pending_jobs
         from src.workers.meeting_intelligence_worker import recover_intelligence_jobs
-        from rq import Worker
+        from run_worker import RecoveringWorker
         queue = get_transcription_queue()
         recover_pending_jobs(queue)
         recover_intelligence_jobs(queue)
-        Worker([queue], connection=queue.connection).work(logging_level="WARNING")
+        RecoveringWorker([queue], connection=queue.connection,
+            default_worker_ttl=75, maintenance_interval=60,
+            job_monitoring_interval=5).work(logging_level="WARNING")
     elif mode in {"presentation", "verify", "erase-rq"}:
         from src.database import SessionLocal
         from src.models import (User, FirebaseIdentity, Transcription, TranscriptionOwnership,
