@@ -53,13 +53,13 @@ export default function ProviderConnectionCard({ provider, details, credential, 
           <HelpPopover label={name}>{helpText} As chaves são criptografadas e nunca voltam à interface. Salvar não testa a conexão com o serviço.</HelpPopover>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${connected ? 'bg-primary-50 text-primary-800' : 'bg-gray-100 text-gray-600'}`}>
-          {connected ? 'Credencial salva' : 'Sem credencial própria'}
+          {connected ? 'Chave salva' : 'Sua própria chave não está conectada'}
         </span>
       </div>
     </CardHeader>
 
     <CardContent className="space-y-3">
-      <p className="text-sm text-gray-600">Cobrança na sua conta {name}, fora da franquia USAGI.</p>
+      <p className="text-sm text-gray-600">O uso da sua própria chave é cobrado pelo serviço {name} e não reduz a franquia da USAGI.</p>
 
       <div className="space-y-1 text-sm" aria-label={`Disponibilidade ${name}`}>
         <p className="text-gray-700">USAGI: <span className="font-medium">{platformAccess ? 'habilitado' : 'não habilitado para esta conta'}</span></p>
@@ -80,21 +80,21 @@ export default function ProviderConnectionCard({ provider, details, credential, 
 
       {editing && supported && storageAvailable && byokAllowed && <form onSubmit={submit} className="space-y-3">
         <label className="block text-sm font-medium text-gray-700" htmlFor={`credential-${provider}`}>
-          {connected ? 'Nova chave de API' : 'Chave de API'}
+          {connected ? 'Nova chave' : 'Sua própria chave'}
           <input id={`credential-${provider}`} aria-label={`Credencial ${name}`} type="password" autoComplete="off" spellCheck={false}
             maxLength={4096} disabled={busy} className="input mt-2" value={value}
             onChange={(event) => onChange(event.target.value)} placeholder={`Cole sua chave ${name}`} />
         </label>
         {connected && <p className="text-sm text-amber-900">A chave anterior pode deixar de funcionar para trabalhos ainda não concluídos.</p>}
         <div className="flex flex-wrap gap-2">
-          <Button type="submit" disabled={!canSave} loading={saving}>{connected ? 'Salvar nova chave' : 'Salvar credencial'}</Button>
+          <Button type="submit" disabled={!canSave} loading={saving} loadingLabel="Salvando…">{connected ? 'Salvar nova chave' : 'Salvar chave'}</Button>
           <Button type="button" variant="ghost" disabled={busy} onClick={cancelEditing}>Cancelar</Button>
         </div>
       </form>}
 
       {!editing && !confirmRemoval && <div className="flex flex-wrap gap-2">
-        {!connected && <Button type="button" aria-label={`Conectar minha API ${name}`} disabled={busy || !supported || !storageAvailable || !byokAllowed}
-          onClick={() => setEditing(true)}>Conectar minha API</Button>}
+        {!connected && <Button type="button" aria-label="Conectar sua própria chave" disabled={busy || !supported || !storageAvailable || !byokAllowed}
+          onClick={() => setEditing(true)}>Conectar chave</Button>}
         {connected && <>
           <Button type="button" variant="outline" disabled={busy || !supported || !storageAvailable || !byokAllowed}
             onClick={() => setEditing(true)}>Substituir chave {name}</Button>
@@ -113,7 +113,7 @@ export default function ProviderConnectionCard({ provider, details, credential, 
         <p className="font-medium">Remover a credencial {name} da USAGI?</p>
         <p>Trabalhos que ainda dependem dela podem falhar. Isso não revoga a chave no serviço externo nem interrompe chamadas já iniciadas.</p>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="danger" disabled={busy} loading={saving} onClick={remove}>Confirmar remoção {name}</Button>
+          <Button type="button" variant="danger" disabled={busy} loading={saving} loadingLabel="Removendo…" onClick={remove}>Confirmar remoção {name}</Button>
           <Button type="button" variant="outline" disabled={busy} onClick={() => setConfirmRemoval(false)}>Cancelar remoção</Button>
         </div>
       </div>}

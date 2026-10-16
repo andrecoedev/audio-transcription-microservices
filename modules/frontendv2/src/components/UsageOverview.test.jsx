@@ -60,7 +60,8 @@ it('shows account plan values, renewal, beta access, and BYOK separately from US
   render(<UsageOverview />)
 
   expect(await screen.findByText('Plano atual: Business')).toBeTruthy()
-  expect(screen.getByText('Fonte: plano efetivo da conta, informado pela API da USAGI.')).toBeTruthy()
+  expect(screen.queryByText(/Fonte: plano efetivo informado pela API/)).toBeNull()
+  expect(screen.getByText('Uso com sua própria chave')).toBeTruthy()
   expect(screen.getByText('Cota USAGI').parentElement.textContent).toContain('60 min de áudio')
   expect(screen.getByText('Consumido pela USAGI').parentElement.textContent).toContain('15 min de áudio')
   expect(screen.getByText(/Medido: 1,51 min/)).toBeTruthy()

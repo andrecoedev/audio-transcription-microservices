@@ -112,7 +112,6 @@ export default function UsageOverview() {
         <Button type="button" variant="outline" size="sm" onClick={() => setPlanRetry((value) => value + 1)}>Tentar novamente</Button>
       </div>}
       {!planLoading && !planError && plan && <>
-        <p className="text-xs text-gray-500">Fonte: plano efetivo da conta, informado pela API da USAGI.</p>
         <p className="text-sm font-medium text-gray-900">Plano atual: {planName(plan.plan)}</p>
         {developmentAccess && <p className="rounded-lg bg-primary-50 p-3 text-sm text-primary-900"><span>Acesso de desenvolvimento</span> — sem franquia comercial para transcrição local. Serviços externos mantêm suas permissões e limites.</p>}
         {plan.plan === 'free' && !plan.local_processing_available && !plan.beta?.capabilities?.includes('transcription.platform') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
@@ -139,7 +138,7 @@ export default function UsageOverview() {
           </dl>
         </>}
         <div className="rounded-lg bg-gray-50 p-3 text-sm">
-          <p className="font-medium text-gray-900">Uso com credenciais próprias (BYOK)</p>
+          <p className="font-medium text-gray-900">Uso com sua própria chave</p>
           <p className="mt-1 text-gray-700">Medido: {formatPlanDuration(plan.byok?.measured_seconds)} · Pendente: {formatPlanDuration(plan.byok?.pending_seconds)}</p>
           <p className="mt-1 text-xs text-gray-600">Cobrado pelo provedor da sua credencial; não é deduzido da cota USAGI.</p>
         </div>

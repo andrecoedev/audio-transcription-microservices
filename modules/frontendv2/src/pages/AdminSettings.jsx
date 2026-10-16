@@ -128,7 +128,7 @@ function ConfirmDialog({ confirmation, onCancel, onConfirm, busy }) {
       </ul>}
       <div className="mt-6 flex flex-wrap justify-end gap-2">
         <button ref={cancelRef} type="button" className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" onClick={onCancel} disabled={busy}>Cancelar</button>
-        <Button onClick={onConfirm} loading={busy}>Confirmar</Button>
+        <Button onClick={onConfirm} loading={busy} loadingLabel="Salvando…">Confirmar</Button>
       </div>
     </section>
   </div>
@@ -253,8 +253,8 @@ export default function AdminSettings() {
 
   if (loading) return <div role="status" className="p-6 text-sm text-gray-600">Carregando painel administrativo…</div>
   return <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6 px-1 pb-10">
-    <PageHeader title="Administração" description="Configuração operacional da rodada Beta fechada. Alterações entram em vigor conforme a política do servidor.">
-      <Button variant="outline" icon={RefreshCw} onClick={load} disabled={busy}>Recarregar</Button>
+    <PageHeader title="Administração" description="Gerencie quem pode receber convite e os limites aplicados a novas operações da rodada Beta.">
+      <Button variant="outline" icon={RefreshCw} onClick={load} disabled={busy} loading={loading} loadingLabel="Carregando…">Recarregar</Button>
     </PageHeader>
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"><span>{error}</span>{error.includes('mudou') && <Button variant="outline" size="sm" onClick={load} disabled={busy}>Recarregar e descartar rascunho</Button>}</div>}
     {notice && <p role="status" className="flex items-center gap-2 text-sm text-green-700"><CheckCircle2 className="h-4 w-4" />{notice}</p>}
@@ -290,7 +290,7 @@ export default function AdminSettings() {
           {snapshot?.overrides?.[item.key] && <p className="mt-1 text-xs text-amber-700">{snapshot.overrides[item.key]} (valor salvo: {display(snapshot.saved_values[item.key])})</p>}
         </div>)}</div>
       {section.id === 'assemblyai' && <p className="mt-5 text-xs text-gray-500">Modelo e detecção de falantes são fixos. Nenhum saldo externo é consultado.</p>}
-        {snapshot?.configured && <div className="mt-6 flex justify-end"><Button onClick={() => saveSection(section)} disabled={busy || !sectionFields(section).some((item) => item.editable && String(snapshot.values[item.key]) !== String(draft[item.key]))} loading={savingSection === section.id}>Salvar {section.title}</Button></div>}
+        {snapshot?.configured && <div className="mt-6 flex justify-end"><Button onClick={() => saveSection(section)} disabled={busy || !sectionFields(section).some((item) => item.editable && String(snapshot.values[item.key]) !== String(draft[item.key]))} loading={savingSection === section.id} loadingLabel="Salvando…">Salvar {section.title}</Button></div>}
         {section.id === 'beta' && <ParticipantsCard participants={participants} maximum={snapshot?.values['beta.max_participants']} search={search} setSearch={setSearch} accounts={accounts} searchError={searchError} busy={busy || !snapshot?.configured} findAccounts={findAccounts} grantAccount={grantAccount} revokeAccount={revokeAccount} expiresAt={expiresAt} setExpiresAt={setExpiresAt} />}
       </CardContent></Card>)}
     <ConfirmDialog confirmation={confirmation} busy={busy} onCancel={() => setConfirmation(null)} onConfirm={confirmation?.onConfirm} />
@@ -305,7 +305,7 @@ function ParticipantsCard({ participants, maximum, search, setSearch, accounts, 
   return <section aria-labelledby="admin-participants-title" className="mt-6 border-t pt-5">
     <h3 id="admin-participants-title" className="text-base font-semibold text-gray-900">Participantes e convites</h3><p className="mt-1 text-sm text-gray-600">Vagas usadas não são repostas após revogação. Consumo e reservas permanecem no histórico.</p>
     <p className="mb-4 text-sm font-medium">Vagas usadas: {participants?.used_slots ?? '—'} / {maximum ?? participants?.maximum ?? '—'}</p>
-    <form onSubmit={findAccounts} className="flex flex-col gap-2 sm:flex-row"><label className="sr-only" htmlFor="admin-account-search">Buscar contas</label><input id="admin-account-search" className="input min-w-0 flex-1" minLength={2} maxLength={100} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome ou e-mail" /><Button type="submit" icon={Search} loading={busy}>Buscar contas</Button></form>
+    <form onSubmit={findAccounts} className="flex flex-col gap-2 sm:flex-row"><label className="sr-only" htmlFor="admin-account-search">Buscar contas</label><input id="admin-account-search" className="input min-w-0 flex-1" minLength={2} maxLength={100} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome ou e-mail" /><Button type="submit" icon={Search} loading={busy} loadingLabel="Buscando…">Buscar contas</Button></form>
     {searchError && <p role="alert" className="mt-2 text-sm text-red-700">{searchError}</p>}
     {accounts.length > 0 && <div className="mt-4 space-y-2 rounded-lg border p-3"><label className="block max-w-sm text-sm">Expira em<input className="input mt-1" type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></label>{accounts.map((account) => <div key={account.user_id} className="flex flex-col justify-between gap-2 border-t pt-3 sm:flex-row sm:items-center"><div className="min-w-0"><p className="break-words text-sm font-medium">{account.username}</p><p className="break-all text-xs text-gray-500">{account.email}</p></div><Button size="sm" onClick={() => grantAccount(account)} disabled={busy}>Conceder acesso</Button></div>)}</div>}
     <div className="mt-5 space-y-3">{(participants?.items || []).length === 0 ? <p className="text-sm text-gray-500">Ainda não há contas convidadas.</p> : participants.items.map((person) => <div key={person.grant_id} className="rounded-lg border p-4"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div className="min-w-0"><p className="break-words font-medium">{person.username}</p><p className="break-all text-sm text-gray-500">{person.email}</p><p className="mt-1 text-xs">{person.active ? <span className="badge badge-success">Ativo</span> : <span className="badge badge-warning">Inativo</span>}</p></div>{person.active && <Button size="sm" variant="danger" onClick={() => revokeAccount(person)} disabled={busy}>Revogar acesso</Button>}</div>

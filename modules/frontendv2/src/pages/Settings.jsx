@@ -100,7 +100,7 @@ function SettingsPage() {
     setErrorMessage('')
     try {
       setProviderSettings(await audioService.saveProviderCredential(provider, secret))
-      toast.success('Chave salva com segurança')
+      toast.success('Chave salva')
       return true
     } catch (error) {
       setErrorMessage(error.status === 422
@@ -139,7 +139,7 @@ function SettingsPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title="Configurações">
         <a href="#plan-usage" className="text-sm font-medium text-primary-800 hover:underline" onClick={() => setUsageOpen(true)}>Plano e consumo</a>
-        <Button variant="outline" size="sm" onClick={() => { refreshStatus(); refreshProviderSettings() }} loading={statusLoading || providerLoading} disabled={statusLoading || providerLoading || providerSaving} icon={RefreshCw}>Atualizar</Button>
+        <Button variant="outline" size="sm" onClick={() => { refreshStatus(); refreshProviderSettings() }} loading={statusLoading || providerLoading} loadingLabel="Atualizando…" disabled={statusLoading || providerLoading || providerSaving} icon={RefreshCw}>Atualizar</Button>
       </PageHeader>
 
       {errorMessage && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>}
