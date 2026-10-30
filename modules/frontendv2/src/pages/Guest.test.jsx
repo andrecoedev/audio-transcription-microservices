@@ -24,7 +24,7 @@ describe('Guest result ownership', () => {
   it('requires an explicit claim before transferring the temporary result', async () => {
     render(<MemoryRouter><Routes><Route path="/" element={<Guest />} /><Route path="/transcriptions/7" element={<p>Saved transcription</p>} /></Routes></MemoryRouter>)
     expect(await screen.findByRole('button', { name: 'Salvar na minha conta' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Salve sua transcrição anterior' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Transcrição temporária' })).toBeTruthy()
     expect(guestService.claim).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Salvar na minha conta' }))
     expect(await screen.findByText('Saved transcription')).toBeTruthy()

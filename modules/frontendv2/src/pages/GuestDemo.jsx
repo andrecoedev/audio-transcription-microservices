@@ -57,12 +57,12 @@ export default function GuestDemo() {
   ]
 
   return <div className="mx-auto max-w-6xl space-y-6">
-    <PageHeader title="Demonstração interativa" description="Explore uma reunião de exemplo com transcrição e análise sintéticas. Nenhum áudio é enviado ou processado nesta demonstração." />
+    <PageHeader title="Demonstração interativa" description="Explore uma reunião com dados de exemplo. Ela não foi criada a partir de um áudio seu, e nenhum áudio é enviado ou processado aqui." />
     {error && <Card><CardContent><div role="alert" className="space-y-3"><p>{error}</p><Button variant="outline" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</Button></div></CardContent></Card>}
     {!demo && !error && <p role="status" className="text-sm text-gray-600">Carregando demonstração...</p>}
     {demo && <>
       <Card>
-        <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{demo.title}</CardTitle><p className="mt-1 text-sm text-gray-600">{demo.description}</p></div><span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">Demonstração sintética</span></div></CardHeader>
+        <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{demo.title}</CardTitle><p className="mt-1 text-sm text-gray-600">{demo.description}</p></div><span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">Dados de exemplo</span></div></CardHeader>
         <CardContent><p className="text-sm text-gray-600">Duração: {formatDuration(demo.duration_seconds)}</p></CardContent>
       </Card>
       <div className="flex flex-wrap gap-2" aria-label="Conteúdo da demonstração">
@@ -89,7 +89,7 @@ export default function GuestDemo() {
               <p className="text-gray-800">{item.description}</p>
               {key === 'action_items' && <p className="mt-1 text-sm text-gray-600">Responsável: {item.assignee || 'Não identificado'} · Prazo: {item.due_date || 'Sem prazo explícito'}</p>}
               {evidenceLinks(item.evidence)}
-            </li>)}</ul> : <p className="text-sm text-gray-500">Nenhum item identificado.</p>}
+            </li>)}</ul> : <p className="text-sm text-gray-500">{key === 'decisions' ? 'Nenhuma decisão identificada nos dados de exemplo.' : key === 'open_questions' ? 'Nenhuma pergunta em aberto identificada nos dados de exemplo.' : `Nenhum ${key === 'topics' ? 'tópico' : 'item'} identificado nos dados de exemplo.`}</p>}
           </section>)}
         </CardContent>
       </Card>}

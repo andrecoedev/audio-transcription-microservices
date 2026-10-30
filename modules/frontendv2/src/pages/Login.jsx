@@ -293,21 +293,20 @@ export default function Login({ signup = false }) {
       ? 'Recuperar senha'
       : isFirebaseSignup || (signup && localMode)
         ? 'Crie sua conta'
-        : legacyMode ? 'Atualizar método de acesso' : 'Salve seu trabalho'
+        : legacyMode ? 'Atualizar método de acesso' : 'Entrar'
 
   return (
     <section aria-labelledby="auth-heading" className="mx-auto flex w-full max-w-md flex-col justify-center py-8">
       <div className="mb-5 text-center">
-        <span className="rounded-full bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-800">Salve seu progresso</span>
-        <h1 id="auth-heading" className="mt-4 text-3xl font-semibold text-gray-900">{title}</h1>
+        <h1 id="auth-heading" className="text-3xl font-semibold text-gray-900">{title}</h1>
         <p className="mx-auto mt-2 max-w-sm text-gray-600">
           {verificationPending
             ? email ? `Confirme ${email} pelo link enviado para acessar sua conta.` : 'Confirme seu endereço pelo link enviado para acessar sua conta.'
             : isFirebaseSignup || (signup && localMode)
-              ? 'Crie uma conta para guardar transcrições e acessar seu histórico.'
+              ? 'Crie uma conta para guardar transcrições e acessar seu histórico. Criar uma conta não concede automaticamente acesso ao Beta.'
               : isRecovery
                 ? 'Informe seu e-mail e enviaremos instruções para redefinir sua senha.'
-                : 'Entre para salvar esta transcrição, acessar o histórico e continuar em outro dispositivo.'}
+                : 'Acesse suas transcrições e reuniões.'}
         </p>
       </div>
 
@@ -316,10 +315,10 @@ export default function Login({ signup = false }) {
           {verificationPending ? (
             <div className="space-y-4">
               {notice && <p role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{notice}</p>}
-              <Button type="button" className="w-full" loading={loading} disabled={loading} onClick={handleRefreshVerification}>
+              <Button type="button" className="w-full" loading={loading} loadingLabel="Verificando..." disabled={loading} onClick={handleRefreshVerification}>
                 Já confirmei meu e-mail
               </Button>
-              <Button type="button" variant="secondary" className="w-full" loading={loading} disabled={loading || secondsUntilResend > 0} onClick={handleResendVerification}>
+              <Button type="button" variant="secondary" className="w-full" loading={loading} loadingLabel="Enviando..." disabled={loading || secondsUntilResend > 0} onClick={handleResendVerification}>
                 {secondsUntilResend > 0 ? `Enviar outro link em ${secondsUntilResend}s` : 'Reenviar link de confirmação'}
               </Button>
               <button type="button" className="w-full text-sm text-gray-600 hover:text-gray-900" disabled={loading} onClick={cancelVerification}>
@@ -332,7 +331,7 @@ export default function Login({ signup = false }) {
                 <input id="recovery-email" type="email" autoComplete="email" className="input mt-2" required maxLength={255}
                   value={email} onChange={(event) => setEmail(event.target.value)} />
               </label>
-              <Button type="submit" className="w-full" loading={loading}>Enviar instruções</Button>
+              <Button type="submit" className="w-full" loading={loading} loadingLabel="Enviando...">Enviar instruções</Button>
               <button type="button" className="w-full text-sm text-primary-800" disabled={loading} onClick={() => { setMode('firebase'); clearFeedback() }}>
                 Voltar ao login
               </button>
@@ -340,7 +339,7 @@ export default function Login({ signup = false }) {
           ) : firebaseMode && firebaseMode !== 'local' ? (
             <>
               {googleEnabled && <div className="mb-4">
-                <Button type="button" className="w-full" loading={loading} disabled={loading} onClick={handleGoogleLogin}>Continuar com Google</Button>
+                <Button type="button" className="w-full" loading={loading} loadingLabel="Conectando..." disabled={loading} onClick={handleGoogleLogin}>Continuar com Google</Button>
                 {!isFirebaseSignup && <p className="my-3 text-center text-sm text-gray-500">ou use seu e-mail e senha</p>}
               </div>}
               <form onSubmit={handleFirebaseSubmit} className="space-y-4">
@@ -371,7 +370,7 @@ export default function Login({ signup = false }) {
                     <button type="button" className="ml-2 underline" onClick={policy.retry}>Tentar novamente</button>
                   </div>}
                 </>}
-                <Button type="submit" className="w-full" loading={loading}
+                <Button type="submit" className="w-full" loading={loading} loadingLabel={isFirebaseSignup ? 'Criando conta...' : 'Entrando...'}
                   disabled={!emailAuthEnabled || (isFirebaseSignup && (!policy.valid || !passwordsMatch))}>{isFirebaseSignup ? 'Criar conta' : 'Entrar'}</Button>
               </form>
               {!isFirebaseSignup && <div className="mt-4 flex flex-col items-center gap-3 text-sm">
@@ -399,7 +398,7 @@ export default function Login({ signup = false }) {
                       required />
                   </span>
                 </label>
-                <Button type="submit" className="w-full" loading={loading}>Entrar</Button>
+                <Button type="submit" className="w-full" loading={loading} loadingLabel="Entrando...">Entrar</Button>
               </form>
               {emailAuthEnabled && <button type="button" className="mt-4 w-full text-sm text-primary-800" disabled={loading} onClick={selectFirebaseLogin}>
                 Voltar ao acesso por e-mail

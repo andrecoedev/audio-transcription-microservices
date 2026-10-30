@@ -96,9 +96,9 @@ export default function Guest() {
   return <div className="max-w-6xl mx-auto space-y-6">
     {error && <Card><CardContent><div role="alert">{error}<Button variant="outline" onClick={() => setRetry((n) => n + 1)}>Tentar novamente</Button></div></CardContent></Card>}
     {session?.resultId ? <Card>
-      <CardHeader><CardTitle>{authenticated ? 'Salve sua transcrição anterior' : 'Resultado da transcrição'}</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{authenticated ? 'Transcrição temporária' : 'Resultado da transcrição'}</CardTitle></CardHeader>
       <CardContent className="space-y-4">
-        {!result ? <p role="status">Carregando resultado...</p> : <>
+        {!result ? <p role="status">Carregando transcrição...</p> : <>
           <ProcessingStatus status={result.status} errorMessage={result.error_message} />
           {result.status === 'completed' && result.segments?.map((segment, index) => <p key={index}>
             [{segment.start}s–{segment.end}s] {segment.text}

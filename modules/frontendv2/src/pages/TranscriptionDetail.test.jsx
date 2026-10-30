@@ -8,7 +8,10 @@ vi.mock('../services/audioService', () => ({ audioService: { getTranscription: v
 vi.mock('react-hot-toast', () => ({ default: { error: vi.fn(), success: vi.fn() } }))
 
 beforeEach(() => vi.resetAllMocks())
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('TranscriptionDetail loading', () => {
   it('keeps long filenames and the statistics grid in the shared page container', async () => {
@@ -18,7 +21,8 @@ describe('TranscriptionDetail loading', () => {
     const heading = await screen.findByRole('heading', { name: filename })
     const grid = screen.getByLabelText('Informações da transcrição')
     expect(grid.parentElement.className).toContain('max-w-6xl')
-    expect(heading.className).toContain('break-all')
+    expect(heading.className).toContain('break-words')
+    expect(await screen.findByText('Nenhuma fala foi identificada neste áudio.')).toBeTruthy()
     expect(grid.className).toContain('sm:grid-cols-2')
     expect(grid.className).toContain('xl:grid-cols-4')
     expect(grid.parentElement.contains(heading)).toBe(true)
@@ -32,6 +36,26 @@ describe('TranscriptionDetail loading', () => {
     render(<MemoryRouter initialEntries={['/transcriptions/8']}><Routes><Route path="/transcriptions/:id" element={<TranscriptionDetail />} /></Routes></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: 'Reunião final.wav' })).toBeTruthy()
     expect(screen.queryByText(`${'c'.repeat(32)}.wav`)).toBeNull()
+  })
+
+  it('does not infer silence when a completed response omits segments', async () => {
+    audioService.getTranscription.mockResolvedValue({ id: 10, filename: 'call.wav', status: 'completed', created_at: '2026-10-02T10:00:00Z' })
+    render(<MemoryRouter initialEntries={['/transcriptions/10']}><Routes><Route path="/transcriptions/:id" element={<TranscriptionDetail />} /></Routes></MemoryRouter>)
+    await screen.findByRole('heading', { name: 'call.wav' })
+    expect(screen.queryByText('Nenhuma fala foi identificada neste áudio.')).toBeNull()
+  })
+
+  it('keeps the last processing state visible and reports a failed status refresh', async () => {
+    audioService.getTranscription.mockResolvedValueOnce({ id: 11, filename: 'call.wav', status: 'queued', created_at: '2026-10-02T10:00:00Z', segments: [] })
+      .mockRejectedValueOnce(new Error('offline'))
+    vi.spyOn(globalThis, 'setInterval').mockImplementation((callback) => {
+      Promise.resolve().then(callback)
+      return 1
+    })
+    render(<MemoryRouter initialEntries={['/transcriptions/11']}><Routes><Route path="/transcriptions/:id" element={<TranscriptionDetail />} /></Routes></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'Transcrevendo áudio' })).toBeTruthy()
+    expect((await screen.findByRole('status')).textContent).toContain('Não foi possível atualizar o status. Exibindo a última informação recebida.')
+    expect(screen.getByRole('heading', { name: 'Na fila' })).toBeTruthy()
   })
 
   it('keeps the page available and retries after a request failure', async () => {
