@@ -122,7 +122,7 @@ function SettingsPage() {
     setErrorMessage('')
     try {
       setProviderSettings(await audioService.deleteProviderCredential(provider))
-      toast.success('Credencial removida')
+      toast.success('Chave removida')
       return true
     } catch {
       setErrorMessage('Não foi possível remover a chave. Tente novamente.')

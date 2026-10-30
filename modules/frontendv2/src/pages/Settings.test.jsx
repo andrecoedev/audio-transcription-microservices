@@ -180,7 +180,7 @@ describe('Settings', () => {
     renderSettings()
 
     expect((await screen.findAllByText('Chave própria exige plano autorizado ou acesso beta.')).length).toBe(2)
-    expect(screen.getByRole('button', { name: 'Conectar chave Gemini' }).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Conectar chave AssemblyAI' }).disabled).toBe(true)
     expect(screen.getByRole('button', { name: 'Substituir chave Gemini' }).disabled).toBe(true)
     expect(screen.getByRole('button', { name: 'Remover chave Gemini' }).disabled).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: 'Remover chave Gemini' }))
