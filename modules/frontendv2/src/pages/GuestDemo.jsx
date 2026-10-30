@@ -67,7 +67,7 @@ export default function GuestDemo() {
       </Card>
       <div className="flex flex-wrap gap-2" aria-label="Conteúdo da demonstração">
         <Button aria-pressed={tab === 'transcript'} variant={tab === 'transcript' ? 'primary' : 'outline'} onClick={() => setTab('transcript')}>Transcrição</Button>
-        <Button aria-pressed={tab === 'summary'} variant={tab === 'summary' ? 'primary' : 'outline'} onClick={() => setTab('summary')}>Resumo e análise</Button>
+        <Button aria-pressed={tab === 'summary'} variant={tab === 'summary' ? 'primary' : 'outline'} onClick={() => setTab('summary')}>Resumo inteligente</Button>
       </div>
       {tab === 'transcript' ? <Card>
         <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>Transcrição de exemplo</CardTitle><label className="text-sm text-gray-700">Filtrar falante{' '}
@@ -81,7 +81,7 @@ export default function GuestDemo() {
           <p className="leading-7 text-gray-800">{segment.text}</p>
         </article>)}</CardContent>
       </Card> : <Card>
-        <CardHeader><CardTitle>Resumo e análise</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Resumo inteligente</CardTitle></CardHeader>
         <CardContent className="space-y-5">
           <section><h3 className="font-semibold text-gray-900">Resumo</h3><p className="mt-2 whitespace-pre-wrap leading-7 text-gray-700">{demo.intelligence?.summary}</p></section>
           {sections.map(([key, title]) => <section key={key} className="space-y-2"><h3 className="font-semibold text-gray-900">{title}</h3>

@@ -59,6 +59,23 @@ it('offers a retry when the meeting cannot be loaded', async () => {
   expect(await screen.findByText('Decidir o lançamento.')).toBeTruthy()
 })
 
+it('identifies no speech only for a completed empty transcript', async () => {
+  audioService.getMeetingTranscript.mockResolvedValueOnce({ segments: [] })
+  renderMeeting()
+  expect(await screen.findByText('Nenhuma fala foi identificada neste áudio.')).toBeTruthy()
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar na transcrição' }), { target: { value: 'fala' } })
+  expect(screen.getByText('Nenhum trecho corresponde à busca.')).toBeTruthy()
+  expect(screen.queryByText('Nenhuma fala foi identificada neste áudio.')).toBeNull()
+})
+
+it('does not infer silence while processing is incomplete', async () => {
+  audioService.getMeeting.mockResolvedValueOnce({ id: 7, title: 'Em processamento', status: 'processing', speakers: [] })
+  audioService.getMeetingTranscript.mockResolvedValueOnce({ segments: [] })
+  renderMeeting()
+  expect(await screen.findByText('Nenhum trecho disponível nesta transcrição.')).toBeTruthy()
+  expect(screen.queryByText('Nenhuma fala foi identificada neste áudio.')).toBeNull()
+})
+
 it('supports roving keyboard navigation across workspace tabs', async () => {
   renderMeeting()
   const summary = await screen.findByRole('tab', { name: 'Resumo' })

@@ -37,7 +37,7 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange, in
         setError('')
         if (['pending', 'processing'].includes(current.generation?.status)) timer = setTimeout(poll, 3000)
       } catch {
-        if (!cancelled) setError('Não foi possível consultar a análise da reunião.')
+        if (!cancelled) setError('Não foi possível consultar o resumo da reunião.')
       }
     }
     poll()
@@ -81,7 +81,7 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange, in
       <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <dt>Versão</dt><dd>{result.revision}</dd>
         {result.provider && <><dt>Serviço</dt><dd>{result.provider}</dd></>}
-        {result.model && <><dt>Modelo</dt><dd>{result.model}</dd></>}
+        {result.model && <><dt>Modelo</dt><dd className="min-w-0 break-words">{result.model}</dd></>}
       </dl>
     </details>}
     {content && <div className="space-y-5">

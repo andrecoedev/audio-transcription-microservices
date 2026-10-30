@@ -186,7 +186,7 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
     finally { setBusy(false) }
   }
 
-  const panelContent = <><CardHeader><CardTitle>Ações da reunião</CardTitle></CardHeader><CardContent>
+  const panelContent = <><CardHeader><CardTitle>Tarefas da reunião</CardTitle></CardHeader><CardContent>
     <div className="space-y-5">
       <p className="text-sm text-gray-600">Revise as sugestões da IA. As tarefas abaixo já foram confirmadas para esta reunião.</p>
       {error && <p role="alert" className="text-red-700">{error}</p>}

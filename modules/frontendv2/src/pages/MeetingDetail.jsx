@@ -185,7 +185,7 @@ export default function MeetingDetail() {
               </div>
               <p className="whitespace-pre-wrap text-[17px] leading-7 text-gray-900">{segment.text}</p>
             </article>)}
-            {segments.length === 0 && <p className="p-4 text-sm text-gray-500">{query ? 'Nenhum trecho corresponde à busca.' : 'Nenhum trecho disponível nesta transcrição.'}</p>}
+            {segments.length === 0 && <p className="p-4 text-sm text-gray-500">{query.trim() ? 'Nenhum trecho corresponde à busca.' : meeting.status === 'completed' && Array.isArray(transcript.segments) ? 'Nenhuma fala foi identificada neste áudio.' : 'Nenhum trecho disponível nesta transcrição.'}</p>}
           </div>
           <footer className="flex justify-between border-t border-gray-200 px-5 py-3 text-xs text-gray-500">
             <span>{query ? `${formatCount(segments.length, 'trecho', 'trechos')} de ${formatCount(transcript.segments.length, 'trecho', 'trechos')}` : `${formatCount(segments.length, 'trecho', 'trechos')} · role para continuar`}</span>

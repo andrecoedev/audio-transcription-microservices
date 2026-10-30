@@ -418,7 +418,7 @@ export default function Login({ signup = false }) {
           {!configLoaded && <p role="status" className="mt-4 text-sm text-gray-500">Verificando formas de acesso…</p>}
           {configLoaded && !config && <p role="alert" className="mt-4 text-sm text-red-800">Não foi possível consultar as formas de acesso. Recarregue a página para tentar novamente.</p>}
           {configLoaded && config && !emailAuthEnabled && !legacyMode && <p role="status" className="mt-4 text-sm text-gray-600">O acesso por e-mail está indisponível neste ambiente. {googleEnabled ? 'Use Google ou continue sem conta.' : 'Você pode continuar sem conta.'}</p>}
-          {!verificationPending && <p className="mt-5 text-center text-sm text-gray-500">Depois de entrar, você volta à transcrição em que estava trabalhando.</p>}
+          {!verificationPending && <p className="mt-5 text-center text-sm text-gray-500">Depois de entrar, você continua de onde parou.</p>}
         </CardContent>
       </Card>
     </section>
