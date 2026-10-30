@@ -54,7 +54,7 @@ describe('TranscriptionDetail loading', () => {
     })
     render(<MemoryRouter initialEntries={['/transcriptions/11']}><Routes><Route path="/transcriptions/:id" element={<TranscriptionDetail />} /></Routes></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: 'Transcrevendo áudio' })).toBeTruthy()
-    expect((await screen.findByRole('status')).textContent).toContain('Não foi possível atualizar o status. Exibindo a última informação recebida.')
+    expect((await screen.findByText('Não foi possível atualizar o status. Exibindo a última informação recebida.')).getAttribute('role')).toBe('status')
     expect(screen.getByRole('heading', { name: 'Na fila' })).toBeTruthy()
   })
 

@@ -262,7 +262,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                 className={`p-4 border-2 rounded-lg transition-all ${options.transcriptionModel === 'automatic' ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
               >
                 <p className="font-medium text-gray-900">Automático</p>
-                <p className="text-xs text-gray-500">Usa uma opção disponível na sua conta.</p>
+                <p className="text-xs text-gray-500">Segue sua configuração automática. Não seleciona a franquia do Beta.</p>
               </button>}
 
               {(!user || providerSettings) && <button

@@ -229,7 +229,7 @@ describe('Guest and account boundaries', () => {
       credentials: { assemblyai: { configured: true, updated_at: null }, gemini: { configured: true, updated_at: null } },
     })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-    expect((await screen.findByRole('button', { name: 'Minha conta AssemblyAI' })).disabled).toBe(false)
+    expect((await screen.findByRole('button', { name: 'Minha chave de transcrição' })).disabled).toBe(false)
     expect(screen.getByLabelText('Detecção de falantes').checked).toBe(true)
   })
 
