@@ -56,7 +56,7 @@ function ActionRow({ item, busy, change, remove, onViewOrigin, evidenceBaseUrl }
     <p className="text-sm text-gray-500">{item.source === 'ai_reviewed' ? 'IA → revisada' : 'Criada manualmente'} · {statusLabels[item.status]}</p>
     {editing ? <form onSubmit={save} className="space-y-3">
       <fieldset disabled={busy}><ActionFields values={values} onChange={setValues} prefix="Editar tarefa" /></fieldset>
-      <div className="flex gap-2"><Button type="submit" disabled={busy || !values.description.trim()}>Salvar tarefa</Button>
+      <div className="flex gap-2"><Button type="submit" loading={busy} loadingLabel="Salvando tarefa..." disabled={!values.description.trim()}>Salvar tarefa</Button>
         <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(false)}>Cancelar edição</Button></div>
     </form> : <>
       <p className="whitespace-pre-wrap">{item.description}</p>
@@ -69,7 +69,7 @@ function ActionRow({ item, busy, change, remove, onViewOrigin, evidenceBaseUrl }
         <Button size="sm" variant="outline" disabled={busy} onClick={edit}>Editar tarefa</Button>
         {item.status !== 'dismissed' && <Button size="sm" disabled={busy} onClick={() => change(item.id, { status: item.status === 'open' ? 'done' : 'open' })}>
           {item.status === 'open' ? 'Concluir' : 'Reabrir'}</Button>}
-        {item.status === 'open' && <Button size="sm" variant="outline" disabled={busy} onClick={() => change(item.id, { status: 'dismissed' })}>Descartar</Button>}
+        {item.status === 'open' && <Button size="sm" variant="outline" disabled={busy} onClick={() => change(item.id, { status: 'dismissed' })}>Marcar como descartada</Button>}
         <Button size="sm" variant="ghost" disabled={busy} onClick={() => remove(item.id)}>Excluir tarefa</Button>
       </div>
     </>}
@@ -194,7 +194,7 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
       <Button variant="outline" disabled={loading || busy} onClick={() => setRefresh(value => value + 1)}>Atualizar tarefas</Button>
       {!loading && !error && <section aria-labelledby="suggested-actions-heading" className="space-y-3">
         <h3 id="suggested-actions-heading" className="font-semibold">Sugeridas pela IA</h3>
-        {!suggestionResult && <p className="text-sm text-gray-500">Ainda não há análise da reunião.</p>}
+        {!suggestionResult && <p className="text-sm text-gray-500">Esta reunião ainda não tem resumo. Gere um resumo para revisar sugestões de tarefas.</p>}
         {suggestionResult && suggestions.length === 0 && <p className="text-sm text-gray-500">Nenhuma sugestão pendente nesta revisão.</p>}
         <ul className="space-y-3">{suggestions.map(item => <Suggestion key={`${suggestionResult.revision}-${item.source_index}`} item={item}
           revision={suggestionResult.revision} references={suggestionResult.references || []} busy={busy} accept={accept} dismiss={dismiss} evidenceBaseUrl={evidenceBaseUrl} />)}</ul>
@@ -208,13 +208,13 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
       </section>}
       <section aria-labelledby="operational-actions-heading" className="space-y-3">
         <h3 id="operational-actions-heading" className="font-semibold">Tarefas</h3>
-        {!loading && !error && items.length === 0 && <p>Nenhuma tarefa criada.</p>}
+        {!loading && !error && items.length === 0 && <p className="text-sm text-gray-500">Nenhuma tarefa aceita ou criada manualmente nesta reunião.</p>}
         <ul className="space-y-3">{items.map(item => <ActionRow key={item.id} item={item} busy={busy || loading} change={change} remove={remove} onViewOrigin={viewOrigin} evidenceBaseUrl={evidenceBaseUrl} />)}</ul>
       </section>
       <form onSubmit={create} className="space-y-3">
         <h3 className="font-semibold">Criar tarefa manual</h3>
         <fieldset disabled={busy || loading}><ActionFields values={values} onChange={setValues} prefix="Nova tarefa" /></fieldset>
-        <Button type="submit" disabled={busy || loading || !values.description.trim()}>{busy ? 'Salvando...' : 'Criar tarefa'}</Button>
+        <Button type="submit" loading={busy} loadingLabel="Salvando tarefa..." disabled={loading || !values.description.trim()}>Criar tarefa</Button>
       </form>
     </div>
   </CardContent></>

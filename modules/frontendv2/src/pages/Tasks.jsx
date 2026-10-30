@@ -46,7 +46,7 @@ export default function Tasks() {
         {loading ? <p role="status" className="text-sm text-gray-500">Carregando reuniões...</p> : error ? <div className="space-y-3">
           <p role="alert" className="text-sm text-red-700">Não foi possível carregar as reuniões.</p>
           <Button variant="outline" onClick={load}>Tentar novamente</Button>
-        </div> : meetings.length === 0 ? <p className="text-sm text-gray-500">Nenhuma reunião disponível.</p> : <>
+        </div> : meetings.length === 0 ? <div className="space-y-2 text-sm text-gray-600"><p className="font-medium text-gray-900">Você ainda não tem reuniões para revisar.</p><p>Crie uma transcrição para começar.</p><Link className="inline-block font-medium text-primary-700 underline" to="/new-transcription">Nova transcrição</Link></div> : <>
           <label htmlFor="task-meeting" className="mb-2 block text-sm font-medium text-gray-700">Reunião</label>
           <select id="task-meeting" value={selectedId} onChange={event => setSelectedId(event.target.value)}
             className="w-full max-w-2xl rounded-lg border border-gray-300 bg-white px-3 py-2">

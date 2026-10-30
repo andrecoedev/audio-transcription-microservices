@@ -101,16 +101,16 @@ export default function MeetingMinutesPanel({ meetingId, version = 0 }) {
         {(minutes.summary || (minutes.topics || []).length || (minutes.decisions || []).length || (minutes.open_questions || []).length) &&
           <p className="mt-2 text-xs text-gray-500">Resumo e demais conteúdos analíticos são gerados por IA; revise antes de utilizar.</p>}
       </header>
-      <Section title="Resumo"><p className="whitespace-pre-wrap text-gray-700">{minutes.summary || 'Nenhum resumo disponível.'}</p></Section>
+      <Section title="Resumo">{minutes.summary ? <p className="whitespace-pre-wrap text-gray-700">{minutes.summary}</p> : <div className="space-y-1"><p className="font-medium text-gray-900">Esta reunião ainda não tem resumo.</p><p className="text-sm text-gray-600">Veja os principais pontos da reunião na área de resumo.</p></div>}</Section>
       <Section title="Tópicos"><TextList values={minutes.topics} empty="Nenhum tópico registrado." /></Section>
-      <Section title="Decisões"><TextList values={minutes.decisions} empty="Nenhuma decisão registrada." /></Section>
+      <Section title="Decisões"><TextList values={minutes.decisions} empty="Nenhuma decisão identificada nesta versão." /></Section>
       <Section title="Tarefas">
         {minutes.action_items?.length ? <ul className="space-y-2">{minutes.action_items.map(action => <li key={action.id} className="rounded border border-gray-200 p-3">
           <p className={action.status === 'done' ? 'text-gray-500 line-through' : 'text-gray-800'}>{action.description}</p>
           <p className="mt-1 text-sm text-gray-600">{action.status === 'done' ? 'Concluída' : 'Aberta'} · {action.source === 'manual' ? 'Criada manualmente' : 'IA → revisada'}{action.assignee ? ` · ${action.assignee}` : ''}{action.due_date ? ` · ${action.due_date}` : ''}</p>
         </li>)}</ul> : <p className="text-sm text-gray-500">Nenhuma tarefa operacional registrada.</p>}
       </Section>
-      <Section title="Perguntas em aberto"><TextList values={minutes.open_questions} empty="Nenhuma pergunta em aberto." /></Section>
+      <Section title="Perguntas em aberto"><TextList values={minutes.open_questions} empty="Nenhuma pergunta em aberto identificada." /></Section>
     </article>}
   </CardContent></Card>
 }

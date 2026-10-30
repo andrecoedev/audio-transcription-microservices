@@ -147,10 +147,10 @@ export default function MeetingMinutes() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
           <Sparkles className="w-8 h-8 text-yellow-500" />
-          Geração de Atas de Reunião
+          Criar ata da reunião
         </h1>
         <p className="text-gray-600 mt-1">
-          O resultado desta tela é temporário. Para salvar a reunião e revisar as tarefas sugeridas, use a área Reuniões.
+          A ata gerada nesta tela é temporária. Para salvar a reunião e revisar as tarefas sugeridas, use a área Reuniões.
         </p>
         <Link to="/meetings" className="text-primary-700 underline">Use Reuniões para análise persistente, tarefas revisadas e ata consolidada.</Link>
       </div>
@@ -194,7 +194,7 @@ export default function MeetingMinutes() {
                 Transcrição
               </label>
               {loadingTranscriptions ? (
-                <div className="flex items-center gap-2 text-gray-500">
+                <div role="status" className="flex items-center gap-2 text-gray-500">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Carregando transcrições...
                 </div>
@@ -214,9 +214,8 @@ export default function MeetingMinutes() {
                 </select>
               )}
               {transcriptions.length === 0 && !loadingTranscriptions && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Nenhuma transcrição disponível. Faça uma nova transcrição primeiro.
-                </p>
+                <div className="mt-2 space-y-1"><p className="text-sm text-gray-600">Nenhuma transcrição concluída disponível. Crie uma transcrição para gerar uma ata.</p>
+                  <Link className="inline-block text-sm font-medium text-primary-700 underline" to="/new-transcription">Nova transcrição</Link></div>
               )}
             </div>
 
@@ -266,18 +265,19 @@ export default function MeetingMinutes() {
             <Button
               onClick={handleGenerate}
               loading={loading}
+              loadingLabel="Gerando ata..."
               disabled={!selectedTranscription || !meetingData.title.trim() || !geminiAvailable}
               icon={Sparkles}
               className="w-full"
             >
-              {loading ? 'Gerando Ata...' : 'Gerar Ata com IA'}
+              Gerar ata
             </Button>
 
             {loading && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-sm text-blue-800 flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Processando com Gemini AI... Isso pode levar alguns segundos.
+                  Gerando a ata. Isso pode levar alguns segundos.
                 </p>
               </div>
             )}
