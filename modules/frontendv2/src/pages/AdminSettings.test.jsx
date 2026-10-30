@@ -44,6 +44,8 @@ afterEach(cleanup)
 it('loads the settings, keeps model fixed, and shows credential configuration without provider checks', async () => {
   render(<AdminSettings />)
   expect(await screen.findByText('Universal-3.5 Pro')).toBeTruthy()
+  expect(screen.getByText(/Gerencie quem pode receber convite e os limites aplicados a novas operações/)).toBeTruthy()
+  expect(screen.queryByText(/conforme a política do servidor/i)).toBeNull()
   expect(screen.getByText('Configurada')).toBeTruthy()
   expect(screen.getByText('Conectado')).toBeTruthy()
   expect(screen.getByText('Uso autorizado estimado').parentElement.textContent).toContain('US$')

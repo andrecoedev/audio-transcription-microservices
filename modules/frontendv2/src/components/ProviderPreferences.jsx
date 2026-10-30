@@ -45,7 +45,7 @@ function serviceDescription(provider, settings) {
   const source = details.credential_source
   if (provider === 'groq') return 'Acesso à Groq disponibilizado pela USAGI.'
   if (source === 'platform') return 'Usa a franquia da USAGI.'
-  if (source === 'user') return `Cobrança na sua conta ${providerNames[provider]}.`
+  if (source === 'user') return `O serviço ${providerNames[provider]} cobra o uso da sua própria chave.`
   return null
 }
 
@@ -63,7 +63,7 @@ function ProviderSelect({ kind, label, ariaLabel, savedValue, value, providers, 
       <HelpPopover label={kind === 'transcription' ? 'Transcrição automática' : 'Resumos automáticos'}>
         {kind === 'transcription'
           ? 'Automático usa sua conta AssemblyAI quando há uma chave salva; caso contrário, usa transcrição local quando disponível. Se houver falha, não tenta outro serviço. O processamento local não envia áudio a um serviço externo.'
-          : 'Automático usa Gemini nesta versão. É necessário conectar uma chave própria ou ter acesso fornecido pela USAGI.'}
+          : 'Automático usa Gemini nesta versão. É necessário conectar sua própria chave ou ter acesso fornecido pela USAGI.'}
       </HelpPopover></div>
     <select id={`preference-${kind}`} aria-label={ariaLabel} className="input mt-2" value={value} disabled={busy}
       onChange={(event) => onChange(event.target.value)}>
