@@ -56,7 +56,7 @@ function ActionRow({ item, busy, change, remove, onViewOrigin, evidenceBaseUrl }
     <p className="text-sm text-gray-500">{item.source === 'ai_reviewed' ? 'IA → revisada' : 'Criada manualmente'} · {statusLabels[item.status]}</p>
     {editing ? <form onSubmit={save} className="space-y-3">
       <fieldset disabled={busy}><ActionFields values={values} onChange={setValues} prefix="Editar tarefa" /></fieldset>
-      <div className="flex gap-2"><Button type="submit" disabled={busy || !values.description.trim()}>Salvar tarefa</Button>
+      <div className="flex gap-2"><Button type="submit" loading={busy} loadingLabel="Salvando tarefa..." disabled={!values.description.trim()}>Salvar tarefa</Button>
         <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(false)}>Cancelar edição</Button></div>
     </form> : <>
       <p className="whitespace-pre-wrap">{item.description}</p>
@@ -214,7 +214,7 @@ export default function MeetingActionsPanel({ meetingId, intelligenceVersion = 0
       <form onSubmit={create} className="space-y-3">
         <h3 className="font-semibold">Criar tarefa manual</h3>
         <fieldset disabled={busy || loading}><ActionFields values={values} onChange={setValues} prefix="Nova tarefa" /></fieldset>
-        <Button type="submit" disabled={busy || loading || !values.description.trim()}>{busy ? 'Salvando...' : 'Criar tarefa'}</Button>
+        <Button type="submit" loading={busy} loadingLabel="Salvando tarefa..." disabled={loading || !values.description.trim()}>Criar tarefa</Button>
       </form>
     </div>
   </CardContent></>

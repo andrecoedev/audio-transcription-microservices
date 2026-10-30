@@ -67,15 +67,23 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange, in
   return <section className="space-y-4">
     {error && <p role="alert" className="text-red-700">{error}</p>}
     {error && <Button variant="outline" onClick={() => setRefresh(value => value + 1)}>Consultar novamente</Button>}
-    {!status && !error && <p role="status" className="text-sm text-gray-500">Consultando análise...</p>}
+    {!status && !error && <p role="status" className="text-sm text-gray-500">Carregando resumo...</p>}
     {status && !status.generation && !result && <div className="space-y-2"><p className="font-medium text-gray-900">Esta reunião ainda não tem resumo.</p><p className="text-sm text-gray-600">Veja os principais pontos da reunião.</p></div>}
-    {status && !status.configured && <p className="text-sm text-gray-600">A análise com IA está indisponível no momento.</p>}
+    {status && !status.configured && <p className="text-sm text-gray-600">A geração de resumo está indisponível no momento.</p>}
     {busy && <p role="status" className="text-sm text-gray-600">{result ? 'Gerando novamente; a versão anterior continua disponível.' : 'Gerando resumo...'}</p>}
-    {state === 'failed' && <p role="alert" className="text-sm text-red-700">A geração falhou. Você pode tentar novamente.</p>}
-    {status && <Button onClick={generate} disabled={submitting || busy || !status.configured}>
-      {submitting ? 'Solicitando...' : result ? 'Gerar novamente' : state === 'failed' ? 'Tentar novamente' : 'Gerar resumo'}
+    {state === 'failed' && <p role="alert" className="text-sm text-red-700">Não foi possível gerar o resumo. Tente novamente.</p>}
+    {status && <Button onClick={generate} loading={submitting} loadingLabel={result ? 'Solicitando novo resumo...' : 'Solicitando resumo...'} disabled={busy || !status.configured}>
+      {result ? 'Gerar novamente' : state === 'failed' ? 'Tentar novamente' : 'Gerar resumo'}
     </Button>}
     {status && <p className="text-sm text-gray-600">Ao gerar um resumo, a transcrição e o contexto da reunião são enviados ao serviço escolhido, inclusive com sua própria chave. Excluir na USAGI não remove automaticamente cópias desse serviço.</p>}
+    {result && <details className="text-sm text-gray-600">
+      <summary className="cursor-pointer font-medium">Sobre esta versão</summary>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        <dt>Versão</dt><dd>{result.revision}</dd>
+        {result.provider && <><dt>Serviço</dt><dd>{result.provider}</dd></>}
+        {result.model && <><dt>Modelo</dt><dd>{result.model}</dd></>}
+      </dl>
+    </details>}
     {content && <div className="space-y-5">
       <p className="text-xs text-gray-500">Conteúdo gerado por IA; revise antes de utilizar.</p>
       {visibleSections.includes('summary') && <section><h3 className="font-semibold text-gray-900">Resumo</h3><p className="mt-2 whitespace-pre-wrap leading-7">{content.summary}</p></section>}
