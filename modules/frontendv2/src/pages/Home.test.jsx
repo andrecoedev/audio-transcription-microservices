@@ -13,7 +13,7 @@ afterEach(cleanup)
 describe('Home', () => {
   it('points authenticated users to a new transcription, their transcriptions, and meetings', () => {
     render(<MemoryRouter><Home /></MemoryRouter>)
-    expect(screen.getByRole('navigation', { name: 'Próximos passos' })).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: 'Suas áreas' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Ver minhas transcrições' }).getAttribute('href')).toBe('/transcriptions')
     expect(screen.getByRole('link', { name: 'Ver minhas reuniões' }).getAttribute('href')).toBe('/meetings')
     expect(screen.getByText('Atividade recente')).toBeTruthy()

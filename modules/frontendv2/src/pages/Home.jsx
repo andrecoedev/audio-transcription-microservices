@@ -27,9 +27,9 @@ export default function Home() {
     </Card>
     <Guest />
     {authenticated && <>
-      <nav aria-label="Próximos passos" className="grid gap-3 sm:grid-cols-2">
-        <Link className="rounded-lg border border-gray-200 bg-white p-4 font-medium text-gray-900 hover:bg-gray-50" to="/transcriptions">Ver minhas transcrições</Link>
-        <Link className="rounded-lg border border-gray-200 bg-white p-4 font-medium text-gray-900 hover:bg-gray-50" to="/meetings">Ver minhas reuniões</Link>
+      <nav aria-label="Suas áreas" className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium">
+        <Link className="text-primary-700 hover:underline" to="/transcriptions">Ver minhas transcrições</Link>
+        <Link className="text-primary-700 hover:underline" to="/meetings">Ver minhas reuniões</Link>
       </nav>
       <Dashboard />
     </>}

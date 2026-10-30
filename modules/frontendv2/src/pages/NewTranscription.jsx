@@ -104,7 +104,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
       }
       
       setFile(selectedFile)
-      toast.success('Arquivo carregado com sucesso!')
+      toast.success('Arquivo selecionado.')
     }
   }, [maxFileSize, allowedExtensions, formatsLabel])
 
@@ -248,11 +248,11 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
             <span>Transcrição temporária</span>
             {!processingAllowed && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">Indisponível</span>}
           </div> : user && !providerSettings ? <div role={providerError ? 'alert' : 'status'} className="space-y-2">
-            <p>{providerLoading ? 'Carregando preferências dos provedores...' : 'Não foi possível carregar as preferências dos provedores. O envio permanece bloqueado.'}</p>
+            <p>{providerLoading ? 'Carregando opções de transcrição...' : 'Não foi possível carregar as opções de transcrição. O envio permanece bloqueado.'}</p>
             {providerError && <Button variant="outline" onClick={() => setProviderAttempt((value) => value + 1)}>Tentar novamente</Button>}
           </div> : <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Modelo de Transcrição
+              Opção de transcrição
             </label>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {user && <button
@@ -262,7 +262,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                 className={`p-4 border-2 rounded-lg transition-all ${options.transcriptionModel === 'automatic' ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
               >
                 <p className="font-medium text-gray-900">Automático</p>
-                <p className="text-xs text-gray-500">AssemblyAI próprio quando configurado; caso contrário, processamento local</p>
+                <p className="text-xs text-gray-500">Usa uma opção disponível na sua conta.</p>
               </button>}
 
               {(!user || providerSettings) && <button
@@ -279,8 +279,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                     options.transcriptionModel === 'whisper' ? 'text-primary-600' : 'text-gray-400'
                   }`} />
                   <div className="text-left">
-                    <p className="font-medium text-gray-900">Faster-Whisper</p>
-                    <p className="text-xs text-gray-500">Processamento local</p>
+                    <p className="font-medium text-gray-900">Transcrição local</p>
                   </div>
                 </div>
               </button>}
@@ -311,7 +310,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
             {user && options.transcriptionModel !== 'automatic' && !selectedProviderAvailable && <p role="alert" className="text-sm text-amber-800">
               {options.transcriptionModel === 'assemblyai' && options.credentialSource === null
                 ? 'Escolha explicitamente a Transcrição do Beta ou Minha chave de transcrição para usar a preferência salva.'
-                : `A preferência salva para ${options.transcriptionModel === 'assemblyai' ? 'AssemblyAI' : 'Faster-Whisper'} não está disponível. Conecte a credencial em Configurações ou escolha Automático ou um provedor disponível.`}
+                : `A opção salva não está disponível. Conecte uma chave em Configurações ou escolha outra opção disponível.`}
             </p>}
           </div>}
 

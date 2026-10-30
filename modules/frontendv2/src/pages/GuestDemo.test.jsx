@@ -31,7 +31,7 @@ describe('Guest demo', () => {
     expect(await screen.findByText('Reunião de exemplo')).toBeTruthy()
     expect(screen.getByText('Dados de exemplo')).toBeTruthy()
     expect(screen.getByText(/não foi criada a partir de um áudio seu/i)).toBeTruthy()
-    expect(screen.getByText(/Nenhum áudio é enviado ou processado/)).toBeTruthy()
+    expect(screen.getByText(/Nenhum áudio é enviado ou processado/i)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Resumo e análise' }))
     expect(screen.getByText('Nenhuma decisão identificada nos dados de exemplo.')).toBeTruthy()
     expect(screen.getByText('Nenhuma pergunta em aberto identificada nos dados de exemplo.')).toBeTruthy()

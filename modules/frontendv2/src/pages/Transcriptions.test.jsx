@@ -36,11 +36,11 @@ describe('Transcriptions history', () => {
     audioService.listTranscriptions.mockResolvedValue({ total: 0, transcriptions: [] })
     render(<MemoryRouter><Transcriptions /></MemoryRouter>)
     expect(await screen.findByText('Você ainda não tem transcrições. Envie um áudio para criar a primeira.')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Nova transcrição' })).toBeTruthy()
+    expect(screen.getAllByRole('link', { name: 'Nova transcrição' })).toHaveLength(2)
 
     fireEvent.change(screen.getByPlaceholderText('Buscar por nome do arquivo...'), { target: { value: 'reunião' } })
     expect(screen.getByText('Nenhuma transcrição corresponde à busca.')).toBeTruthy()
-    expect(screen.queryByRole('link', { name: 'Nova transcrição' })).toBeNull()
+    expect(screen.getAllByRole('link', { name: 'Nova transcrição' })).toHaveLength(1)
   })
 
   it('shows and searches by the original Unicode filename instead of the storage key', async () => {
