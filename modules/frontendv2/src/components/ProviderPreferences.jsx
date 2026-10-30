@@ -35,6 +35,7 @@ function resolveProvider(preference, settings, kind) {
 function serviceDescription(provider, settings) {
   const details = settings.providers?.[provider]
   if (!isProviderEligible(provider, details)) {
+    if (provider === 'whisper') return 'A transcrição local está indisponível neste ambiente. Confira as opções em Nova transcrição.'
     if (provider === 'groq') return 'Groq está indisponível para esta conta no momento.'
     if (provider === 'assemblyai' && settings.credentials?.assemblyai?.configured) {
       return 'Sua chave AssemblyAI não está disponível para uso. Confira Serviços conectados.'
