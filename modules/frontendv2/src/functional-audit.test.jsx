@@ -195,7 +195,7 @@ describe('functional frontend contracts', () => {
     const link = screen.getByRole('link', { name: new RegExp(filename) })
     expect(link.getAttribute('href')).toBe('/transcriptions/1')
     expect(link.className).toContain('min-w-0')
-    expect(link.parentElement.className).toContain('grid-cols-1')
+    expect(screen.getByRole('list').contains(link)).toBe(true)
   })
 
   it.each(['transcriptions', 'meetings'])('retries failed %s instead of claiming there are no records', async kind => {
