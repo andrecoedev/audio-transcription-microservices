@@ -33,7 +33,7 @@ it.each([
 ])('%s cannot fetch admin settings', async (_label, auth) => {
   useAuthStore.setState(auth)
   render(<App />)
-  expect(await screen.findByText(auth.isAuthenticated ? 'Acesso restrito' : 'Salve e acompanhe suas reuniões')).toBeTruthy()
+  expect(await screen.findByText(auth.isAuthenticated ? 'Acesso restrito' : 'Entre para continuar')).toBeTruthy()
   expect(adminSettingsService.getSettings).not.toHaveBeenCalled()
   expect(adminSettingsService.getOverview).not.toHaveBeenCalled()
 })

@@ -31,6 +31,9 @@ it('shows null assignee/deadline and retains completed result while regenerating
   audioService.requestMeetingIntelligence.mockResolvedValue({ status: 'pending' })
   render(<MeetingIntelligencePanel meetingId="42" />)
   expect(await screen.findByText('Resumo da reunião')).toBeTruthy()
+  expect(screen.getByText('Sobre esta versão')).toBeTruthy()
+  expect(screen.getByText('gemini')).toBeTruthy()
+  expect(screen.getByText('fixture')).toBeTruthy()
   expect(screen.getByText(/Não identificado/)).toBeTruthy()
   expect(screen.getByText(/Sem prazo explícito/)).toBeTruthy()
   expect(screen.getByRole('link', { name: '0,0 s–2,0 s' }).getAttribute('href')).toBe('#segment-0')
@@ -47,6 +50,22 @@ it('allows explicit retry after failure', async () => {
   render(<MeetingIntelligencePanel meetingId="42" />)
   fireEvent.click(await screen.findByRole('button', { name: 'Tentar novamente' }))
   await waitFor(() => expect(audioService.requestMeetingIntelligence).toHaveBeenCalledWith('42', false))
+})
+
+it('explains an empty summary state and distinguishes unconfirmed findings', async () => {
+  audioService.getMeetingIntelligenceStatus.mockResolvedValue({ configured: true, generation: null, completed_revision: null })
+  const first = render(<MeetingIntelligencePanel meetingId="42" />)
+  expect(await screen.findByText('Esta reunião ainda não tem resumo.')).toBeTruthy()
+  expect(screen.getByText('Veja os principais pontos da reunião.')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Gerar resumo' })).toBeTruthy()
+  first.unmount()
+
+  audioService.getMeetingIntelligenceStatus.mockResolvedValue({ configured: true, generation: { status: 'completed' }, completed_revision: 1 })
+  audioService.getMeetingIntelligenceResult.mockResolvedValue({ ...result, content: { ...result.content, decisions: [], open_questions: [] } })
+  const { rerender } = render(<MeetingIntelligencePanel meetingId="42" initialTab="decisions" />)
+  expect(await screen.findByText('Nenhuma decisão identificada nesta versão.')).toBeTruthy()
+  rerender(<MeetingIntelligencePanel meetingId="42" initialTab="questions" />)
+  expect(await screen.findByText('Nenhuma pergunta em aberto identificada.')).toBeTruthy()
 })
 
 it('uses per-account configured status for a public account', async () => {

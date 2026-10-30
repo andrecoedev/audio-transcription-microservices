@@ -104,7 +104,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
       }
       
       setFile(selectedFile)
-      toast.success('Arquivo carregado com sucesso!')
+      toast.success('Arquivo selecionado.')
     }
   }, [maxFileSize, allowedExtensions, formatsLabel])
 
@@ -245,14 +245,14 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
         <CardContent className="space-y-4">
           {/* Modelo de Transcrição */}
           {guestPolicy ? <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-            <span>Transcrição com AssemblyAI</span>
+            <span>Transcrição temporária</span>
             {!processingAllowed && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">Indisponível</span>}
           </div> : user && !providerSettings ? <div role={providerError ? 'alert' : 'status'} className="space-y-2">
-            <p>{providerLoading ? 'Carregando preferências dos provedores...' : 'Não foi possível carregar as preferências dos provedores. O envio permanece bloqueado.'}</p>
+            <p>{providerLoading ? 'Carregando opções de transcrição...' : 'Não foi possível carregar as opções de transcrição. O envio permanece bloqueado.'}</p>
             {providerError && <Button variant="outline" onClick={() => setProviderAttempt((value) => value + 1)}>Tentar novamente</Button>}
           </div> : <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Modelo de Transcrição
+              Opção de transcrição
             </label>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {user && <button
@@ -262,7 +262,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                 className={`p-4 border-2 rounded-lg transition-all ${options.transcriptionModel === 'automatic' ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
               >
                 <p className="font-medium text-gray-900">Automático</p>
-                <p className="text-xs text-gray-500">AssemblyAI próprio quando configurado; caso contrário, processamento local</p>
+                <p className="text-xs text-gray-500">Segue sua configuração automática. Não seleciona a franquia do Beta.</p>
               </button>}
 
               {(!user || providerSettings) && <button
@@ -279,8 +279,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                     options.transcriptionModel === 'whisper' ? 'text-primary-600' : 'text-gray-400'
                   }`} />
                   <div className="text-left">
-                    <p className="font-medium text-gray-900">Faster-Whisper</p>
-                    <p className="text-xs text-gray-500">Processamento local</p>
+                    <p className="font-medium text-gray-900">Transcrição local</p>
                   </div>
                 </div>
               </button>}
@@ -294,24 +293,24 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
                 >
                   <p className="font-medium text-gray-900">Transcrição do Beta</p>
                   {!canUsePlatformAssemblyAI && <span className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Indisponível</span>}
-                  <p className="mt-1 text-xs text-gray-500">AssemblyAI com detecção de falantes pela franquia beta</p>
+                  <p className="mt-1 text-xs text-gray-500">Detecção de falantes incluída na franquia desta rodada</p>
                 </button>
                 <button
-                  aria-label="Minha conta AssemblyAI"
+                  aria-label="Minha chave de transcrição"
                   onClick={() => setOptions({ ...options, transcriptionModel: 'assemblyai', credentialSource: 'user' })}
                   disabled={uploading || !canUseOwnAssemblyAI}
                   className={`p-4 border-2 rounded-lg transition-all ${!canUseOwnAssemblyAI ? 'border-gray-200 bg-gray-50 cursor-not-allowed' : options.transcriptionModel === 'assemblyai' && options.credentialSource === 'user' ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
                 >
-                  <p className="font-medium text-gray-900">Minha conta AssemblyAI</p>
+                  <p className="font-medium text-gray-900">Minha chave de transcrição</p>
                   {!canUseOwnAssemblyAI && <span className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Indisponível</span>}
-                  <p className="mt-1 text-xs text-gray-500">Usa sua credencial AssemblyAI</p>
+                  <p className="mt-1 text-xs text-gray-500">Usa sua chave AssemblyAI salva em Configurações</p>
                 </button>
               </>}
             </div>
             {user && options.transcriptionModel !== 'automatic' && !selectedProviderAvailable && <p role="alert" className="text-sm text-amber-800">
               {options.transcriptionModel === 'assemblyai' && options.credentialSource === null
-                ? 'Escolha explicitamente a Transcrição do Beta ou Minha conta AssemblyAI para usar a preferência AssemblyAI salva.'
-                : `A preferência salva para ${options.transcriptionModel === 'assemblyai' ? 'AssemblyAI' : 'Faster-Whisper'} não está disponível. Conecte a credencial em Configurações ou escolha Automático ou um provedor disponível.`}
+                ? 'Escolha explicitamente a Transcrição do Beta ou Minha chave de transcrição para usar a preferência salva.'
+                : `A opção salva não está disponível. Conecte uma chave em Configurações ou escolha outra opção disponível.`}
             </p>}
           </div>}
 
@@ -357,6 +356,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
           onClick={handleSubmit}
           disabled={!file || uploading || !policyReady || !processingAllowed || !providerReady || !selectedProviderAvailable}
           loading={uploading}
+          loadingLabel="Enviando..."
         >
           Iniciar Transcrição
         </Button>

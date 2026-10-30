@@ -25,6 +25,7 @@ export default function TranscriptionDetail() {
   const [transcription, setTranscription] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [pollingError, setPollingError] = useState(false)
   const [copied, setCopied] = useState(false)
   const displayFilename = getDisplayFilename(transcription)
   const canExportTranscript = transcription?.status === 'completed' && Boolean(transcription?.segments?.length)
@@ -35,8 +36,10 @@ export default function TranscriptionDetail() {
       const data = await audioService.getTranscription(id)
       setTranscription(data)
       setLoadError(false)
+      setPollingError(false)
     } catch {
       if (!silent) setLoadError(true)
+      else setPollingError(true)
       if (!silent) {
         toast.error('Erro ao carregar transcrição')
       }
@@ -177,6 +180,7 @@ export default function TranscriptionDetail() {
     return <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader title="Transcrevendo áudio" description={`${displayFilename} · ${formatDuration(transcription.duration_seconds)}`} />
       <ProcessingStatus status={transcription.status} />
+      {pollingError && <p role="status" className="text-sm text-amber-800">Não foi possível atualizar o status. Exibindo a última informação recebida.</p>}
       <Link to="/transcriptions" className="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-900">
         <ArrowLeft className="mr-2 h-4 w-4" />Voltar ao histórico
       </Link>
@@ -197,14 +201,14 @@ export default function TranscriptionDetail() {
             Voltar
           </Button>
           <div className="min-w-0">
-            <h1 className="break-all text-3xl font-bold text-gray-900">{displayFilename}</h1>
+            <h1 className="break-words text-3xl font-bold text-gray-900">{displayFilename}</h1>
             <p className="text-gray-600 mt-1">
               Criado em {new Date(transcription.created_at).toLocaleString('pt-BR')}
             </p>
             {['queued', 'processing'].includes(transcription.status) && <div className="mt-4 max-w-md"><ProcessingStatus status={transcription.status} /></div>}
             {transcription.status === 'completed' && (
               <Link className="text-primary-700 hover:underline" to={`/meetings/${transcription.id}`}>
-                Ver reunião estruturada
+                Abrir reunião
               </Link>
             )}
             {transcription.status === 'failed' && <p role="alert" className="text-red-700 mt-2">
@@ -268,7 +272,9 @@ export default function TranscriptionDetail() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {transcription.segments?.map((segment, index) => (
+            {transcription.status === 'completed' && Array.isArray(transcription.segments) && transcription.segments.length === 0
+              ? <p className="text-gray-600">Nenhuma fala foi identificada neste áudio.</p>
+              : transcription.segments?.map((segment, index) => (
               <div
                 key={index}
                 className="p-4 bg-gray-50 rounded-lg border border-gray-200"

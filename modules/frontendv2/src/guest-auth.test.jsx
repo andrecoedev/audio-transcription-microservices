@@ -140,7 +140,7 @@ describe('Guest and account boundaries', () => {
   it('App keeps protected history behind login', async () => {
     window.history.replaceState({}, '', '/meetings')
     render(<App />)
-    expect(await screen.findByText('Salve e acompanhe suas reuniões')).toBeTruthy()
+    expect(await screen.findByText('Entre para continuar')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Reuniões' })).toBeNull()
   })
   it('opens the public demo without upload, policy lookup, or creating an identity', async () => {
@@ -229,7 +229,7 @@ describe('Guest and account boundaries', () => {
       credentials: { assemblyai: { configured: true, updated_at: null }, gemini: { configured: true, updated_at: null } },
     })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-    expect((await screen.findByRole('button', { name: 'Minha conta AssemblyAI' })).disabled).toBe(false)
+    expect((await screen.findByRole('button', { name: 'Minha chave de transcrição' })).disabled).toBe(false)
     expect(screen.getByLabelText('Detecção de falantes').checked).toBe(true)
   })
 

@@ -25,12 +25,16 @@ beforeEach(() => { vi.resetAllMocks() })
 afterEach(cleanup)
 
 describe('Guest demo', () => {
-  it('loads a clearly labeled read-only synthetic example without file upload controls', async () => {
+  it('loads clearly labeled example data without implying it came from the user or offering file upload', async () => {
     guestService.demo.mockResolvedValue(demo)
     render(<MemoryRouter><GuestDemo /></MemoryRouter>)
     expect(await screen.findByText('Reunião de exemplo')).toBeTruthy()
-    expect(screen.getByText('Demonstração sintética')).toBeTruthy()
-    expect(screen.getByText(/Nenhum áudio é enviado ou processado/)).toBeTruthy()
+    expect(screen.getByText('Dados de exemplo')).toBeTruthy()
+    expect(screen.getByText(/não foi criada a partir de um áudio seu/i)).toBeTruthy()
+    expect(screen.getByText(/Nenhum áudio é enviado ou processado/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Resumo inteligente' }))
+    expect(screen.getByText('Nenhuma decisão identificada nos dados de exemplo.')).toBeTruthy()
+    expect(screen.getByText('Nenhuma pergunta em aberto identificada nos dados de exemplo.')).toBeTruthy()
     expect(screen.getByText('Entre para consultar os serviços disponíveis e salvar suas reuniões.')).toBeTruthy()
     expect(document.querySelector('input[type="file"]')).toBeNull()
     expect(screen.getByRole('link', { name: 'Entrar' }).getAttribute('href')).toBe('/login?returnTo=%2Fnew-transcription')
@@ -53,7 +57,7 @@ describe('Guest demo', () => {
     fireEvent.change(screen.getByLabelText('Filtrar falante'), { target: { value: 'SPEAKER_01' } })
     expect(screen.queryByText('Vamos revisar o projeto.')).toBeNull()
     expect(screen.getByText('A entrega fica para sexta.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Resumo e análise' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Resumo inteligente' }))
     fireEvent.click(await screen.findByRole('button', { name: /Trecho 1:/ }))
     expect(screen.getByRole('button', { name: 'Transcrição' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByText('Vamos revisar o projeto.')).toBeTruthy()

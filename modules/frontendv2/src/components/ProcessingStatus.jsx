@@ -1,9 +1,9 @@
 import { requestErrorMessage } from '../services/requestError'
 
 const STATUS = {
-  queued: { label: 'Na fila', current: 0 },
-  processing: { label: 'Processando', current: 1 },
-  completed: { label: 'Concluída', current: 2 },
+  queued: { label: 'Na fila', current: 0, description: 'Áudio recebido. Aguardando processamento.' },
+  processing: { label: 'Processando', current: 1, description: 'Seu áudio está sendo processado. Você pode voltar depois para acompanhar.' },
+  completed: { label: 'Concluída', current: 2, description: 'Transcrição concluída. Abra a reunião para revisar o conteúdo.' },
   failed: { label: 'Falhou', current: -1 },
 }
 
@@ -34,6 +34,6 @@ export default function ProcessingStatus({ status, errorMessage, uploadProgress 
         </li>
       })}
     </ol>
-    <p className="mt-4 text-sm text-gray-600">O status é atualizado automaticamente. Você pode acompanhar o processamento nesta página.</p>
+    <p role="status" className="mt-4 text-sm text-gray-600">{state.description}</p>
   </section>
 }

@@ -100,14 +100,14 @@ function SettingsPage() {
     setErrorMessage('')
     try {
       setProviderSettings(await audioService.saveProviderCredential(provider, secret))
-      toast.success('Chave salva com segurança')
+      toast.success('Chave salva')
       return true
     } catch (error) {
       setErrorMessage(error.status === 422
         ? 'Formato da chave inválido. Copie a chave de API do serviço, sem espaços, e tente novamente.'
         : error.status === 429 ? 'Muitas alterações em pouco tempo. Aguarde antes de tentar novamente.'
-          : 'Não foi possível salvar a credencial. Tente novamente; se continuar, procure o suporte da USAGI.')
-      toast.error('Não foi possível salvar a credencial')
+          : 'Não foi possível salvar a chave. Tente novamente; se continuar, procure o suporte da USAGI.')
+      toast.error('Não foi possível salvar a chave')
       return false
     } finally {
       setCredentials((current) => ({ ...current, [provider]: '' }))
@@ -122,11 +122,11 @@ function SettingsPage() {
     setErrorMessage('')
     try {
       setProviderSettings(await audioService.deleteProviderCredential(provider))
-      toast.success('Credencial removida')
+      toast.success('Chave removida')
       return true
     } catch {
-      setErrorMessage('Não foi possível remover a credencial. Tente novamente.')
-      toast.error('Não foi possível remover a credencial')
+      setErrorMessage('Não foi possível remover a chave. Tente novamente.')
+      toast.error('Não foi possível remover a chave')
       return false
     } finally {
       setCredentials((current) => ({ ...current, [provider]: '' }))
@@ -139,7 +139,7 @@ function SettingsPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title="Configurações">
         <a href="#plan-usage" className="text-sm font-medium text-primary-800 hover:underline" onClick={() => setUsageOpen(true)}>Plano e consumo</a>
-        <Button variant="outline" size="sm" onClick={() => { refreshStatus(); refreshProviderSettings() }} loading={statusLoading || providerLoading} disabled={statusLoading || providerLoading || providerSaving} icon={RefreshCw}>Atualizar</Button>
+        <Button variant="outline" size="sm" onClick={() => { refreshStatus(); refreshProviderSettings() }} loading={statusLoading || providerLoading} loadingLabel="Atualizando…" disabled={statusLoading || providerLoading || providerSaving} icon={RefreshCw}>Atualizar</Button>
       </PageHeader>
 
       {errorMessage && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errorMessage}</p>}

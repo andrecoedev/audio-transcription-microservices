@@ -30,12 +30,29 @@ export default function MeetingDetail() {
   const [query, setQuery] = useState('')
   const [activeTab, setActiveTab] = useState('summary')
   const transcriptScrollRef = useRef(null)
+  const tabRefs = useRef({})
   const initialHashMeeting = useRef(null)
   const loadedMeetingRef = useRef(null)
   const [intelligenceVersion, setIntelligenceVersion] = useState(0)
   const refreshActions = useCallback(() => setIntelligenceVersion(value => value + 1), [])
   const [minutesVersion, setMinutesVersion] = useState(0)
   const refreshMinutes = useCallback(() => setMinutesVersion(value => value + 1), [])
+
+  const focusTab = useCallback(tabId => {
+    tabRefs.current[tabId]?.focus()
+    setActiveTab(tabId)
+  }, [])
+
+  const handleTabKeyDown = useCallback((event, currentIndex) => {
+    let nextIndex
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % workspaceTabs.length
+    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + workspaceTabs.length) % workspaceTabs.length
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = workspaceTabs.length - 1
+    else return
+    event.preventDefault()
+    focusTab(workspaceTabs[nextIndex].id)
+  }, [focusTab])
 
   const load = useCallback(async () => {
     try {
@@ -106,7 +123,7 @@ export default function MeetingDetail() {
     requestAnimationFrame(() => scrollToSegment(`segment-${order}`))
   }, [id, transcript, scrollToSegment])
 
-  if (error) return <p role="alert">Reunião indisponível. <Link to="/meetings">Voltar</Link></p>
+  if (error) return <div className="space-y-3"><p role="alert">Não foi possível carregar esta reunião.</p><div className="flex gap-3"><Button variant="outline" onClick={load}>Tentar novamente</Button><Link className="inline-flex items-center text-sm text-primary-700 underline" to="/meetings">Voltar às reuniões</Link></div></div>
   if (!meeting || !transcript) return <p role="status">Carregando reunião...</p>
 
   const durationLabel = meeting.duration_seconds == null ? 'Duração não informada' : formatDuration(meeting.duration_seconds)
@@ -129,7 +146,7 @@ export default function MeetingDetail() {
         <p className="mt-1 text-sm text-gray-500">{new Date(meeting.created_at).toLocaleString('pt-BR')} · {durationLabel} · {formatCount(meeting.speakers.length, 'falante', 'falantes')}</p>
       </div>
       <div className="flex items-center gap-2">
-        {meeting.transcription_id && <Link to={`/transcriptions/${meeting.transcription_id}`} className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Exportar transcrição</Link>}
+        {meeting.transcription_id && <Link to={`/transcriptions/${meeting.transcription_id}`} className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Abrir transcrição</Link>}
         <details className="relative">
           <summary className="cursor-pointer list-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700">Falantes</summary>
           <div className="absolute right-0 z-10 mt-2 w-[min(24rem,90vw)] rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
@@ -154,9 +171,9 @@ export default function MeetingDetail() {
         <CardHeader className="border-b border-gray-200 px-5 pt-5 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div><CardTitle>Transcrição</CardTitle><p className="mt-1 text-sm text-gray-500">{formatCount(transcript.segments.length, 'trecho', 'trechos')} · {durationLabel} · {formatCount(meeting.speakers.length, 'falante', 'falantes')}</p></div>
-            <label className="sr-only" htmlFor="transcript-search">Buscar no áudio</label>
+            <label className="sr-only" htmlFor="transcript-search">Buscar na transcrição</label>
             <input id="transcript-search" type="search" value={query} onChange={event => setQuery(event.target.value)}
-              placeholder="Buscar no áudio" className="w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" />
+              placeholder="Buscar na transcrição" className="w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" />
           </div>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col p-0">
@@ -166,9 +183,9 @@ export default function MeetingDetail() {
                 <span className="rounded-full bg-primary-50 px-2.5 py-1 font-medium text-primary-700">{segment.speaker_display_name || segment.speaker || 'Falante'}</span>
                 <time className="text-gray-500" dateTime={`PT${segment.start || 0}S`}>{formatSeconds(Number(segment.start || 0), 2)}</time>
               </div>
-              <p className="whitespace-pre-wrap leading-7 text-gray-900">{segment.text}</p>
+              <p className="whitespace-pre-wrap text-[17px] leading-7 text-gray-900">{segment.text}</p>
             </article>)}
-            {segments.length === 0 && <p className="p-4 text-sm text-gray-500">{query ? 'Nenhum trecho corresponde à busca.' : 'Nenhum trecho disponível.'}</p>}
+            {segments.length === 0 && <p className="p-4 text-sm text-gray-500">{query.trim() ? 'Nenhum trecho corresponde à busca.' : meeting.status === 'completed' && Array.isArray(transcript.segments) ? 'Nenhuma fala foi identificada neste áudio.' : 'Nenhum trecho disponível nesta transcrição.'}</p>}
           </div>
           <footer className="flex justify-between border-t border-gray-200 px-5 py-3 text-xs text-gray-500">
             <span>{query ? `${formatCount(segments.length, 'trecho', 'trechos')} de ${formatCount(transcript.segments.length, 'trecho', 'trechos')}` : `${formatCount(segments.length, 'trecho', 'trechos')} · role para continuar`}</span>
@@ -180,13 +197,15 @@ export default function MeetingDetail() {
       <Card className="!p-0 flex h-[65vh] min-h-[28rem] flex-col overflow-hidden xl:h-full">
         <CardHeader className="px-5 pt-5 pb-3"><div className="flex items-center justify-between gap-2"><CardTitle>Resumo inteligente</CardTitle><span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">{formatCount(transcript.segments.length, 'fala', 'falas')}</span></div></CardHeader>
         <div role="tablist" aria-label="Conteúdo da reunião" className="flex gap-1 overflow-x-auto border-b border-gray-200 px-4">
-          {workspaceTabs.map(tab => <button type="button" role="tab" key={tab.id} aria-selected={activeTab === tab.id}
-            aria-controls="meeting-workspace-tab" onClick={() => setActiveTab(tab.id)}
+          {workspaceTabs.map((tab, index) => <button type="button" role="tab" id={`meeting-tab-${tab.id}`} key={tab.id} aria-selected={activeTab === tab.id}
+            aria-controls="meeting-workspace-tab" tabIndex={activeTab === tab.id ? 0 : -1}
+            ref={element => { tabRefs.current[tab.id] = element }}
+            onKeyDown={event => handleTabKeyDown(event, index)} onClick={() => setActiveTab(tab.id)}
             className={`shrink-0 rounded-t-lg px-3 py-2 text-sm ${activeTab === tab.id ? 'bg-primary-50 font-medium text-primary-700' : 'text-gray-600 hover:bg-gray-50'}`}>
             {tab.label}
           </button>)}
         </div>
-        <div id="meeting-workspace-tab" role="tabpanel" className="min-h-0 flex-1 overflow-y-auto p-4"
+        <div id="meeting-workspace-tab" role="tabpanel" aria-labelledby={`meeting-tab-${activeTab}`} tabIndex={0} className="min-h-0 flex-1 overflow-y-auto p-4"
           onClick={event => {
             const link = event.target.closest('a[href^="#segment-"]')
             if (!link) return

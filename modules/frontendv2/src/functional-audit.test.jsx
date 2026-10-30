@@ -109,10 +109,10 @@ describe('functional frontend contracts', () => {
       transcription_provider: 'whisper', intelligence_provider: 'gemini', use_diarization: true,
     }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Conectar minha API Gemini' }))
-    const secretInput = screen.getByLabelText('Credencial Gemini')
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar chave Gemini' }))
+    const secretInput = screen.getByLabelText('Chave Gemini')
     fireEvent.change(secretInput, { target: { value: 'synthetic-key-never-rendered' } })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar chave' }))
     await waitFor(() => expect(audioService.saveProviderCredential).toHaveBeenCalledWith('gemini', 'synthetic-key-never-rendered'))
     await waitFor(() => expect(secretInput.value).toBe(''))
     expect(screen.queryByText('synthetic-key-never-rendered')).toBeNull()
@@ -131,12 +131,12 @@ describe('functional frontend contracts', () => {
     })
     audioService.saveProviderCredential.mockRejectedValue(new Error('provider returned sensitive detail'))
     render(<MemoryRouter><Settings /></MemoryRouter>)
-    fireEvent.click(await screen.findByRole('button', { name: 'Conectar minha API AssemblyAI' }))
-    const secretInput = screen.getByLabelText('Credencial AssemblyAI')
+    fireEvent.click(await screen.findByRole('button', { name: 'Conectar chave AssemblyAI' }))
+    const secretInput = screen.getByLabelText('Chave AssemblyAI')
     fireEvent.change(secretInput, { target: { value: 'synthetic-key' } })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Salvar credencial' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar chave' }))
     await waitFor(() => expect(secretInput.value).toBe(''))
-    expect(toast.error).toHaveBeenCalledWith('Não foi possível salvar a credencial')
+    expect(toast.error).toHaveBeenCalledWith('Não foi possível salvar a chave')
     expect(toast.error).not.toHaveBeenCalledWith('provider returned sensitive detail')
   })
 
@@ -167,7 +167,7 @@ describe('functional frontend contracts', () => {
     render(<MemoryRouter><Settings /></MemoryRouter>)
     const selector = await screen.findByRole('combobox', { name: label })
     expect(selector.value).toBe(provider)
-    fireEvent.click(screen.getByRole('button', { name: `Remover credencial ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}` }))
+    fireEvent.click(screen.getByRole('button', { name: `Remover chave ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}` }))
     expect(audioService.deleteProviderCredential).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: `Confirmar remoção ${provider === 'assemblyai' ? 'AssemblyAI' : 'Gemini'}` }))
     await waitFor(() => expect(audioService.deleteProviderCredential).toHaveBeenCalledWith(provider))
@@ -180,9 +180,9 @@ describe('functional frontend contracts', () => {
     audioService.listTranscriptions.mockRejectedValueOnce(new Error('offline'))
     render(<MemoryRouter><Dashboard /></MemoryRouter>)
     expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.queryByText('Nenhuma transcrição ainda.')).toBeNull()
+    expect(screen.queryByText('Você ainda não tem transcrições.')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
-    expect(await screen.findByText('Nenhuma transcrição ainda.')).toBeTruthy()
+    expect(await screen.findByText('Você ainda não tem transcrições.')).toBeTruthy()
   })
 
   it('labels queued transcriptions honestly', async () => {
@@ -195,7 +195,7 @@ describe('functional frontend contracts', () => {
     const link = screen.getByRole('link', { name: new RegExp(filename) })
     expect(link.getAttribute('href')).toBe('/transcriptions/1')
     expect(link.className).toContain('min-w-0')
-    expect(link.parentElement.className).toContain('grid-cols-1')
+    expect(screen.getByRole('list').contains(link)).toBe(true)
   })
 
   it.each(['transcriptions', 'meetings'])('retries failed %s instead of claiming there are no records', async kind => {

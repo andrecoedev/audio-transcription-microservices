@@ -57,17 +57,17 @@ export default function GuestDemo() {
   ]
 
   return <div className="mx-auto max-w-6xl space-y-6">
-    <PageHeader title="Demonstração interativa" description="Explore uma reunião de exemplo com transcrição e análise sintéticas. Nenhum áudio é enviado ou processado nesta demonstração." />
+    <PageHeader title="Demonstração interativa" description="Explore uma reunião com dados de exemplo. Ela não foi criada a partir de um áudio seu, e nenhum áudio é enviado ou processado aqui." />
     {error && <Card><CardContent><div role="alert" className="space-y-3"><p>{error}</p><Button variant="outline" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</Button></div></CardContent></Card>}
     {!demo && !error && <p role="status" className="text-sm text-gray-600">Carregando demonstração...</p>}
     {demo && <>
       <Card>
-        <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{demo.title}</CardTitle><p className="mt-1 text-sm text-gray-600">{demo.description}</p></div><span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">Demonstração sintética</span></div></CardHeader>
+        <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{demo.title}</CardTitle><p className="mt-1 text-sm text-gray-600">{demo.description}</p></div><span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">Dados de exemplo</span></div></CardHeader>
         <CardContent><p className="text-sm text-gray-600">Duração: {formatDuration(demo.duration_seconds)}</p></CardContent>
       </Card>
       <div className="flex flex-wrap gap-2" aria-label="Conteúdo da demonstração">
         <Button aria-pressed={tab === 'transcript'} variant={tab === 'transcript' ? 'primary' : 'outline'} onClick={() => setTab('transcript')}>Transcrição</Button>
-        <Button aria-pressed={tab === 'summary'} variant={tab === 'summary' ? 'primary' : 'outline'} onClick={() => setTab('summary')}>Resumo e análise</Button>
+        <Button aria-pressed={tab === 'summary'} variant={tab === 'summary' ? 'primary' : 'outline'} onClick={() => setTab('summary')}>Resumo inteligente</Button>
       </div>
       {tab === 'transcript' ? <Card>
         <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>Transcrição de exemplo</CardTitle><label className="text-sm text-gray-700">Filtrar falante{' '}
@@ -81,7 +81,7 @@ export default function GuestDemo() {
           <p className="leading-7 text-gray-800">{segment.text}</p>
         </article>)}</CardContent>
       </Card> : <Card>
-        <CardHeader><CardTitle>Resumo e análise</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Resumo inteligente</CardTitle></CardHeader>
         <CardContent className="space-y-5">
           <section><h3 className="font-semibold text-gray-900">Resumo</h3><p className="mt-2 whitespace-pre-wrap leading-7 text-gray-700">{demo.intelligence?.summary}</p></section>
           {sections.map(([key, title]) => <section key={key} className="space-y-2"><h3 className="font-semibold text-gray-900">{title}</h3>
@@ -89,7 +89,7 @@ export default function GuestDemo() {
               <p className="text-gray-800">{item.description}</p>
               {key === 'action_items' && <p className="mt-1 text-sm text-gray-600">Responsável: {item.assignee || 'Não identificado'} · Prazo: {item.due_date || 'Sem prazo explícito'}</p>}
               {evidenceLinks(item.evidence)}
-            </li>)}</ul> : <p className="text-sm text-gray-500">Nenhum item identificado.</p>}
+            </li>)}</ul> : <p className="text-sm text-gray-500">{key === 'decisions' ? 'Nenhuma decisão identificada nos dados de exemplo.' : key === 'open_questions' ? 'Nenhuma pergunta em aberto identificada nos dados de exemplo.' : `Nenhum ${key === 'topics' ? 'tópico' : 'item'} identificado nos dados de exemplo.`}</p>}
           </section>)}
         </CardContent>
       </Card>}

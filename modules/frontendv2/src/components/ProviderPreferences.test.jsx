@@ -36,7 +36,13 @@ it('resolves automatic transcription to local processing when there is no saved 
 it('resolves automatic transcription to AssemblyAI when its own credential is configured', () => {
   setup({ settings: { credentials: { assemblyai: { configured: true } } } })
   expect(paragraphContaining('Transcrição: AssemblyAI')).toBeTruthy()
-  expect(paragraphContaining('Cobrança na sua conta AssemblyAI.')).toBeTruthy()
+  expect(paragraphContaining('O serviço AssemblyAI cobra o uso da sua própria chave.')).toBeTruthy()
+})
+
+it('does not ask to connect a local processing account when it is unavailable', () => {
+  setup({ settings: { providers: { whisper: { available: false, allowed: false, configured: false } } } })
+  expect(screen.getByText('A transcrição local está indisponível neste ambiente. Confira as opções em Nova transcrição.')).toBeTruthy()
+  expect(screen.queryByText(/Conecte ou atualize sua conta Transcrição local/)).toBeNull()
 })
 
 it('shows a configured AssemblyAI route as unavailable when credential storage makes it ineligible', () => {
@@ -171,7 +177,7 @@ it('keeps saved active services distinct from draft selections', () => {
   expect(paragraphContaining('Resumos inteligentes: Gemini')).toBeTruthy()
   const drafts = screen.getAllByRole('status').map(element => element.textContent)
   expect(drafts.some(text => text.includes('Alteração pendente: AssemblyAI'))).toBe(true)
-  expect(drafts.some(text => text.includes('Cobrança na sua conta AssemblyAI'))).toBe(true)
+  expect(drafts.some(text => text.includes('O serviço AssemblyAI cobra o uso da sua própria chave.'))).toBe(true)
 })
 
 it('disables all preference controls while saving', () => {

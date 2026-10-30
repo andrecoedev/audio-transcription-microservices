@@ -89,7 +89,7 @@ describe('Login', () => {
   })
   it('uses public email login without username or local account options', async () => {
     render(<MemoryRouter><Login /></MemoryRouter>)
-    expect(screen.getByRole('heading', { name: 'Salve seu trabalho' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Entrar' })).toBeTruthy()
     expect(await screen.findByLabelText('E-mail')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Entrar' }).disabled).toBe(true)
     expect(screen.queryByLabelText('Usuário')).toBeNull()
@@ -106,6 +106,7 @@ describe('Login', () => {
     expect(screen.getByRole('button', { name: 'Criar conta' }).disabled).toBe(true)
     expect(screen.getByLabelText('Confirmar senha')).toBeTruthy()
     expect(screen.queryByLabelText('Usuário')).toBeNull()
+    expect(screen.getByText(/não concede automaticamente acesso ao Beta/i)).toBeTruthy()
     expect(authService.signup).not.toHaveBeenCalled()
   })
 
@@ -290,7 +291,7 @@ describe('Login', () => {
     fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'user@example.test' } })
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'synthetic-pass' } })
     fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-    const submit = (await screen.findAllByRole('button', { name: 'Carregando...' }))
+    const submit = (await screen.findAllByRole('button', { name: 'Entrando...' }))
       .find((button) => button.type === 'submit')
     expect(submit.disabled).toBe(true)
     expect(submit.getAttribute('aria-busy')).toBe('true')

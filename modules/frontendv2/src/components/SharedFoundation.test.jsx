@@ -8,6 +8,13 @@ import PageHeader from './PageHeader'
 
 afterEach(cleanup)
 
+it('names the action being performed while keeping a loading button disabled', () => {
+  render(<Button loading loadingLabel="Salvando…">Salvar</Button>)
+  const button = screen.getByRole('button', { name: 'Salvando…' })
+  expect(button.disabled).toBe(true)
+  expect(button.getAttribute('aria-busy')).toBe('true')
+})
+
 it('preserves disabled/loading buttons, accessible names and form submission', () => {
   const submit = vi.fn(event => event.preventDefault())
   const { rerender } = render(<form onSubmit={submit}><Button type="submit" icon={Save}>Salvar</Button></form>)

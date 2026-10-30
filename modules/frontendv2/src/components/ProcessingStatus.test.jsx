@@ -3,6 +3,12 @@ import { cleanup, render, screen } from '@testing-library/react'
 import ProcessingStatus from './ProcessingStatus'
 
 describe('ProcessingStatus', () => {
+  it('explains queued and active processing without promising a completion time', () => {
+    const { rerender } = render(<ProcessingStatus status="queued" />)
+    expect(screen.getByText('Áudio recebido. Aguardando processamento.')).toBeTruthy()
+    rerender(<ProcessingStatus status="processing" />)
+    expect(screen.getByText('Seu áudio está sendo processado. Você pode voltar depois para acompanhar.')).toBeTruthy()
+  })
   it('shows queued work without inventing percentage or estimated time', () => {
     render(<ProcessingStatus status="queued" />)
     expect(screen.getByRole('heading', { name: 'Na fila' })).toBeTruthy()

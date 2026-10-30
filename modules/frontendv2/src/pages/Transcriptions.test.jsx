@@ -32,6 +32,17 @@ describe('Transcriptions history', () => {
     expect(screen.getByRole('link', { name: 'interview.mp3' })).toBeTruthy()
   })
 
+  it('distinguishes the initial empty state from a search with no matches', async () => {
+    audioService.listTranscriptions.mockResolvedValue({ total: 0, transcriptions: [] })
+    render(<MemoryRouter><Transcriptions /></MemoryRouter>)
+    expect(await screen.findByText('Você ainda não tem transcrições. Envie um áudio para criar a primeira.')).toBeTruthy()
+    expect(screen.getAllByRole('link', { name: 'Nova transcrição' })).toHaveLength(2)
+
+    fireEvent.change(screen.getByPlaceholderText('Buscar por nome do arquivo...'), { target: { value: 'reunião' } })
+    expect(screen.getByText('Nenhuma transcrição corresponde à busca.')).toBeTruthy()
+    expect(screen.getAllByRole('link', { name: 'Nova transcrição' })).toHaveLength(1)
+  })
+
   it('shows and searches by the original Unicode filename instead of the storage key', async () => {
     audioService.listTranscriptions.mockResolvedValue({ total: 1, transcriptions: [
       { id: 3, filename: `${'a'.repeat(32)}.wav`, original_filename: 'Reunião da equipe.wav', status: 'completed', created_at: '2026-10-02T10:00:00Z' },

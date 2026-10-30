@@ -73,7 +73,7 @@ it.each([[true, false], [false, true]])('labels and blocks unavailable AssemblyA
   audioService.getProviderSettings.mockResolvedValue(settings(available, allowed))
   const { container } = render(<MemoryRouter><NewTranscription /></MemoryRouter>)
   const platformChoice = await screen.findByRole('button', { name: 'Transcrição do Beta' })
-  const ownChoice = screen.getByRole('button', { name: 'Minha conta AssemblyAI' })
+  const ownChoice = screen.getByRole('button', { name: 'Minha chave de transcrição' })
   expect(platformChoice.disabled).toBe(true)
   expect(ownChoice.disabled).toBe(true)
   expect(platformChoice.textContent).toContain('Indisponível')
@@ -85,7 +85,7 @@ it.each([[true, false], [false, true]])('labels and blocks unavailable AssemblyA
 it('keeps AssemblyAI selectable when the server permits it', async () => {
   audioService.getProviderSettings.mockResolvedValue(settings(true, true))
   render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-  expect((await screen.findByRole('button', { name: 'Minha conta AssemblyAI' })).disabled).toBe(false)
+  expect((await screen.findByRole('button', { name: 'Minha chave de transcrição' })).disabled).toBe(false)
   expect(screen.queryByText('Indisponível')).toBeNull()
   expect(screen.getByText(/o áudio necessário ao processamento é enviado ao serviço selecionado/i)).toBeTruthy()
 })
@@ -95,7 +95,7 @@ it('offers separate beta and own-account routes and submits the selected source 
   audioService.createTranscriptionJob.mockResolvedValue({ id: 23 })
   render(<MemoryRouter><NewTranscription /></MemoryRouter>)
   const betaChoice = await screen.findByRole('button', { name: /Transcrição do Beta/ })
-  const ownChoice = screen.getByRole('button', { name: /Minha conta AssemblyAI/ })
+  const ownChoice = screen.getByRole('button', { name: /Minha chave de transcrição/ })
   expect(betaChoice.disabled).toBe(false)
   expect(ownChoice.disabled).toBe(false)
 
@@ -115,7 +115,7 @@ it('blocks the beta route when platform access is unavailable even if another so
   })
   render(<MemoryRouter><NewTranscription /></MemoryRouter>)
   expect((await screen.findByRole('button', { name: /Transcrição do Beta/ })).disabled).toBe(true)
-  expect(screen.getByRole('button', { name: /Minha conta AssemblyAI/ }).disabled).toBe(false)
+  expect(screen.getByRole('button', { name: /Minha chave de transcrição/ }).disabled).toBe(false)
 })
 
 it('shows Guest AssemblyAI as unavailable directly from guest policy', () => {
@@ -148,7 +148,7 @@ it('accepts M4A with video/mp4 MIME when the extension is allowed', async () => 
   await screen.findByText(/Formatos disponíveis: M4A/)
   await userEvent.upload(document.querySelector('input[type="file"]'), new File(['audio'], 'recording.m4a', { type: 'video/mp4' }))
   expect(screen.getByText('recording.m4a')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Minha conta AssemblyAI' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Minha chave de transcrição' }))
   await waitFor(() => expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(false))
   fireEvent.click(screen.getByRole('button', { name: 'Iniciar Transcrição' }))
   await waitFor(() => expect(audioService.createTranscriptionJob).toHaveBeenCalledOnce())
