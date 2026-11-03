@@ -303,3 +303,53 @@ def test_firebase_upload_rejects_unverified_or_inactive_identity_before_body(
         "Content-Type": "multipart/form-data; boundary=test"}, content=unread_body())
     assert response.status_code == status, response.text
     assert not db_context["queue"].enqueued
+
+
+@pytest.mark.parametrize("valid", [False, True])
+def test_firebase_upload_ip_limit_runs_before_identity_verification(
+        db_context, monkeypatch, wav_bytes, valid):
+    from fastapi import HTTPException
+    from src.services import firebase_identity, rate_limit
+    from .conftest import FakeRedisConnection
+    headers = firebase_headers(db_context, monkeypatch)(1)
+    connection = FakeRedisConnection()
+    monkeypatch.setattr(rate_limit, "get_redis_connection", lambda: connection)
+    monkeypatch.setattr(settings, "UPLOAD_RATE_LIMIT_PER_IP", 1)
+    verify = firebase_identity._verify_with_sdk
+    calls = []
+
+    def observed_verify(token):
+        calls.append(token)
+        if not valid:
+            raise HTTPException(401, "Synthetic rejected token")
+        return verify(token)
+
+    monkeypatch.setattr(firebase_identity, "_verify_with_sdk", observed_verify)
+    client = db_context["client"]
+    first = client.post("/transcriptions/jobs", headers=headers,
+                        files={"file": ("sample.wav", wav_bytes)})
+    assert first.status_code == (202 if valid else 401), first.text
+    verified_before = len(calls)
+    assert verified_before > 0
+    second = client.post("/transcriptions/jobs", headers=headers,
+                         files={"file": ("sample.wav", wav_bytes)})
+    assert second.status_code == 429, second.text
+    assert len(calls) == verified_before
+    assert len(db_context["queue"].enqueued) == int(valid)
+
+
+def test_firebase_upload_redis_failure_prevents_verification(db_context, monkeypatch):
+    from src.services import firebase_identity, rate_limit
+    headers = firebase_headers(db_context, monkeypatch)(1)
+
+    def unavailable():
+        raise RuntimeError("Synthetic Redis outage")
+
+    def unexpected_verify(_token):
+        pytest.fail("Unavailable rate limiting must prevent Firebase calls")
+
+    monkeypatch.setattr(rate_limit, "get_redis_connection", unavailable)
+    monkeypatch.setattr(firebase_identity, "_verify_with_sdk", unexpected_verify)
+    response = db_context["client"].post("/transcriptions/jobs", headers=headers)
+    assert response.status_code == 503, response.text
+    assert not db_context["queue"].enqueued
