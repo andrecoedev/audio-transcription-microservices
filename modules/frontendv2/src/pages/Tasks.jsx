@@ -36,7 +36,7 @@ export default function Tasks() {
   const page = Math.floor(skip / limit) + 1
   return <div className="space-y-6">
     <header className="flex flex-wrap items-end justify-between gap-3">
-      <div><h1 className="text-3xl font-semibold tracking-tight text-gray-900">Tarefas</h1>
+      <div><h1 className="editorial-title text-gray-900">Tarefas</h1>
         <p className="mt-1 text-gray-600">Revise as sugestões e acompanhe tarefas de uma reunião.</p></div>
     </header>
 

@@ -145,7 +145,7 @@ export default function MeetingMinutes() {
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="editorial-title text-gray-900 flex items-center gap-2">
           <Sparkles className="w-8 h-8 text-yellow-500" />
           Criar ata da reunião
         </h1>

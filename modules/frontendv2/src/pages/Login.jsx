@@ -298,7 +298,7 @@ export default function Login({ signup = false }) {
   return (
     <section aria-labelledby="auth-heading" className="mx-auto flex w-full max-w-md flex-col justify-center py-8">
       <div className="mb-5 text-center">
-        <h1 id="auth-heading" className="text-3xl font-semibold text-gray-900">{title}</h1>
+        <h1 id="auth-heading" className="editorial-title text-gray-900">{title}</h1>
         <p className="mx-auto mt-2 max-w-sm text-gray-600">
           {verificationPending
             ? email ? `Confirme ${email} pelo link enviado para acessar sua conta.` : 'Confirme seu endereço pelo link enviado para acessar sua conta.'
