@@ -100,10 +100,8 @@ it('keeps a long transcript in a bounded scroll region', async () => {
   renderMeeting()
   expect(await screen.findByText('Segmento 499')).toBeTruthy()
   const transcript = screen.getByLabelText('Trechos da transcrição')
-  expect(transcript.className).toContain('overflow-y-auto')
-  expect(transcript.className).toContain('overscroll-contain')
-  expect(transcript.closest('.card').parentElement.className).toContain('xl:h-[min(72vh,52rem)]')
-  expect(transcript.closest('.card').className).toContain('h-[65vh]')
+  expect(transcript.tabIndex).toBe(0)
+  expect(transcript.contains(screen.getByText('Segmento 499'))).toBe(true)
 })
 
 it('scrolls to an evidence segment after opening the meeting from its hash', async () => {
@@ -113,6 +111,8 @@ it('scrolls to an evidence segment after opening the meeting from its hash', asy
   renderMeeting()
   expect(await screen.findByText('Revisar métricas.')).toBeTruthy()
   await waitFor(() => expect(scrollTo).toHaveBeenCalledOnce())
+  expect(document.activeElement?.id).toBe('segment-1')
+  expect(document.activeElement?.dataset.evidence).toBe('true')
 })
 
 it('allows maximum-length unbroken meeting titles to wrap', async () => {

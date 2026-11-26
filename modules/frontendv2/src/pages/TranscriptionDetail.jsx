@@ -2,15 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { 
   ArrowLeft, 
-  Download, 
-  FileAudio,
-  Clock,
-  User,
-  FileText,
+  ChevronDown,
   Copy,
   CheckCircle2
 } from 'lucide-react'
-import Card, { CardHeader, CardTitle, CardContent } from '../components/Card'
 import Button from '../components/Button'
 import ProcessingStatus from '../components/ProcessingStatus'
 import PageHeader from '../components/PageHeader'
@@ -18,6 +13,7 @@ import { audioService } from '../services/audioService'
 import { requestErrorMessage } from '../services/requestError'
 import { formatDuration, formatNumber, formatSeconds, getDisplayFilename } from '../utils/format'
 import toast from 'react-hot-toast'
+import '../styles/editorial-workspace.css'
 
 export default function TranscriptionDetail() {
   const { id } = useParams()
@@ -169,9 +165,7 @@ export default function TranscriptionDetail() {
       <div role={loadError ? 'alert' : undefined} className="text-center py-12">
         <p className="text-gray-600">Transcrição não encontrada</p>
         {loadError && <Button variant="outline" className="mt-4" onClick={() => loadTranscription()}>Tentar novamente</Button>}
-        <Link to="/transcriptions">
-          <Button variant="primary" className="mt-4">Voltar para Transcrições</Button>
-        </Link>
+        <Link to="/transcriptions" className="btn-primary mt-4">Voltar para Transcrições</Link>
       </div>
     )
   }
@@ -190,8 +184,8 @@ export default function TranscriptionDetail() {
   return (
     <div className="mx-auto min-w-0 max-w-6xl space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-1 items-start gap-4">
+      <header className="editorial-workspace-header">
+        <div className="min-w-0">
           <Button
             variant="ghost"
             size="sm"
@@ -200,12 +194,11 @@ export default function TranscriptionDetail() {
           >
             Voltar
           </Button>
-          <div className="min-w-0">
-            <h1 className="break-words text-3xl font-bold text-gray-900">{displayFilename}</h1>
+          <div className="mt-2 min-w-0">
+            <h1 className="editorial-title">{displayFilename}</h1>
             <p className="text-gray-600 mt-1">
               Criado em {new Date(transcription.created_at).toLocaleString('pt-BR')}
             </p>
-            {['queued', 'processing'].includes(transcription.status) && <div className="mt-4 max-w-md"><ProcessingStatus status={transcription.status} /></div>}
             {transcription.status === 'completed' && (
               <Link className="text-primary-700 hover:underline" to={`/meetings/${transcription.id}`}>
                 Abrir reunião
@@ -222,98 +215,48 @@ export default function TranscriptionDetail() {
             {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             {copied ? 'Copiado!' : 'Copiar'}
           </Button>
-          <Button variant="outline" size="sm" onClick={downloadAsText} disabled={!canExportTranscript}>
-            <Download className="w-4 h-4" />
-            TXT
-          </Button>
-          <Button variant="outline" size="sm" onClick={downloadAsJSON}>
-            <Download className="w-4 h-4" />
-            JSON
-          </Button>
-          <Button variant="outline" size="sm" onClick={downloadAsVTT} disabled={!canExportTranscript}>
-            <Download className="w-4 h-4" />
-            VTT
-          </Button>
-          <Button variant="outline" size="sm" onClick={downloadAsSRT} disabled={!canExportTranscript}>
-            <Download className="w-4 h-4" />
-            SRT
-          </Button>
+          <details className="relative">
+            <summary className="btn-secondary cursor-pointer list-none gap-2">
+              Exportar <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            </summary>
+            <div className="absolute left-0 z-10 mt-2 grid min-w-36 rounded-xl border bg-surface p-2 shadow-popover sm:left-auto sm:right-0">
+              {[
+                ['TXT', downloadAsText],
+                ['SRT', downloadAsSRT],
+                ['VTT', downloadAsVTT],
+                ['JSON', downloadAsJSON],
+              ].map(([label, download]) => <button key={label} type="button" disabled={label !== 'JSON' && !canExportTranscript}
+                onClick={download} className="min-h-11 rounded-lg px-3 text-left text-sm font-medium hover:bg-canvas disabled:text-muted">{label}</button>)}
+            </div>
+          </details>
         </div>
-      </div>
+      </header>
 
-      {/* Estatísticas */}
-      <div aria-label="Informações da transcrição" className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          icon={Clock}
-          label="Duração"
-          value={formatSeconds(transcription.duration_seconds)}
-        />
-        <StatCard
-          icon={FileText}
-          label="Palavras"
-          value={formatNumber(transcription.word_count ?? 0)}
-        />
-        <StatCard
-          icon={User}
-          label="Falantes"
-          value={formatNumber(transcription.num_speakers ?? 1)}
-        />
-        <StatCard
-          icon={FileAudio}
-          label="Modelo"
-          value={transcription.transcription_model === 'whisper' ? 'Faster-Whisper' : transcription.transcription_model === 'assemblyai' ? 'AssemblyAI' : 'Não informado'}
-        />
-      </div>
+      <dl aria-label="Informações da transcrição" className="flex flex-wrap gap-x-6 gap-y-2 border-b pb-4 text-[15px] text-gray-600">
+        {[
+          ['Duração', formatSeconds(transcription.duration_seconds)],
+          ['Palavras', formatNumber(transcription.word_count ?? 0)],
+          ['Falantes', formatNumber(transcription.num_speakers ?? 1)],
+          ['Modelo', transcription.transcription_model === 'whisper' ? 'Faster-Whisper' : transcription.transcription_model === 'assemblyai' ? 'AssemblyAI' : 'Não informado'],
+        ].map(([label, value]) => <div key={label} className="flex items-baseline gap-2">
+          <dt>{label}</dt><dd className="font-semibold text-ink">{value}</dd>
+        </div>)}
+      </dl>
 
-      {/* Transcrição */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Transcrição completa</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {transcription.status === 'completed' && Array.isArray(transcription.segments) && transcription.segments.length === 0
-              ? <p className="text-gray-600">Nenhuma fala foi identificada neste áudio.</p>
-              : transcription.segments?.map((segment, index) => (
-              <div
-                key={index}
-                className="p-4 bg-gray-50 rounded-lg border border-gray-200"
-              >
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-700 text-sm font-medium">
-                      {segment.speaker?.replace('SPEAKER_', '')}
-                    </span>
-                    <span className="font-medium text-gray-900">
-                      Falante {segment.speaker?.replace('SPEAKER_', '')}
-                    </span>
-                  </div>
-                  <span className="text-sm text-gray-500">
-                    {formatSeconds(segment.start)} - {formatSeconds(segment.end)}
-                  </span>
-                </div>
-                <p className="break-words text-gray-800 leading-relaxed">{segment.text}</p>
+      <section aria-labelledby="complete-transcript-title">
+        <h2 id="complete-transcript-title" className="text-[22px] font-semibold">Transcrição completa</h2>
+        {transcription.status === 'completed' && Array.isArray(transcription.segments) && transcription.segments.length === 0
+          ? <p className="mt-4 text-gray-600">Nenhuma fala foi identificada neste áudio.</p>
+          : transcription.segments?.map((segment, index) => (
+            <article key={index} className="editorial-segment">
+              <time dateTime={`PT${segment.start}S`}>{formatSeconds(segment.start)} – {formatSeconds(segment.end)}</time>
+              <div>
+                <span className="editorial-speaker">Falante {segment.speaker?.replace('SPEAKER_', '')}</span>
+                <p>{segment.text}</p>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </article>
+          ))}
+      </section>
     </div>
-  )
-}
-
-function StatCard({ icon: Icon, label, value }) {
-  return (
-    <Card className="min-w-0">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="shrink-0 p-3 rounded-lg bg-primary-100">
-          <Icon className="w-5 h-5 text-primary-600" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm text-gray-600">{label}</p>
-          <p className="break-words text-xl font-bold text-gray-900">{value}</p>
-        </div>
-      </div>
-    </Card>
   )
 }

@@ -15,7 +15,7 @@ function EvidenceLinks({ evidence = [], references = [], evidenceBaseUrl = '' })
   if (!evidence.length) return <p className="text-sm text-gray-500">Sem evidência vinculada.</p>
   return <div className="text-sm text-gray-600">Evidência: {evidence.map((item, index) => {
     const reference = references.find(ref => ref.segment_order === item.segment_order)
-    return <a key={`${item.segment_order}-${index}`} href={`${evidenceBaseUrl}#segment-${item.segment_order}`} title={item.quote || ''} className="text-primary-700 underline mr-3">
+    return <a key={`${item.segment_order}-${index}`} href={`${evidenceBaseUrl}#segment-${item.segment_order}`} title={item.quote || ''} className="editorial-evidence">
       {reference ? `${formatSeconds(reference.start)}–${formatSeconds(reference.end)}` : `Trecho ${item.segment_order + 1}`}
     </a>
   })}</div>

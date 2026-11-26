@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import Button from '../components/Button'
 import { audioService } from '../services/audioService'
 import MeetingIntelligencePanel from '../components/MeetingIntelligencePanel'
@@ -9,6 +8,7 @@ import MeetingActionsPanel from '../components/MeetingActionsPanel'
 import MeetingMinutesPanel from '../components/MeetingMinutesPanel'
 import { formatCount, formatDuration, formatSeconds } from '../utils/format'
 import { deletionFeedback } from '../utils/deletionFeedback'
+import '../styles/editorial-workspace.css'
 
 const workspaceTabs = [
   { id: 'summary', label: 'Resumo' },
@@ -28,6 +28,8 @@ export default function MeetingDetail() {
   const [speakerNames, setSpeakerNames] = useState({})
   const [error, setError] = useState(false)
   const [query, setQuery] = useState('')
+  const [mobileView, setMobileView] = useState('transcript')
+  const [focusedSegment, setFocusedSegment] = useState(null)
   const [activeTab, setActiveTab] = useState('summary')
   const transcriptScrollRef = useRef(null)
   const tabRefs = useRef({})
@@ -112,8 +114,16 @@ export default function MeetingDetail() {
     if (!container || !target) return
     const offset = target.getBoundingClientRect().top - container.getBoundingClientRect().top
     const top = container.scrollTop + offset - (container.clientHeight - target.offsetHeight) / 2
-    container.scrollTo?.({ top: Math.max(0, top), behavior: 'smooth' })
-  }, [])
+    const behavior = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'auto' : 'smooth'
+    setFocusedSegment({ meetingId: id, segmentId })
+    target.focus({ preventScroll: true })
+    const mobile = window.matchMedia?.('(max-width: 860px)')?.matches
+    if (mobile) target.scrollIntoView?.({ behavior, block: 'center' })
+    else {
+      container.scrollIntoView?.({ behavior: 'auto', block: 'nearest' })
+      container.scrollTo?.({ top: Math.max(0, top), behavior })
+    }
+  }, [id])
 
   useEffect(() => {
     if (!transcript || loadedMeetingRef.current !== id || initialHashMeeting.current === id) return
@@ -128,12 +138,12 @@ export default function MeetingDetail() {
 
   const durationLabel = meeting.duration_seconds == null ? 'Duração não informada' : formatDuration(meeting.duration_seconds)
 
-  return <div className="space-y-5">
-    <header className="flex flex-wrap items-start justify-between gap-4">
+  return <div className="editorial-workspace">
+    <header className="editorial-workspace-header">
       <div className="min-w-0 flex-1">
         <Link className="text-sm text-gray-500 hover:text-gray-900" to="/meetings">← Reuniões</Link>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <h1 className="min-w-0 break-words text-3xl font-semibold tracking-tight text-gray-900">{meeting.title}</h1>
+          <h1 className="editorial-title min-w-0 break-words">{meeting.title}</h1>
           {!editingTitle && <Button type="button" variant="outline" size="sm" onClick={() => setEditingTitle(true)}>Editar título</Button>}
         </div>
         {editingTitle && <form onSubmit={saveTitle} className="mt-2 flex flex-wrap items-center gap-2">
@@ -143,13 +153,13 @@ export default function MeetingDetail() {
           <Button type="submit" size="sm">Salvar título</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => { setTitle(meeting.title); setEditingTitle(false) }}>Cancelar</Button>
         </form>}
-        <p className="mt-1 text-sm text-gray-500">{new Date(meeting.created_at).toLocaleString('pt-BR')} · {durationLabel} · {formatCount(meeting.speakers.length, 'falante', 'falantes')}</p>
+        <p className="mt-2 text-[15px] text-gray-500">{new Date(meeting.created_at).toLocaleString('pt-BR')} · {durationLabel} · {formatCount(meeting.speakers.length, 'falante', 'falantes')} · {formatCount(transcript.segments.length, 'trecho', 'trechos')}</p>
       </div>
-      <div className="flex items-center gap-2">
-        {meeting.transcription_id && <Link to={`/transcriptions/${meeting.transcription_id}`} className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Abrir transcrição</Link>}
+      <div className="flex flex-wrap items-center gap-2">
+        {meeting.transcription_id && <Link to={`/transcriptions/${meeting.transcription_id}`} className="btn-secondary">Abrir transcrição</Link>}
         <details className="relative">
-          <summary className="cursor-pointer list-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700">Falantes</summary>
-          <div className="absolute right-0 z-10 mt-2 w-[min(24rem,90vw)] rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
+          <summary className="btn-secondary cursor-pointer list-none">Falantes</summary>
+          <div className="editorial-speakers rounded-xl border border-gray-200 bg-surface p-4 shadow-popover">
             <h2 className="mb-3 font-semibold">Renomear falantes</h2>
             {meeting.speakers.length === 0 ? <p className="text-sm text-gray-500">Nenhum falante identificado.</p> : <div className="space-y-3">
               {meeting.speakers.map(speaker => <form key={speaker.id} onSubmit={event => saveSpeaker(event, speaker.id)} className="flex items-center gap-2">
@@ -166,52 +176,55 @@ export default function MeetingDetail() {
       </div>
     </header>
 
-    <div className="grid min-h-0 gap-5 xl:h-[min(72vh,52rem)] xl:grid-cols-[minmax(0,1.65fr)_minmax(20rem,0.9fr)]">
-      <Card className="!p-0 flex h-[65vh] min-h-[28rem] flex-col overflow-hidden xl:h-full">
-        <CardHeader className="border-b border-gray-200 px-5 pt-5 pb-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><CardTitle>Transcrição</CardTitle><p className="mt-1 text-sm text-gray-500">{formatCount(transcript.segments.length, 'trecho', 'trechos')} · {durationLabel} · {formatCount(meeting.speakers.length, 'falante', 'falantes')}</p></div>
-            <label className="sr-only" htmlFor="transcript-search">Buscar na transcrição</label>
-            <input id="transcript-search" type="search" value={query} onChange={event => setQuery(event.target.value)}
-              placeholder="Buscar na transcrição" className="w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" />
-          </div>
-        </CardHeader>
-        <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-          <div ref={transcriptScrollRef} className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-5 py-4" aria-label="Trechos da transcrição">
-            {segments.map(segment => <article id={`segment-${segment.order}`} key={segment.order} className="rounded-lg px-3 py-3 hover:bg-gray-50">
-              <div className="mb-1 flex items-center gap-2 text-sm">
-                <span className="rounded-full bg-primary-50 px-2.5 py-1 font-medium text-primary-700">{segment.speaker_display_name || segment.speaker || 'Falante'}</span>
-                <time className="text-gray-500" dateTime={`PT${segment.start || 0}S`}>{formatSeconds(Number(segment.start || 0), 2)}</time>
-              </div>
-              <p className="whitespace-pre-wrap text-[17px] leading-7 text-gray-900">{segment.text}</p>
-            </article>)}
-            {segments.length === 0 && <p className="p-4 text-sm text-gray-500">{query.trim() ? 'Nenhum trecho corresponde à busca.' : meeting.status === 'completed' && Array.isArray(transcript.segments) ? 'Nenhuma fala foi identificada neste áudio.' : 'Nenhum trecho disponível nesta transcrição.'}</p>}
-          </div>
-          <footer className="flex justify-between border-t border-gray-200 px-5 py-3 text-xs text-gray-500">
-            <span>{query ? `${formatCount(segments.length, 'trecho', 'trechos')} de ${formatCount(transcript.segments.length, 'trecho', 'trechos')}` : `${formatCount(segments.length, 'trecho', 'trechos')} · role para continuar`}</span>
-            <span>{durationLabel}</span>
-          </footer>
-        </CardContent>
-      </Card>
+    <div className="editorial-workspace-switch" role="group" aria-label="Visualização da reunião">
+      <button type="button" aria-pressed={mobileView === 'transcript'} aria-controls="meeting-transcript" onClick={() => setMobileView('transcript')}>Transcrição</button>
+      <button type="button" aria-pressed={mobileView === 'summary'} aria-controls="meeting-summary" onClick={() => setMobileView('summary')}>Resumo inteligente</button>
+    </div>
 
-      <Card className="!p-0 flex h-[65vh] min-h-[28rem] flex-col overflow-hidden xl:h-full">
-        <CardHeader className="px-5 pt-5 pb-3"><div className="flex items-center justify-between gap-2"><CardTitle>Resumo inteligente</CardTitle><span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">{formatCount(transcript.segments.length, 'fala', 'falas')}</span></div></CardHeader>
-        <div role="tablist" aria-label="Conteúdo da reunião" className="flex gap-1 overflow-x-auto border-b border-gray-200 px-4">
+    <div className="editorial-workspace-grid">
+      <section id="meeting-transcript" aria-labelledby="meeting-transcript-title" className="editorial-transcript" data-mobile-active={mobileView === 'transcript'}>
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="meeting-transcript-title" className="text-[22px] font-semibold">Transcrição</h2>
+          <label className="sr-only" htmlFor="transcript-search">Buscar na transcrição</label>
+          <input id="transcript-search" type="search" value={query} onChange={event => setQuery(event.target.value)}
+            placeholder="Buscar na transcrição" className="input max-w-56 rounded-full" />
+        </header>
+        <div ref={transcriptScrollRef} className="editorial-transcript-scroll" aria-label="Trechos da transcrição" role="region" tabIndex={0}>
+          {segments.map(segment => {
+            const segmentId = `segment-${segment.order}`
+            return <article id={segmentId} key={segment.order} tabIndex={-1} className="editorial-segment"
+              data-evidence={focusedSegment?.meetingId === id && focusedSegment.segmentId === segmentId}>
+              <time dateTime={`PT${segment.start || 0}S`}>{formatSeconds(Number(segment.start || 0), 2)}</time>
+              <div>
+                <span className="editorial-speaker">{segment.speaker_display_name || segment.speaker || 'Falante'}</span>
+                <p>{segment.text}</p>
+              </div>
+            </article>
+          })}
+          {segments.length === 0 && <p className="py-4 text-sm text-gray-500">{query.trim() ? 'Nenhum trecho corresponde à busca.' : meeting.status === 'completed' && Array.isArray(transcript.segments) ? 'Nenhuma fala foi identificada neste áudio.' : 'Nenhum trecho disponível nesta transcrição.'}</p>}
+        </div>
+        {query && <p className="pt-3 text-xs text-gray-500">{formatCount(segments.length, 'trecho', 'trechos')} de {formatCount(transcript.segments.length, 'trecho', 'trechos')}</p>}
+      </section>
+
+      <section id="meeting-summary" aria-labelledby="meeting-summary-title" className="editorial-summary" data-mobile-active={mobileView === 'summary'}>
+        <h2 id="meeting-summary-title" className="mb-4 text-[22px] font-semibold">Resumo inteligente</h2>
+        <div role="tablist" aria-label="Conteúdo da reunião" className="editorial-summary-tabs">
           {workspaceTabs.map((tab, index) => <button type="button" role="tab" id={`meeting-tab-${tab.id}`} key={tab.id} aria-selected={activeTab === tab.id}
             aria-controls="meeting-workspace-tab" tabIndex={activeTab === tab.id ? 0 : -1}
             ref={element => { tabRefs.current[tab.id] = element }}
             onKeyDown={event => handleTabKeyDown(event, index)} onClick={() => setActiveTab(tab.id)}
-            className={`shrink-0 rounded-t-lg px-3 py-2 text-sm ${activeTab === tab.id ? 'bg-primary-50 font-medium text-primary-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+            >
             {tab.label}
           </button>)}
         </div>
-        <div id="meeting-workspace-tab" role="tabpanel" aria-labelledby={`meeting-tab-${activeTab}`} tabIndex={0} className="min-h-0 flex-1 overflow-y-auto p-4"
+        <div id="meeting-workspace-tab" role="tabpanel" aria-labelledby={`meeting-tab-${activeTab}`} tabIndex={0} className="editorial-summary-content"
           onClick={event => {
             const link = event.target.closest('a[href^="#segment-"]')
             if (!link) return
             event.preventDefault()
             const segmentId = link.getAttribute('href').slice(1)
             setQuery('')
+            setMobileView('transcript')
             requestAnimationFrame(() => scrollToSegment(segmentId))
           }}>
           <div hidden={activeTab === 'actions'}>
@@ -219,10 +232,10 @@ export default function MeetingDetail() {
           </div>
           {activeTab === 'actions' && <MeetingActionsPanel key={id} meetingId={id} intelligenceVersion={intelligenceVersion} onActionsChanged={refreshMinutes} embedded />}
         </div>
-      </Card>
+      </section>
     </div>
 
-    <details className="group">
+    <details className="mt-8 border-t border-gray-200 pt-4">
       <summary className="cursor-pointer text-sm font-medium text-gray-700">Ata da reunião e exportação</summary>
       <div className="mt-3"><MeetingMinutesPanel key={`minutes-${id}`} meetingId={id} version={minutesVersion + intelligenceVersion} /></div>
     </details>

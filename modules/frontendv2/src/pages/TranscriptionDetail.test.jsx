@@ -14,18 +14,17 @@ afterEach(() => {
 })
 
 describe('TranscriptionDetail loading', () => {
-  it('keeps long filenames and the statistics grid in the shared page container', async () => {
+  it('keeps long filenames and metadata in the shared page container', async () => {
     const filename = `${'reuniao_de_planejamento_'.repeat(6)}.wav`
     audioService.getTranscription.mockResolvedValue({ id: 8, filename, status: 'completed', created_at: '2026-10-02T10:00:00Z', segments: [] })
     render(<MemoryRouter initialEntries={['/transcriptions/8']}><Routes><Route path="/transcriptions/:id" element={<TranscriptionDetail />} /></Routes></MemoryRouter>)
     const heading = await screen.findByRole('heading', { name: filename })
-    const grid = screen.getByLabelText('Informações da transcrição')
-    expect(grid.parentElement.className).toContain('max-w-6xl')
-    expect(heading.className).toContain('break-words')
+    const metadata = screen.getByLabelText('Informações da transcrição')
     expect(await screen.findByText('Nenhuma fala foi identificada neste áudio.')).toBeTruthy()
-    expect(grid.className).toContain('sm:grid-cols-2')
-    expect(grid.className).toContain('xl:grid-cols-4')
-    expect(grid.parentElement.contains(heading)).toBe(true)
+    expect(metadata.tagName).toBe('DL')
+    expect(metadata.parentElement.contains(heading)).toBe(true)
+    expect(metadata.textContent).toContain('Duração')
+    expect(metadata.textContent).toContain('Modelo')
   })
 
   it('uses the original Unicode filename in a completed transcription', async () => {
