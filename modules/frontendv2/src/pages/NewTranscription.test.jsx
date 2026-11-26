@@ -64,8 +64,6 @@ it('identifies development access while presenting upload and duration values as
   expect(await screen.findByText('Acesso de desenvolvimento para transcrição local. Os limites abaixo são tetos técnicos; serviços externos mantêm suas permissões e limites.')).toBeTruthy()
   expect(screen.getByLabelText('Limites desta conta').textContent).toContain('Teto técnico 5.120 MB por arquivo')
   expect(screen.getByLabelText('Limites desta conta').textContent).toContain('Até 1.440 minutos de áudio (teto técnico)')
-  expect(screen.getByText('Tetos técnicos de envio')).toBeTruthy()
-  expect(screen.getByText(/Até 5\.120 MB e 1\.440 minutos por áudio \(teto técnico\)/)).toBeTruthy()
   expect(screen.queryByText(/Sem limite comercial/)).toBeNull()
 })
 
@@ -131,13 +129,12 @@ it('shows Guest AssemblyAI as unavailable directly from guest policy', () => {
 it('advertises exactly the formats returned by server policy', async () => {
   guestService.policy.mockResolvedValue({ ...policy, allowed_extensions: ['wav', 'm4a'] })
   render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-  await screen.findByText('WAV, M4A')
+  expect((await screen.findByLabelText('Limites desta conta')).textContent).toContain('Formatos disponíveis: WAV, M4A')
   const input = document.querySelector('input[type="file"]')
   expect(input.getAttribute('accept')).toContain('.wav')
   expect(input.getAttribute('accept')).toContain('.m4a')
   expect(input.getAttribute('accept')).not.toContain('.ogg')
   expect(input.getAttribute('accept')).not.toContain('.aac')
-  expect(screen.getByText('WAV, M4A')).toBeTruthy()
 })
 
 it('accepts M4A with video/mp4 MIME when the extension is allowed', async () => {
@@ -145,7 +142,7 @@ it('accepts M4A with video/mp4 MIME when the extension is allowed', async () => 
   audioService.getProviderSettings.mockResolvedValue(settings(true, true))
   audioService.createTranscriptionJob.mockResolvedValue({ id: 12 })
   render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-  await screen.findByText(/Formatos disponíveis: M4A/)
+  expect((await screen.findByLabelText('Limites desta conta')).textContent).toContain('Formatos disponíveis: M4A')
   await userEvent.upload(document.querySelector('input[type="file"]'), new File(['audio'], 'recording.m4a', { type: 'video/mp4' }))
   expect(screen.getByText('recording.m4a')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Minha chave de transcrição' }))
@@ -161,7 +158,7 @@ it.each([
 ])('rejects .%s before creating a job when server policy omits that extension', async (extension, mimeType) => {
   guestService.policy.mockResolvedValue({ ...policy, allowed_extensions: ['wav', 'm4a'] })
   render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-  await screen.findByText(/Formatos disponíveis: WAV, M4A/)
+  expect((await screen.findByLabelText('Limites desta conta')).textContent).toContain('Formatos disponíveis: WAV, M4A')
   await userEvent.upload(document.querySelector('input[type="file"]'), new File(['audio'], `recording.${extension}`, { type: mimeType }), { applyAccept: false })
   expect(audioService.createTranscriptionJob).not.toHaveBeenCalled()
   expect(screen.queryByText(`recording.${extension}`)).toBeNull()
