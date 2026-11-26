@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
+import { useAuthStore } from '../stores/authStore'
 
 const focusableSelector = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { pathname } = useLocation()
+  const authenticated = useAuthStore(state => state.isAuthenticated)
+  const publicHome = pathname === '/' && !authenticated
   const menuButtonRef = useRef(null)
   const drawerRef = useRef(null)
   const mainRef = useRef(null)
@@ -29,7 +32,7 @@ export default function Layout() {
 
   useEffect(() => {
     if (!window.matchMedia) return undefined
-    const media = window.matchMedia('(min-width: 768px)')
+    const media = window.matchMedia('(min-width: 861px)')
     const handleBreakpoint = (event) => { if (event.matches) closeMenu(false) }
     if (media.addEventListener) media.addEventListener('change', handleBreakpoint)
     else media.addListener?.(handleBreakpoint)
@@ -76,16 +79,23 @@ export default function Layout() {
     }
   }, [menuOpen, closeMenu])
 
-  return <div className="flex min-h-screen flex-col bg-canvas md:h-screen md:flex-row md:overflow-hidden">
-    <a ref={skipLinkRef} href="#main-content" className="sr-only z-50 rounded-lg bg-white p-3 focus:not-sr-only focus:absolute">Ir para o conteúdo</a>
-    <div ref={desktopSidebarRef} className="hidden overflow-y-auto md:block"><Sidebar /></div>
+  const skipLink = <a ref={skipLinkRef} href="#main-content" className="sr-only z-50 rounded-lg bg-surface p-3 focus:not-sr-only focus:absolute">Ir para o conteúdo</a>
+
+  if (publicHome) return <>
+    {skipLink}
+    <main ref={mainRef} id="main-content" tabIndex={-1}><Outlet /></main>
+  </>
+
+  return <div className="flex min-h-screen flex-col bg-canvas min-[861px]:h-dvh min-[861px]:flex-row min-[861px]:overflow-hidden">
+    {skipLink}
+    <div ref={desktopSidebarRef} className="hidden overflow-y-auto min-[861px]:block"><Sidebar /></div>
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <Navbar ref={menuButtonRef} backgroundRef={navbarRef} expanded={menuOpen} onMenu={() => setMenuOpen(true)} />
-      <main ref={mainRef} id="main-content" tabIndex={-1} className="min-w-0 flex-1 p-5 sm:p-8 md:overflow-y-auto lg:px-10 lg:py-10">
-        <div className="mx-auto max-w-7xl"><Outlet /></div>
+      <main ref={mainRef} id="main-content" tabIndex={-1} className="app-main min-w-0 flex-1 min-[861px]:overflow-y-auto">
+        <div className="mx-auto max-w-[1080px]"><Outlet /></div>
       </main>
     </div>
-    {menuOpen && <div className="fixed inset-0 z-40 flex md:hidden">
+    {menuOpen && <div className="fixed inset-0 z-40 flex min-[861px]:hidden">
       <div id="mobile-navigation" ref={drawerRef} role="dialog" aria-modal="true" aria-label="Navegação principal" tabIndex={-1} className="relative z-10 h-full max-h-[100dvh] overflow-y-auto overscroll-contain shadow-xl">
         <Sidebar compact onNavigate={navigateFromMenu} onClose={() => closeMenu()} />
       </div>

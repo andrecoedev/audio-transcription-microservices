@@ -36,12 +36,12 @@ export default function Tasks() {
   const page = Math.floor(skip / limit) + 1
   return <div className="space-y-6">
     <header className="flex flex-wrap items-end justify-between gap-3">
-      <div><h1 className="text-3xl font-semibold tracking-tight text-gray-900">Tarefas</h1>
+      <div><h1 className="editorial-title text-gray-900">Tarefas</h1>
         <p className="mt-1 text-gray-600">Revise as sugestões e acompanhe tarefas de uma reunião.</p></div>
     </header>
 
     <Card>
-      <CardHeader><CardTitle>Escolha uma reunião</CardTitle></CardHeader>
+      <CardHeader><CardTitle as="h2">Escolha uma reunião</CardTitle></CardHeader>
       <CardContent>
         {loading ? <p role="status" className="text-sm text-gray-500">Carregando reuniões...</p> : error ? <div className="space-y-3">
           <p role="alert" className="text-sm text-red-700">Não foi possível carregar as reuniões.</p>

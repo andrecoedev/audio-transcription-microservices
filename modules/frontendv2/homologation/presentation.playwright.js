@@ -14,8 +14,7 @@ async (page) => {
   await page.getByText('Decidimos publicar o guia de integração em português.', { exact: true }).first().waitFor()
   const longId = new URL(page.url()).pathname.split('/').pop()
   await page.goto(`${base}/meetings/${longId}`)
-  // UI currently uses aria-label on a generic scroll container, not region role.
-  const transcript = page.locator('[aria-label="Trechos da transcrição"]')
+  const transcript = page.getByRole('region', { name: 'Trechos da transcrição' })
   await transcript.locator('article').last().waitFor()
   if (await transcript.locator('article').count() !== 200) throw new Error('Long transcript truncated')
   await page.getByRole('tabpanel').getByText('Esta reunião ainda não tem resumo.', { exact: true }).waitFor()

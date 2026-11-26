@@ -7,12 +7,19 @@ import { useAuthStore } from '../stores/authStore'
 beforeEach(() => useAuthStore.setState({ user: null, token: null, isAuthenticated: false }))
 afterEach(cleanup)
 
-const open = () => render(<MemoryRouter><Routes><Route element={<Layout />}>
-  <Route path="/" element={<h1>Conteúdo útil</h1>} />
+const open = (path = '/app-test') => render(<MemoryRouter initialEntries={[path]}><Routes><Route element={<Layout />}>
+  <Route path="/" element={<h1>Página pública</h1>} />
+  <Route path="/app-test" element={<h1>Conteúdo útil</h1>} />
   <Route path="/tasks" element={<h1>Tarefas da conta</h1>} />
 </Route></Routes></MemoryRouter>)
 
 describe('USAGI application shell', () => {
+  it('gives the public home the full page and a skip link', () => {
+    open('/')
+    expect(screen.getByRole('main').textContent).toContain('Página pública')
+    expect(screen.getByRole('link', { name: 'Ir para o conteúdo' }).getAttribute('href')).toBe('#main-content')
+    expect(screen.queryByRole('navigation', { name: 'Navegação principal' })).toBeNull()
+  })
   it('keeps navigation and useful content available to visitors', () => {
     open()
     expect(screen.getByRole('main').textContent).toContain('Conteúdo útil')

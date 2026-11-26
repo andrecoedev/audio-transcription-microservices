@@ -14,11 +14,11 @@ export function CardHeader({ children, className = '' }) {
   )
 }
 
-export function CardTitle({ children, className = '' }) {
+export function CardTitle({ children, className = '', as: Heading = 'h3' }) {
   return (
-    <h3 className={`text-base font-semibold text-gray-900 ${className}`}>
+    <Heading className={`text-base font-semibold text-gray-900 ${className}`}>
       {children}
-    </h3>
+    </Heading>
   )
 }
 

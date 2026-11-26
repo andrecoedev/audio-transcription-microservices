@@ -122,7 +122,7 @@ describe('public React flow', () => {
     })
     window.history.pushState({}, '', '/new-transcription')
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Nova Transcrição' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Envie o áudio da reunião.' })).toBeTruthy()
     expect(useAuthStore.getState().isAuthenticated).toBe(true)
   })
 

@@ -5,6 +5,7 @@ import Card, { CardContent, CardHeader, CardTitle } from '../components/Card'
 import PageHeader from '../components/PageHeader'
 import { guestService } from '../services/guestService'
 import { formatDuration, formatSeconds } from '../utils/format'
+import '../styles/editorial-workspace.css'
 
 const RETURN_TO = encodeURIComponent('/new-transcription')
 
@@ -32,7 +33,8 @@ export default function GuestDemo() {
     if (tab !== 'transcript' || focusedOrder === null) return
     const segment = segmentRefs.current[focusedOrder]
     segment?.focus()
-    segment?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+    const behavior = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'auto' : 'smooth'
+    segment?.scrollIntoView?.({ behavior, block: 'center' })
   }, [focusedOrder, speaker, tab, demo])
 
   function focusEvidence(order) {
@@ -45,7 +47,7 @@ export default function GuestDemo() {
   function evidenceLinks(evidence = []) {
     return <div className="mt-2 flex flex-wrap gap-2">{evidence.map((item, index) => (
       <button key={`${item.segment_order}-${index}`} type="button" onClick={() => focusEvidence(item.segment_order)}
-        title={item.quote} className="text-sm text-primary-700 underline underline-offset-2">
+        title={item.quote} className="editorial-evidence">
         Trecho {item.segment_order + 1}{item.quote ? `: “${item.quote}”` : ''}
       </button>
     ))}</div>
@@ -62,26 +64,29 @@ export default function GuestDemo() {
     {!demo && !error && <p role="status" className="text-sm text-gray-600">Carregando demonstração...</p>}
     {demo && <>
       <Card>
-        <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{demo.title}</CardTitle><p className="mt-1 text-sm text-gray-600">{demo.description}</p></div><span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">Dados de exemplo</span></div></CardHeader>
+        <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle as="h2">{demo.title}</CardTitle><p className="mt-1 text-sm text-gray-600">{demo.description}</p></div><span className="rounded-full bg-[var(--usagi-warning-soft)] px-3 py-1 text-xs font-medium text-warning">Dados de exemplo</span></div></CardHeader>
         <CardContent><p className="text-sm text-gray-600">Duração: {formatDuration(demo.duration_seconds)}</p></CardContent>
       </Card>
       <div className="flex flex-wrap gap-2" aria-label="Conteúdo da demonstração">
         <Button aria-pressed={tab === 'transcript'} variant={tab === 'transcript' ? 'primary' : 'outline'} onClick={() => setTab('transcript')}>Transcrição</Button>
         <Button aria-pressed={tab === 'summary'} variant={tab === 'summary' ? 'primary' : 'outline'} onClick={() => setTab('summary')}>Resumo inteligente</Button>
       </div>
-      {tab === 'transcript' ? <Card>
-        <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>Transcrição de exemplo</CardTitle><label className="text-sm text-gray-700">Filtrar falante{' '}
+      {tab === 'transcript' ? <section aria-label="Transcrição de exemplo">
+        <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle as="h2">Transcrição de exemplo</CardTitle><label className="text-sm text-gray-700">Filtrar falante{' '}
           <select aria-label="Filtrar falante" value={speaker} onChange={(event) => setSpeaker(event.target.value)} className="ml-2 rounded-lg border border-gray-300 bg-white px-3 py-2">
             <option value="all">Todos</option>{demo.speakers?.map((person) => <option key={person.id} value={person.id}>{person.display_name}</option>)}
           </select>
         </label></div></CardHeader>
-        <CardContent className="space-y-3">{visibleSegments.map((segment) => <article key={segment.order} id={`demo-segment-${segment.order}`} tabIndex={-1} ref={(node) => { segmentRefs.current[segment.order] = node }}
-          className={`rounded-lg border p-4 ${focusedOrder === segment.order ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-gray-50'}`}>
-          <p className="mb-1 text-xs font-medium text-gray-500">{formatSeconds(segment.start)}–{formatSeconds(segment.end)} · {demo.speakers?.find((person) => person.id === segment.speaker)?.display_name || segment.speaker}</p>
-          <p className="leading-7 text-gray-800">{segment.text}</p>
-        </article>)}</CardContent>
-      </Card> : <Card>
-        <CardHeader><CardTitle>Resumo inteligente</CardTitle></CardHeader>
+        <div>{visibleSegments.map((segment) => <article key={segment.order} id={`demo-segment-${segment.order}`} tabIndex={-1} ref={(node) => { segmentRefs.current[segment.order] = node }}
+          className="editorial-segment" data-evidence={focusedOrder === segment.order}>
+          <time dateTime={`PT${segment.start}S`}>{formatSeconds(segment.start)}–{formatSeconds(segment.end)}</time>
+          <div>
+            <span className="editorial-speaker">{demo.speakers?.find((person) => person.id === segment.speaker)?.display_name || segment.speaker}</span>
+            <p>{segment.text}</p>
+          </div>
+        </article>)}</div>
+      </section> : <Card>
+        <CardHeader><CardTitle as="h2">Resumo inteligente</CardTitle></CardHeader>
         <CardContent className="space-y-5">
           <section><h3 className="font-semibold text-gray-900">Resumo</h3><p className="mt-2 whitespace-pre-wrap leading-7 text-gray-700">{demo.intelligence?.summary}</p></section>
           {sections.map(([key, title]) => <section key={key} className="space-y-2"><h3 className="font-semibold text-gray-900">{title}</h3>

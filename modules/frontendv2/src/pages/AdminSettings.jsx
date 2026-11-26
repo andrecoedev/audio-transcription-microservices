@@ -259,7 +259,7 @@ export default function AdminSettings() {
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"><span>{error}</span>{error.includes('mudou') && <Button variant="outline" size="sm" onClick={load} disabled={busy}>Recarregar e descartar rascunho</Button>}</div>}
     {notice && <p role="status" className="flex items-center gap-2 text-sm text-green-700"><CheckCircle2 className="h-4 w-4" />{notice}</p>}
 
-    <Card><CardHeader><CardTitle>Visão geral</CardTitle></CardHeader><CardContent>
+    <Card><CardHeader><CardTitle as="h2">Visão geral</CardTitle></CardHeader><CardContent>
       {overview && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={Users} label="Participantes" value={`${overview.participants_used} / ${overview.participants_maximum}`} />
         <Metric icon={Clock3} label="Áudio consumido" value={`${formatSeconds(overview.consumed_seconds)} min`} detail={`${formatSeconds(overview.reserved_seconds)} min reservados`} />
@@ -281,7 +281,7 @@ export default function AdminSettings() {
     </li>)}</ol></details>}
     </CardContent></Card>
 
-    {sections.map((section) => <Card key={section.id}><CardHeader className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{section.title}</CardTitle><p className="mt-1 text-xs text-gray-500">Versão {snapshot?.version ?? 0} · salvamento independente desta seção</p></div><HelpPopover label={`Ajuda: ${section.title}`}>Os limites efetivos podem ser menores por capacidade técnica do ambiente. Valores monetários são tetos internos em USD, não saldos do provedor.</HelpPopover></CardHeader>
+    {sections.map((section) => <Card key={section.id}><CardHeader className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle as="h2">{section.title}</CardTitle><p className="mt-1 text-xs text-gray-500">Versão {snapshot?.version ?? 0} · salvamento independente desta seção</p></div><HelpPopover label={`Ajuda: ${section.title}`}>Os limites efetivos podem ser menores por capacidade técnica do ambiente. Valores monetários são tetos internos em USD, não saldos do provedor.</HelpPopover></CardHeader>
       <CardContent>
         {section.id === 'beta' && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-50 p-3"><span className="text-sm font-medium">Estado da rodada Beta</span><span className={`badge ${!snapshot?.configured ? 'badge-warning' : snapshot.values['beta.enabled'] ? 'badge-success' : 'badge-info'}`}>{!snapshot?.configured ? 'Não preparada' : snapshot.values['beta.enabled'] ? 'Ativa' : 'Desativada'}</span></div>}
         {!snapshot?.configured && section.id === 'beta' && <div className="mb-5 flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold text-gray-900">Configuração ainda não preparada</h2><p className="mt-1 max-w-2xl text-sm text-gray-600">Prepare uma política desativada. Valores existentes de rodada, orçamento e histórico serão preservados; nenhuma chamada externa será feita.</p></div><Button onClick={initialize} disabled={busy}>Preparar configuração</Button></div>}

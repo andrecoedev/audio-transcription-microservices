@@ -6,7 +6,7 @@ import { formatSeconds } from '../utils/format'
 function EvidenceLinks({ evidence = [], references = [] }) {
   return <div className="mt-1 text-sm text-gray-500">{evidence.map((item, index) => {
     const reference = references.find(ref => ref.segment_order === item.segment_order)
-    return <a key={index} href={`#segment-${item.segment_order}`} title={item.quote} className="mr-3 text-primary-700 underline">
+    return <a key={index} href={`#segment-${item.segment_order}`} title={item.quote} className="editorial-evidence">
       {reference ? `${formatSeconds(reference.start)}–${formatSeconds(reference.end)}` : `Trecho ${item.segment_order + 1}`}
     </a>
   })}</div>
@@ -72,18 +72,6 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange, in
     {status && !status.configured && <p className="text-sm text-gray-600">A geração de resumo está indisponível no momento.</p>}
     {busy && <p role="status" className="text-sm text-gray-600">{result ? 'Gerando novamente; a versão anterior continua disponível.' : 'Gerando resumo...'}</p>}
     {state === 'failed' && <p role="alert" className="text-sm text-red-700">Não foi possível gerar o resumo. Tente novamente.</p>}
-    {status && <Button onClick={generate} loading={submitting} loadingLabel={result ? 'Solicitando novo resumo...' : 'Solicitando resumo...'} disabled={busy || !status.configured}>
-      {result ? 'Gerar novamente' : state === 'failed' ? 'Tentar novamente' : 'Gerar resumo'}
-    </Button>}
-    {status && <p className="text-sm text-gray-600">Ao gerar um resumo, a transcrição e o contexto da reunião são enviados ao serviço escolhido, inclusive com sua própria chave. Excluir na USAGI não remove automaticamente cópias desse serviço.</p>}
-    {result && <details className="text-sm text-gray-600">
-      <summary className="cursor-pointer font-medium">Sobre esta versão</summary>
-      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        <dt>Versão</dt><dd>{result.revision}</dd>
-        {result.provider && <><dt>Serviço</dt><dd>{result.provider}</dd></>}
-        {result.model && <><dt>Modelo</dt><dd className="min-w-0 break-words">{result.model}</dd></>}
-      </dl>
-    </details>}
     {content && <div className="space-y-5">
       <p className="text-xs text-gray-500">Conteúdo gerado por IA; revise antes de utilizar.</p>
       {visibleSections.includes('summary') && <section><h3 className="font-semibold text-gray-900">Resumo</h3><p className="mt-2 whitespace-pre-wrap leading-7">{content.summary}</p></section>}
@@ -96,5 +84,17 @@ export default function MeetingIntelligencePanel({ meetingId, onResultChange, in
         </li>)}</ul> : <p className="text-sm text-gray-500">{key === 'decisions' ? 'Nenhuma decisão identificada nesta versão.' : key === 'questions' ? 'Nenhuma pergunta em aberto identificada.' : key === 'topics' ? 'Nenhum tópico identificado nesta versão.' : 'Nenhuma tarefa sugerida nesta versão.'}</p>}
       </section>)}
     </div>}
+    {status && <Button onClick={generate} loading={submitting} loadingLabel={result ? 'Solicitando novo resumo...' : 'Solicitando resumo...'} disabled={busy || !status.configured}>
+      {result ? 'Gerar novamente' : state === 'failed' ? 'Tentar novamente' : 'Gerar resumo'}
+    </Button>}
+    {status && <p className="text-sm text-gray-600">Ao gerar um resumo, a transcrição e o contexto da reunião são enviados ao serviço escolhido, inclusive com sua própria chave. Excluir na USAGI não remove automaticamente cópias desse serviço.</p>}
+    {result && <details className="text-sm text-gray-600">
+      <summary className="cursor-pointer font-medium">Sobre esta versão</summary>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        <dt>Versão</dt><dd>{result.revision}</dd>
+        {result.provider && <><dt>Serviço</dt><dd>{result.provider}</dd></>}
+        {result.model && <><dt>Modelo</dt><dd className="min-w-0 break-words">{result.model}</dd></>}
+      </dl>
+    </details>}
   </section>
 }
