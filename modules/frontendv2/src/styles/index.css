@@ -37,8 +37,8 @@
     overflow-wrap: anywhere;
     text-wrap: balance;
   }
-  .app-main { padding: 24px clamp(16px, 5vw, 72px) 80px; }
-  @media (max-width: 860px) { .app-main { padding-inline: 16px; } }
+  .app-main { padding: 64px clamp(16px, 5vw, 72px) 80px; }
+  @media (max-width: 860px) { .app-main { padding: 24px 16px 80px; } }
   .card {
     background: var(--usagi-surface);
     border: 1px solid var(--usagi-border);

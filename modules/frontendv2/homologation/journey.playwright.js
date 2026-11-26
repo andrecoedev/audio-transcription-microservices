@@ -44,7 +44,7 @@ async (page) => {
   await page.getByLabel('Confirmar senha', { exact: true }).fill('Synthetic-passphrase!')
   await click(page.getByRole('button', { name: 'Criar conta', exact: true }))
   await page.waitForURL('**/new-transcription')
-  await waitText('Preferências da transcrição')
+  await page.getByRole('group', { name: 'Opção de transcrição' }).waitFor()
   check(await page.getByRole('button', { name: 'Transcrição do Beta', exact: true }).isDisabled(), 'New account must not have platform permission')
   record('Cadastro sem concessão automática')
   // Admin acts through the real HTTP API; only the Firebase SDK boundary is fake.

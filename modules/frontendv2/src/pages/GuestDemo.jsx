@@ -64,7 +64,7 @@ export default function GuestDemo() {
     {!demo && !error && <p role="status" className="text-sm text-gray-600">Carregando demonstração...</p>}
     {demo && <>
       <Card>
-        <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{demo.title}</CardTitle><p className="mt-1 text-sm text-gray-600">{demo.description}</p></div><span className="rounded-full bg-[var(--usagi-warning-soft)] px-3 py-1 text-xs font-medium text-warning">Dados de exemplo</span></div></CardHeader>
+        <CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle as="h2">{demo.title}</CardTitle><p className="mt-1 text-sm text-gray-600">{demo.description}</p></div><span className="rounded-full bg-[var(--usagi-warning-soft)] px-3 py-1 text-xs font-medium text-warning">Dados de exemplo</span></div></CardHeader>
         <CardContent><p className="text-sm text-gray-600">Duração: {formatDuration(demo.duration_seconds)}</p></CardContent>
       </Card>
       <div className="flex flex-wrap gap-2" aria-label="Conteúdo da demonstração">
@@ -72,7 +72,7 @@ export default function GuestDemo() {
         <Button aria-pressed={tab === 'summary'} variant={tab === 'summary' ? 'primary' : 'outline'} onClick={() => setTab('summary')}>Resumo inteligente</Button>
       </div>
       {tab === 'transcript' ? <section aria-label="Transcrição de exemplo">
-        <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>Transcrição de exemplo</CardTitle><label className="text-sm text-gray-700">Filtrar falante{' '}
+        <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle as="h2">Transcrição de exemplo</CardTitle><label className="text-sm text-gray-700">Filtrar falante{' '}
           <select aria-label="Filtrar falante" value={speaker} onChange={(event) => setSpeaker(event.target.value)} className="ml-2 rounded-lg border border-gray-300 bg-white px-3 py-2">
             <option value="all">Todos</option>{demo.speakers?.map((person) => <option key={person.id} value={person.id}>{person.display_name}</option>)}
           </select>
@@ -86,7 +86,7 @@ export default function GuestDemo() {
           </div>
         </article>)}</div>
       </section> : <Card>
-        <CardHeader><CardTitle>Resumo inteligente</CardTitle></CardHeader>
+        <CardHeader><CardTitle as="h2">Resumo inteligente</CardTitle></CardHeader>
         <CardContent className="space-y-5">
           <section><h3 className="font-semibold text-gray-900">Resumo</h3><p className="mt-2 whitespace-pre-wrap leading-7 text-gray-700">{demo.intelligence?.summary}</p></section>
           {sections.map(([key, title]) => <section key={key} className="space-y-2"><h3 className="font-semibold text-gray-900">{title}</h3>

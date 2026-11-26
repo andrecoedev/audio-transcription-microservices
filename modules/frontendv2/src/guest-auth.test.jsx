@@ -83,7 +83,7 @@ describe('Guest and account boundaries', () => {
     if (signup) await waitFor(() => expect(screen.getByRole('button', { name: 'Criar conta' }).disabled).toBe(false))
     fireEvent.click(screen.getByRole('button', { name: signup ? 'Criar conta' : 'Entrar' }))
     await waitFor(() => expect(signup ? firebaseAuth.createWithEmail : firebaseAuth.signInWithEmail).toHaveBeenCalledOnce())
-    expect(await screen.findByRole('heading', { name: 'Nova Transcrição' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Envie o áudio da reunião.' })).toBeTruthy()
     expect(window.location.pathname).toBe('/new-transcription')
     expect(useAuthStore.getState().isAuthenticated).toBe(true)
     expect(useAuthStore.getState().authProvider).toBe('firebase')
@@ -95,13 +95,13 @@ describe('Guest and account boundaries', () => {
     expect(guestService.claim).not.toHaveBeenCalled()
     cleanup()
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Nova Transcrição' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Envie o áudio da reunião.' })).toBeTruthy()
     expect(sessionStorage.getItem('usagi-guest-session')).not.toBeNull()
   })
   it('shows server upload limits and keeps platform-only providers disabled for public accounts', async () => {
     useAuthStore.setState({ user: { registration_source: 'public' }, token: 'test-user-proof', isAuthenticated: true })
     render(<MemoryRouter><NewTranscription /></MemoryRouter>)
-    expect(await screen.findByText((_, element) => element.textContent === 'Máximo de 100 MB por arquivo')).toBeTruthy()
+    expect(await screen.findByText((_, element) => element.textContent.startsWith('Máximo de 100 MB por arquivo'))).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Transcrição do Beta' }).disabled).toBe(true)
     expect(screen.getByLabelText('Detecção de falantes')).toBeTruthy()
   })
@@ -113,7 +113,7 @@ describe('Guest and account boundaries', () => {
     expect(await screen.findByText('Não foi possível consultar os limites e formatos de upload.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Iniciar Transcrição' }).disabled).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
-    expect(await screen.findByText((_, element) => element.textContent === 'Máximo de 100 MB por arquivo')).toBeTruthy()
+    expect(await screen.findByText((_, element) => element.textContent.startsWith('Máximo de 100 MB por arquivo'))).toBeTruthy()
   })
   it('App root is public without a session or auth bootstrap request', async () => {
     render(<App />)
@@ -128,7 +128,7 @@ describe('Guest and account boundaries', () => {
 
   it('opens the synthetic demo without exposing upload or creating a guest session/job', async () => {
     render(<App />)
-    fireEvent.click(await screen.findByRole('link', { name: 'Ver demonstração' }))
+    fireEvent.click((await screen.findAllByRole('link', { name: 'Ver demonstração' }))[0])
     expect(await screen.findByRole('heading', { name: 'Demonstração interativa' })).toBeTruthy()
     expect(await screen.findByText('Reunião de exemplo')).toBeTruthy()
     expect(document.querySelector('input[type="file"]')).toBeNull()

@@ -22,7 +22,7 @@ export default function Sidebar({ onNavigate, onClose, compact = false }) {
   const [accountOpen, setAccountOpen] = useState(false)
   const adminHeadingId = useId()
   return <aside className={`flex min-h-full shrink-0 flex-col border-r border-gray-200 bg-shell px-4 ${compact ? 'w-[240px] py-5' : 'w-[240px] pb-6 pt-10'}`}>
-    <div className={`mb-10 flex items-start justify-between ${compact ? 'px-3 py-1' : 'px-3 py-2'}`}>
+    <div className={`mb-10 flex items-start justify-between ${compact ? 'px-3 py-1' : 'px-4'}`}>
       <Link to="/" onClick={onNavigate}>
         <Brand className={compact ? 'text-lg' : 'text-xl'} />
       </Link>

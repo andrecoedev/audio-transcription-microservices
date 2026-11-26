@@ -41,7 +41,7 @@ export default function Tasks() {
     </header>
 
     <Card>
-      <CardHeader><CardTitle>Escolha uma reunião</CardTitle></CardHeader>
+      <CardHeader><CardTitle as="h2">Escolha uma reunião</CardTitle></CardHeader>
       <CardContent>
         {loading ? <p role="status" className="text-sm text-gray-500">Carregando reuniões...</p> : error ? <div className="space-y-3">
           <p role="alert" className="text-sm text-red-700">Não foi possível carregar as reuniões.</p>

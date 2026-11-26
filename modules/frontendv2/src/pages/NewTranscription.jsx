@@ -177,7 +177,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
         <div>
           <p className="editorial-upload__eyebrow">Nova transcrição</p>
           <h1 className="editorial-title">Envie o áudio da reunião.</h1>
-          <p className="editorial-upload__intro">A transcrição fica pronta para revisar, exportar e virar resumo.</p>
+          <p className="editorial-upload__intro">Envie um arquivo de áudio e obtenha uma transcrição para revisar e compartilhar.</p>
         </div>
         {user && <Link className="editorial-upload__history" to="/transcriptions">Histórico</Link>}
       </header>
@@ -191,9 +191,8 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
         {...getRootProps({
           role: 'group',
           'aria-label': 'Envio de áudio',
-          'aria-disabled': !policyReady || !processingAllowed,
         })}>
-        <input {...getInputProps()} disabled={!policyReady || !processingAllowed || uploading} />
+        <input {...getInputProps()} aria-label="Arquivo de áudio" disabled={!policyReady || !processingAllowed || uploading} />
         {!policyReady ? (
           <div className="editorial-upload__policy-state" role={policyError || guestPolicy ? 'alert' : 'status'}>
             {policyError || guestPolicy ? <>
@@ -212,7 +211,7 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
               <FileAudio aria-hidden="true" className="editorial-upload__file-icon" />
               <div className="editorial-upload__file-info">
                 <p className="editorial-upload__file-name">{file.name}</p>
-                <p className="editorial-upload__file-meta">{formatNumber(file.size / (1024 * 1024), { maximumFractionDigits: 2 })} MB · ainda não enviado</p>
+                <p className="editorial-upload__file-meta">{formatNumber(file.size / (1024 * 1024), { maximumFractionDigits: 2 })} MB{!uploading && ' · ainda não enviado'}</p>
               </div>
             </div>
             <div className="editorial-upload__file-actions">
@@ -244,9 +243,9 @@ export default function NewTranscription({ guestPolicy = null, onCreate = null, 
             <p>{providerLoading ? 'Carregando opções de transcrição...' : 'Não foi possível carregar as opções de transcrição. O envio permanece bloqueado.'}</p>
             {providerError && <Button variant="outline" onClick={() => setProviderAttempt(value => value + 1)}>Tentar novamente</Button>}
           </div> : <div className="editorial-upload__choice-list">
-            {user && <button type="button" aria-label="Automático" aria-pressed={options.transcriptionModel === 'automatic'} disabled={uploading}
+            {user && <button type="button" aria-label="Automático" aria-describedby="automatic-transcription-description" aria-pressed={options.transcriptionModel === 'automatic'} disabled={uploading}
               onClick={() => chooseProcessing({ transcriptionModel: 'automatic', credentialSource: null })} className="editorial-upload__choice">
-              <span className="editorial-upload__choice-copy"><strong>Automático</strong><small>Segue sua configuração automática. Não seleciona a franquia do Beta.</small></span>
+              <span className="editorial-upload__choice-copy"><strong>Automático</strong><small id="automatic-transcription-description">Segue sua configuração automática. Não seleciona a franquia do Beta.</small></span>
             </button>}
 
             {(!user || providerSettings) && <button type="button" aria-label="Transcrição local" aria-pressed={options.transcriptionModel === 'whisper'} disabled={uploading || (user && !canUseWhisper)}
