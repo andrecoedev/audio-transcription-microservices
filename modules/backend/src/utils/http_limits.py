@@ -9,11 +9,28 @@ from starlette.concurrency import run_in_threadpool
 from ..config import settings
 from ..database import SessionLocal
 from ..models import User
-from ..security import decode_access_token
+from ..security import get_authenticated_user, get_optional_user
 from ..services.transcription_entitlements import has_development_local_access
 from ..services.upload_policy import upload_limit_mb
 
 logger = logging.getLogger(__name__)
+
+
+async def _authenticated_upload_limit(token):
+    db = SessionLocal()
+    try:
+        # Use the same verified identity as the endpoint, including Firebase.
+        principal = await get_optional_user(token=token, db=db)
+        principal = await get_authenticated_user(current_user=principal)
+
+        def current_upload_policy():
+            user = db.get(User, principal.user_id)
+            development = has_development_local_access(user)
+            return upload_limit_mb(principal.user_id, user.registration_source, development, db=db)
+
+        return await run_in_threadpool(current_upload_policy)
+    finally:
+        db.close()
 
 
 class BodyLimitedRoute(APIRoute):
@@ -31,31 +48,18 @@ class BodyLimitedRoute(APIRoute):
         if scope.get("method") == "POST":
             if path in {"/auth/signup", "/auth/login", "/guest/claim"}:
                 limit = 16 * 1024
-            public_upload = path == "/guest/transcriptions/jobs"
             upload_mb = settings.PUBLIC_MAX_UPLOAD_MB
             if path == "/transcriptions/jobs":
                 authorization = dict(scope.get("headers", [])).get(b"authorization", b"").decode("latin-1")
                 scheme, _, token = authorization.partition(" ")
-                principal = decode_access_token(token) if scheme.lower() == "bearer" else None
-                upload_mb = settings.PUBLIC_MAX_UPLOAD_MB
-                development_access = False
-                if principal and principal.user_id is not None:
-                    def current_upload_policy():
-                        db = SessionLocal()
-                        try:
-                            user = db.get(User, principal.user_id)
-                            development = has_development_local_access(user)
-                            return (development, upload_limit_mb(principal.user_id,
-                                user.registration_source if user else "public", development, db=db))
-                        finally:
-                            db.close()
+                if scheme.lower() == "bearer" and token:
                     try:
-                        development_access, upload_mb = await run_in_threadpool(current_upload_policy)
+                        upload_mb = await _authenticated_upload_limit(token)
+                    except HTTPException:
+                        raise
                     except Exception:
                         logger.warning("Upload policy lookup unavailable; upload denied")
                         raise HTTPException(503, "Não foi possível verificar o limite de envio. Tente novamente em alguns instantes.") from None
-                if development_access:
-                    upload_mb = settings.MAX_UPLOAD_SIZE_MB
             if path in {"/guest/transcriptions/jobs", "/transcriptions/jobs"}:
                 limit = upload_mb * 1024 * 1024 + 64 * 1024
         if limit is not None:

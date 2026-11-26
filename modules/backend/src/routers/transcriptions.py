@@ -33,17 +33,14 @@ logger = logging.getLogger(__name__)
 class UploadLimitedRoute(BodyLimitedRoute):
     """Enforce the IP upload budget before FastAPI parses multipart bodies."""
 
-    def get_route_handler(self):
-        original = super().get_route_handler()
-
-        async def limited(request: Request):
-            if request.method == "POST" and request.url.path == "/guest/transcriptions/jobs":
+    async def handle(self, scope, receive, send):
+        if scope.get("method") == "POST":
+            if scope.get("path") == "/guest/transcriptions/jobs":
                 require_guest_processing()  # Reject before Redis, parsing or spooling.
-            if request.method == "POST" and request.url.path == "/transcriptions/jobs":
-                enforce_rate_limit(request, "upload-ip")
-            return await original(request)
-
-        return limited
+            if scope.get("path") == "/transcriptions/jobs":
+                # Bound attempts before BodyLimitedRoute verifies the identity.
+                enforce_rate_limit(Request(scope), "upload-ip")
+        await super().handle(scope, receive, send)
 
 
 router = APIRouter(route_class=UploadLimitedRoute)

@@ -145,7 +145,34 @@ def test_development_grant_body_is_bounded_before_parsing(db_context):
     assert response.status_code == 413
 
 
-def test_streaming_size_and_multipart_limits(db_context, monkeypatch, wav_bytes):
+def firebase_headers(db_context, monkeypatch):
+    """Use real token validation/mapping with only the external SDK mocked."""
+    import time
+    from src.models import FirebaseIdentity
+    from src.services import firebase_identity
+    project = "synthetic-upload-project"
+    monkeypatch.setattr(settings, "FIREBASE_AUTH_ENABLED", True)
+    monkeypatch.setattr(settings, "FIREBASE_PROJECT_ID", project)
+    monkeypatch.delenv("FIREBASE_AUTH_EMULATOR_HOST", raising=False)
+    with db_context["session_factory"]() as db:
+        for user_id in (1, 2):
+            db.add(FirebaseIdentity(project_id=project, uid=f"upload-{user_id}", user_id=user_id))
+        db.commit()
+
+    def verified_claims(token):
+        user_id = int(token.removeprefix("synthetic-upload-"))
+        uid = f"upload-{user_id}"
+        return {"aud": project, "iss": f"https://securetoken.google.com/{project}",
+                "sub": uid, "uid": uid, "email": f"upload-{user_id}@example.test",
+                "email_verified": True, "auth_time": int(time.time()),
+                "firebase": {"sign_in_provider": "google.com"}}
+
+    monkeypatch.setattr(firebase_identity, "_verify_with_sdk", verified_claims)
+    return lambda user_id: {"Authorization": f"Bearer synthetic-upload-{user_id}"}
+
+
+@pytest.mark.parametrize("provider", ["local", "firebase"])
+def test_streaming_size_and_multipart_limits(db_context, monkeypatch, wav_bytes, provider):
     from src.utils import http_limits
     monkeypatch.setattr(settings, "PUBLIC_MAX_UPLOAD_MB", 1)
     monkeypatch.setattr(settings, "LARGE_UPLOAD_USER_IDS", [1])
@@ -156,20 +183,22 @@ def test_streaming_size_and_multipart_limits(db_context, monkeypatch, wav_bytes)
             db.get(User, user_id).registration_source = "public"
         db.commit()
     client = db_context["client"]
-    audio = wav_bytes + b"\0" * (1024 * 1024)
-    selected = client.post("/transcriptions/jobs", headers=public_headers(1),
+    headers = firebase_headers(db_context, monkeypatch) if provider == "firebase" else public_headers
+    audio = wav_bytes + b"\0" * (1200 * 1024)
+    selected = client.post("/transcriptions/jobs", headers=headers(1),
                            files={"file": ("sample.wav", audio)})
     assert selected.status_code == 202, selected.text
-    other = client.post("/transcriptions/jobs", headers=public_headers(2),
+    other = client.post("/transcriptions/jobs", headers=headers(2),
                         files={"file": ("sample.wav", audio)})
     assert other.status_code == 413
-    above_cap = client.post("/transcriptions/jobs", headers=public_headers(1),
+    above_cap = client.post("/transcriptions/jobs", headers=headers(1),
                             files={"file": ("sample.wav", audio * 2)})
     assert above_cap.status_code == 413
     assert len(db_context["queue"].enqueued) == 1
 
 
-def test_dev_account_upload_uses_db_flag_and_technical_limits(db_context, monkeypatch, wav_bytes):
+@pytest.mark.parametrize("provider", ["local", "firebase"])
+def test_dev_account_upload_uses_db_flag_and_technical_limits(db_context, monkeypatch, wav_bytes, provider):
     from types import SimpleNamespace
     from sqlalchemy.orm import Session
     from src.models import TranscriptionJob
@@ -191,8 +220,12 @@ def test_dev_account_upload_uses_db_flag_and_technical_limits(db_context, monkey
         user.registration_source = "public"
         user.development_local_access = True
         db.commit()
-    audio = wav_bytes + b"\0" * (1024 * 1024)
-    response = db_context["client"].post("/transcriptions/jobs", headers=public_headers(1),
+    audio = wav_bytes + b"\0" * (1200 * 1024)
+    headers = firebase_headers(db_context, monkeypatch) if provider == "firebase" else public_headers
+    policy = db_context["client"].get("/settings/providers", headers=headers(1))
+    assert policy.status_code == 200, policy.text
+    assert policy.json()["upload_policy"]["max_upload_mb"] == 2
+    response = db_context["client"].post("/transcriptions/jobs", headers=headers(1),
                                          files={"file": ("sample.wav", audio)})
     assert response.status_code == 202, response.text
     with db_context["session_factory"]() as db:
@@ -201,7 +234,8 @@ def test_dev_account_upload_uses_db_flag_and_technical_limits(db_context, monkey
         assert job_row.timeout_seconds is None
 
 
-def test_beta_upload_admission_and_duration_use_db_not_public_bootstrap(db_context, auth_headers, monkeypatch, wav_bytes):
+@pytest.mark.parametrize("provider", ["local", "firebase"])
+def test_beta_upload_admission_and_duration_use_db_not_public_bootstrap(db_context, auth_headers, monkeypatch, wav_bytes, provider):
     from src.models import PlatformProviderBudget, TranscriptionJob
     from src.services.beta_settings import update_policy
     from tests.platform_helpers import configure_platform, confirm_test_balance
@@ -218,7 +252,8 @@ def test_beta_upload_admission_and_duration_use_db_not_public_bootstrap(db_conte
             version=budget.configuration_version, confirmed=False, actor_user_id=1)
         db.commit()
     audio = wav_bytes + b"\0" * (1200 * 1024)
-    response = db_context["client"].post("/transcriptions/jobs", headers=auth_headers(),
+    headers = firebase_headers(db_context, monkeypatch)(1) if provider == "firebase" else auth_headers()
+    response = db_context["client"].post("/transcriptions/jobs", headers=headers,
         data={"transcription_model": "assemblyai", "credential_source": "platform"},
         files={"file": ("synthetic.wav", audio)})
     assert response.status_code == 202, response.text
@@ -236,3 +271,85 @@ def test_upload_policy_lookup_failure_rejects_before_queueing(db_context, auth_h
     assert response.status_code == 503
     assert len(db_context["queue"].enqueued) == 0
     assert "synthetic database outage" not in response.text
+
+
+@pytest.mark.parametrize("failure,status", [("invalid", 401), ("unavailable", 503),
+                                           ("inactive", 401), ("unlinked", 401)])
+def test_firebase_upload_rejects_unverified_or_inactive_identity_before_body(
+        db_context, monkeypatch, failure, status):
+    from fastapi import HTTPException
+    from src.models import FirebaseIdentity
+    from src.services import firebase_identity
+    headers = firebase_headers(db_context, monkeypatch)(1)
+    monkeypatch.setattr(settings, "PUBLIC_MAX_UPLOAD_MB", 1)
+    monkeypatch.setattr(settings, "LARGE_UPLOAD_USER_IDS", [1])
+    if failure in {"invalid", "unavailable"}:
+        def reject(_token):
+            raise HTTPException(status, "Synthetic identity rejection")
+        monkeypatch.setattr(firebase_identity, "_verify_with_sdk", reject)
+    else:
+        with db_context["session_factory"]() as db:
+            if failure == "inactive":
+                db.get(User, 1).is_active = False
+            else:
+                db.query(FirebaseIdentity).filter_by(user_id=1).delete()
+            db.commit()
+
+    def unread_body():
+        pytest.fail("Rejected identity must not consume the upload body")
+        yield b"unused"
+
+    response = db_context["client"].post("/transcriptions/jobs", headers={**headers,
+        "Content-Type": "multipart/form-data; boundary=test"}, content=unread_body())
+    assert response.status_code == status, response.text
+    assert not db_context["queue"].enqueued
+
+
+@pytest.mark.parametrize("valid", [False, True])
+def test_firebase_upload_ip_limit_runs_before_identity_verification(
+        db_context, monkeypatch, wav_bytes, valid):
+    from fastapi import HTTPException
+    from src.services import firebase_identity, rate_limit
+    from .conftest import FakeRedisConnection
+    headers = firebase_headers(db_context, monkeypatch)(1)
+    connection = FakeRedisConnection()
+    monkeypatch.setattr(rate_limit, "get_redis_connection", lambda: connection)
+    monkeypatch.setattr(settings, "UPLOAD_RATE_LIMIT_PER_IP", 1)
+    verify = firebase_identity._verify_with_sdk
+    calls = []
+
+    def observed_verify(token):
+        calls.append(token)
+        if not valid:
+            raise HTTPException(401, "Synthetic rejected token")
+        return verify(token)
+
+    monkeypatch.setattr(firebase_identity, "_verify_with_sdk", observed_verify)
+    client = db_context["client"]
+    first = client.post("/transcriptions/jobs", headers=headers,
+                        files={"file": ("sample.wav", wav_bytes)})
+    assert first.status_code == (202 if valid else 401), first.text
+    verified_before = len(calls)
+    assert verified_before > 0
+    second = client.post("/transcriptions/jobs", headers=headers,
+                         files={"file": ("sample.wav", wav_bytes)})
+    assert second.status_code == 429, second.text
+    assert len(calls) == verified_before
+    assert len(db_context["queue"].enqueued) == int(valid)
+
+
+def test_firebase_upload_redis_failure_prevents_verification(db_context, monkeypatch):
+    from src.services import firebase_identity, rate_limit
+    headers = firebase_headers(db_context, monkeypatch)(1)
+
+    def unavailable():
+        raise RuntimeError("Synthetic Redis outage")
+
+    def unexpected_verify(_token):
+        pytest.fail("Unavailable rate limiting must prevent Firebase calls")
+
+    monkeypatch.setattr(rate_limit, "get_redis_connection", unavailable)
+    monkeypatch.setattr(firebase_identity, "_verify_with_sdk", unexpected_verify)
+    response = db_context["client"].post("/transcriptions/jobs", headers=headers)
+    assert response.status_code == 503, response.text
+    assert not db_context["queue"].enqueued
